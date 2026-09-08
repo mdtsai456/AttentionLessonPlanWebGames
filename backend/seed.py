@@ -28,7 +28,9 @@ load_dotenv()
 SEED = 20260710
 SCHEMA_PATH = pathlib.Path(__file__).parent / "tests" / "schema.sql"
 
-SCHOOLS = ["陽光國小", "西門國小", "民富國小"]
+# 用 seed_directory.py 的佔位場域代碼的前三個,讓「老師→學生→報告」的驗收流程
+# 走得通(老師掛在這些場域上)。場域字串定案後兩支腳本一起改。
+SCHOOLS = ["KMU", "NTHU-01", "NTHU-02"]
 STUDENTS = [("G1", "S01"), ("G1", "S02"), ("G1", "S03"),
             ("G2", "S04"), ("G2", "S05"), ("G2", "S06")]
 
