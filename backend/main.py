@@ -1,10 +1,9 @@
 """學生遊戲場次與總覽報告 API。
 
 啟動方式：
-    cp .env.example .env   # 填入 DB_PASSWORD
-    "$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv
-    .venv/bin/pip install -r requirements.txt
-    .venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 5001
+    cp .env.example .env   # 填入 DB_PASSWORD / DB_WRITE_PASSWORD
+    uv sync --group dev
+    uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 端點：
     POST /api/sessions

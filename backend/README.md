@@ -17,16 +17,23 @@
 
 ## 開發
 
-**需要 Python 3.10 以上。** 程式碼使用 `X | None` 型別註記，Pydantic 在 3.9 上無法解析它。macOS 內建的 `/usr/bin/python3` 是 3.9。
+**需要 Python 3.10 以上。** 程式碼使用 `X | None` 型別註記，Pydantic 在 3.9 上無法解析它。
+
+環境以 [`uv`](https://docs.astral.sh/uv/) 管理，版本鎖在 `uv.lock`（進版控，CI 與本機一致）。
 
 ```bash
-cp .env.example .env        # 填入 DB_PASSWORD 與 TEST_DB_NAME
-"$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv
-.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-.venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 5001
+# 安裝 uv（見官方文件；或 pipx install uv）
+cp .env.example .env        # 填入 DB_PASSWORD / DB_WRITE_PASSWORD / TEST_DB_NAME
+uv sync --group dev         # 依 uv.lock 建 .venv 並裝好相依套件
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 ```
 
-互動式文件在 <http://127.0.0.1:5001/docs>。
+Windows PowerShell 相同，指令逐字照打即可。互動式文件在
+<http://127.0.0.1:5001/docs>。
+
+`requirements.txt` / `requirements-dev.txt` 是 `uv export` 的產物，僅供不吃
+`pyproject.toml` 的部署流程（如現行 Zeabur）使用，**不要手改**；改相依請改
+`pyproject.toml` 後 `uv lock` 再重新 export。
 
 ## 測試
 
@@ -34,7 +41,7 @@ cp .env.example .env        # 填入 DB_PASSWORD 與 TEST_DB_NAME
 其他資料庫上執行，以免清空正式資料。
 
 ```bash
-.venv/bin/python -m pytest tests/ -v
+uv run pytest -q
 ```
 
 **不要並行執行測試。** 所有測試共用同一個測試資料庫，每個測試前後都會清空它。
@@ -49,13 +56,13 @@ cp .env.example .env        # 填入 DB_PASSWORD 與 TEST_DB_NAME
 [`docs/superpowers/plans/2026-07-10-seed-mock-data.md`](docs/superpowers/plans/2026-07-10-seed-mock-data.md)。
 
 ```bash
-.venv/bin/python seed.py          # 預設 → 灌 TEST_DB_NAME 的 _test 庫（需名字結尾 _test）
+uv run python seed.py          # 預設 → 灌 TEST_DB_NAME 的 _test 庫（需名字結尾 _test）
 ```
 
 `--prod` 才會改灌正式庫（先清空再灌），且正式庫走 root 閘門（`seeder` 帳號無正式庫權限）：
 
 ```bash
-DB_USER=root DB_PASSWORD='<root密碼>' .venv/bin/python seed.py --prod
+DB_USER=root DB_PASSWORD='<root密碼>' uv run python seed.py --prod
 ```
 
 **注意：一旦正式庫存有真實受試者資料，`--prod`（先清空再灌）會刪掉真資料，應停用。**
