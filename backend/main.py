@@ -13,6 +13,7 @@
     GET /api/schools
     GET /api/schools/{school}/teachers
     GET /api/teachers/{teacherId}/students
+    GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端）
 
 CORS：瀏覽器前端跨網域呼叫需要放行其 origin。用環境變數 CORS_ALLOW_ORIGINS
 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時預設放行常見的本機
@@ -23,15 +24,19 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from db import validate_db_settings
 from routers import directory, sessions, students
 
 load_dotenv()
+
+_DEMO_HTML = Path(__file__).parent / "demo" / "index.html"
 
 # 未設定 CORS_ALLOW_ORIGINS 時放行的本機前端 dev server。
 _DEFAULT_DEV_ORIGINS = [
@@ -93,6 +98,18 @@ def root() -> dict[str, str]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/demo", response_class=HTMLResponse, include_in_schema=False)
+def demo() -> str:
+    """開發／驗收用的簡易檢視畫面。
+
+    讀取同源的 /api/*（不會有 CORS 問題），把「選場域→選老師／學生→看報告」的
+    流程畫出來給人看。**這不是正式前端**（正式前端由另一位組員負責）。
+    """
+    if not _DEMO_HTML.exists():
+        return "<h1>demo/index.html 不存在</h1>"
+    return _DEMO_HTML.read_text(encoding="utf-8")
 
 
 if __name__ == "__main__":

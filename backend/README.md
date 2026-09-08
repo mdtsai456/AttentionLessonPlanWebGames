@@ -14,6 +14,7 @@
 | GET | `/api/schools` | 場域清單（第一層下拉）。永遠回 200 |
 | GET | `/api/schools/{school}/teachers` | 某場域的老師清單。未知場域回 200 + 空陣列 |
 | GET | `/api/teachers/{teacherId}/students` | 某老師名下（＝該場域全部）學生概況。未知 `teacherId` 回 404 |
+| GET | `/demo` | 開發／驗收用的簡易檢視畫面（非正式前端，原始碼 `demo/index.html`） |
 
 `studentKey` 的格式是 `grade_caseId`，例如 `G1_S03`。學生的唯一鍵是
 `(grade, case_id, school)` —— 不同場域的 `G1_S03` 是不同的學生。
