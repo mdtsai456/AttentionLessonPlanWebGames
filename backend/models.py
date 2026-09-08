@@ -84,3 +84,33 @@ class StudentListResponse(BaseModel):
     school: str | None = None  # 回顯查詢參數；未指定時為 None
     studentCount: int
     students: list[StudentListItem] = Field(default_factory=list)
+
+
+# --- 參照資料：場域／老師名錄（選單式登入） ---
+
+
+class SchoolItem(BaseModel):
+    school: str  # 場域識別字串，等同 student.school；前端後續呼叫要原樣帶回
+    displayName: str  # 下拉顯示文字，可與 school 相同
+
+
+class SchoolListResponse(BaseModel):
+    schools: list[SchoolItem] = Field(default_factory=list)
+
+
+class TeacherItem(BaseModel):
+    teacherId: int
+    name: str
+
+
+class TeacherListResponse(BaseModel):
+    school: str  # 回顯路徑參數
+    teachers: list[TeacherItem] = Field(default_factory=list)
+
+
+class TeacherStudentsResponse(BaseModel):
+    teacherId: int
+    teacherName: str
+    school: str
+    studentCount: int  # 等同 students 長度，Python 端計算
+    students: list[StudentListItem] = Field(default_factory=list)

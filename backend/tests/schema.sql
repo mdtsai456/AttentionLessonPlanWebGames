@@ -145,3 +145,21 @@ CREATE TABLE IF NOT EXISTS `tgame_result` (
     REFERENCES `assessment_result` (`grade`, `case_id`, `school`, `uuid`)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 參照資料：場域清單與老師名錄。school 必須在 teacher 之前（外鍵）。
+CREATE TABLE IF NOT EXISTS `school` (
+  `school` varchar(100) NOT NULL,        -- 與 student.school 完全相同的字串
+  `display_name` varchar(100) NOT NULL,  -- 前端下拉顯示用
+  `sort_order` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`school`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `teacher` (
+  `teacher_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) NOT NULL,
+  `school` varchar(100) NOT NULL,
+  PRIMARY KEY (`teacher_id`),
+  UNIQUE KEY `uq_teacher_school_name` (`school`, `name`),
+  CONSTRAINT `fk_teacher_school` FOREIGN KEY (`school`)
+    REFERENCES `school` (`school`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

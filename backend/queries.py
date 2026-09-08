@@ -149,3 +149,47 @@ def fetch_students(school: str | None = None) -> list[dict[str, Any]]:
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
             return list(cursor.fetchall())
+
+
+# --- 參照資料：場域與老師名錄（見 teacher-directory-login-design） ---
+
+
+def fetch_schools() -> list[dict[str, Any]]:
+    """場域清單，依 sort_order、再依 school 排序。"""
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT school, display_name, sort_order
+                FROM school
+                ORDER BY sort_order, school
+                """
+            )
+            return list(cursor.fetchall())
+
+
+def fetch_teachers(school: str) -> list[dict[str, Any]]:
+    """某場域的老師清單，依 teacher_id（建立順序）排序。"""
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT teacher_id, name
+                FROM teacher
+                WHERE school = %s
+                ORDER BY teacher_id
+                """,
+                [school],
+            )
+            return list(cursor.fetchall())
+
+
+def fetch_teacher(teacher_id: int) -> dict[str, Any] | None:
+    """查單一老師。None 表示查無此老師（router 轉 404）。"""
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT teacher_id, name, school FROM teacher WHERE teacher_id = %s",
+                [teacher_id],
+            )
+            return cursor.fetchone()

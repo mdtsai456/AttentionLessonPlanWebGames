@@ -11,6 +11,9 @@
 | GET | `/api/students` | 學生名單與總數。`?school=` 選填，不給則回傳所有場域 |
 | GET | `/api/students/{studentKey}/sessions` | 單一學生的場次清單。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
 | GET | `/api/students/{studentKey}/report` | 單一學生的場次明細與各遊戲彙總。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
+| GET | `/api/schools` | 場域清單（第一層下拉）。永遠回 200 |
+| GET | `/api/schools/{school}/teachers` | 某場域的老師清單。未知場域回 200 + 空陣列 |
+| GET | `/api/teachers/{teacherId}/students` | 某老師名下（＝該場域全部）學生概況。未知 `teacherId` 回 404 |
 
 `studentKey` 的格式是 `grade_caseId`，例如 `G1_S03`。學生的唯一鍵是
 `(grade, case_id, school)` —— 不同場域的 `G1_S03` 是不同的學生。
@@ -22,6 +25,21 @@ DAT／DCCS／EFT 有「單人版」與「雙人版」（一台裝置兩個小孩
 （由 Unity 產生，後端只存）。`/report` 與 `/sessions` 每筆回應帶 `mode`；
 `summaryByGame`／`trends` 依 `(gameType, mode)` 分組（`single` 排在 `double` 前）。
 設計見 [`docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md`](docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md)。
+
+### 選單式登入 / 參照資料
+
+「登入」＝下拉選人，無帳號密碼、無驗證（廠商定調）。`school`、`teacher` 兩張
+表是**由人工維護、量少、變動極慢**的參照資料，用 `seed_directory.py` 冪等灌注
+（不像 `seed.py` 是「先清空再灌的假成績」）：
+
+```bash
+uv run python seed_directory.py          # → TEST_DB_NAME 的 _test 庫
+DB_USER=root DB_PASSWORD='<root密碼>' uv run python seed_directory.py --prod
+```
+
+8 個場域字串（`school` 表主鍵）目前是**佔位代碼**（`KMU`、`NTHU-01`…），待廠商
+確認正式字串後只改 `seed_directory.py` 的常數、重跑即可。設計見
+[`docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md`](docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md)。
 
 ## 開發
 
@@ -108,4 +126,6 @@ DB_USER=root DB_PASSWORD='<root密碼>' uv run python seed.py --prod
 | `writes.py` | 以單一 transaction 建立學生、場次與遊戲結果 |
 | `routers/sessions.py` | 接收 Unity GameData 的 `/api/sessions` 路由 |
 | `routers/students.py` | `/api/students` 路由與組裝邏輯 |
+| `routers/directory.py` | `/api/schools`、`/api/teachers/...` 場域／老師名錄路由 |
 | `seed.py` | 灌假資料到 `_test`（`--prod` 才碰正式庫）。獨立 dev 工具 |
+| `seed_directory.py` | 冪等灌注 `school`／`teacher` 參照資料。獨立工具 |

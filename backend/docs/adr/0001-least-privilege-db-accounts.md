@@ -42,3 +42,9 @@ root 手動執行。理由:`seeder` 是每天跑測試、且會被編進測試�
   `assessment_result` 與五張遊戲結果表授予 `INSERT`。GET 與 POST 在 app 內使用
   獨立 read/write connections；`app_ro`/`seeder` 權限不變。
 - 真資料進正式庫後,`seed.py --prod`(wipe-and-fill)應退役或加閘門。
+- 場域／老師名錄功能新增 `school`、`teacher` 兩張表後，`app_ro` 需要對它們的
+  `SELECT`（由 root 執行；待場域字串定案、正式庫建表後補上）：
+  `GRANT SELECT ON AttentionLessonPlan.school TO 'app_ro'@'%';`
+  `GRANT SELECT ON AttentionLessonPlan.teacher TO 'app_ro'@'%';`
+  `seeder` 是 `_test` 庫級授權，已涵蓋這兩張新表，不需額外處理。
+  `seed_directory.py --prod` 灌參照資料時走 root（不是 `seeder`，`seeder` 無正式庫權限）。

@@ -27,6 +27,8 @@ TABLES_CHILD_FIRST = (
     "tgame_result",
     "assessment_result",
     "student",
+    "teacher",  # 參照資料：teacher 掛在 school 底下，先刪 teacher
+    "school",
 )
 
 
@@ -158,6 +160,26 @@ class DbHelper:
             "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
             [grade, case_id, school],
         )
+
+    def insert_school(
+        self, school: str, display_name: str | None = None, sort_order: int = 0
+    ) -> None:
+        self.execute(
+            "INSERT INTO school (school, display_name, sort_order) VALUES (%s, %s, %s)",
+            [school, display_name if display_name is not None else school, sort_order],
+        )
+
+    def insert_teacher(self, name: str, school: str) -> int:
+        from db import get_connection
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO teacher (name, school) VALUES (%s, %s)", [name, school]
+                )
+                teacher_id = cursor.lastrowid
+            connection.commit()
+        return teacher_id
 
     def insert_session(
         self,
