@@ -169,12 +169,15 @@ class DbHelper:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         current_day: int = 1,
+        mode: str = "single",
+        pair_id: str | None = None,
     ) -> None:
         self.execute(
             """
             INSERT INTO assessment_result
-                (grade, case_id, school, uuid, start_time, game_type, current_day, end_time)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (grade, case_id, school, uuid, start_time, game_type,
+                 mode, pair_id, current_day, end_time)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             [
                 grade,
@@ -183,6 +186,8 @@ class DbHelper:
                 uuid,
                 start_time or datetime(2026, 7, 1, 9, 0, 0),
                 game_type,
+                mode,
+                pair_id,
                 current_day,
                 end_time,
             ],

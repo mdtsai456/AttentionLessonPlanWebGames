@@ -8,6 +8,8 @@
 - **School(場域)** — 學生所屬的施測場域,是學生身分的一部分,不只是屬性。
 - **Session(場次)** — 一位學生某天玩某一個遊戲的一次紀錄,對應 `assessment_result` 一列,唯一鍵 `(grade, case_id, school, uuid)`。帶 `start_time`、`end_time`、`current_day`、`game_type`。
 - **game_type(遊戲類型)** — 一場 Session 玩的是哪一個遊戲,取值為以下五種之一。
+- **mode(模式)** — 一場 Session 是 `single`(單人版)或 `double`(雙人版)。存在 `assessment_result.mode`,預設 `single`;既有所有資料視為 `single`。只有 DAT/DCCS/EFT 有雙人版。
+- **pair(雙人局)** — 一台裝置上兩個小孩一起玩的一場雙人遊戲,產生**兩筆** Session(各一位學生),兩筆共用同一個 **`pair_id`**(UUID 字串,由 Unity 開局時產生,後端只存不生;`single` 時為 `NULL`)。
 - **五款遊戲** — 每一款在專屬明細表有一列,以 `(grade, case_id, school, uuid)` 外鍵掛在 Session 底下:
   - **DCCS** → `dccs_result`
   - **DAT** → `dat_result`

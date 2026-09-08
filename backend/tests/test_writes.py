@@ -47,6 +47,8 @@ def test_insert_session_with_stats_returns_retrievable_session(db):
         {
             "uuid": session_id,
             "game_type": "DCCS",
+            "mode": "single",
+            "pair_id": None,
             "current_day": 1,
             "start_time": START,
             "end_time": END,
@@ -73,6 +75,38 @@ def test_insert_session_with_stats_routes_each_game_to_its_result_table(
     rows = queries.fetch_assessment_rows("G1", "S03", "測試場域")
     assert rows[0]["game_type"] == game_type
     assert queries.fetch_stats_for_rows(rows)[session_id]["stage"] == 5
+
+
+def test_insert_session_with_stats_stores_mode_and_pair_id(db):
+    session_id = writes.insert_session_with_stats(
+        "G1",
+        "S03",
+        "測試場域",
+        START,
+        "DAT",
+        1,
+        END,
+        STATS,
+        mode="double",
+        pair_id="6f1c8e2a-3b7d-4e11-9a52-0c9d7f2b1e44",
+    )
+
+    row = db.query(
+        "SELECT mode, pair_id FROM assessment_result WHERE uuid = %s", [session_id]
+    )
+    assert row == [
+        {"mode": "double", "pair_id": "6f1c8e2a-3b7d-4e11-9a52-0c9d7f2b1e44"}
+    ]
+
+
+def test_insert_session_with_stats_defaults_to_single_mode(db):
+    session_id = writes.insert_session_with_stats(
+        "G1", "S03", "測試場域", START, "DCCS", 1, END, STATS
+    )
+
+    assert db.query(
+        "SELECT mode, pair_id FROM assessment_result WHERE uuid = %s", [session_id]
+    ) == [{"mode": "single", "pair_id": None}]
 
 
 def test_insert_session_with_stats_writes_missing_core_value_as_null(db):

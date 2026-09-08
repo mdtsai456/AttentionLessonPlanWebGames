@@ -30,10 +30,15 @@ def fetch_assessment_rows(
     case_id: str,
     school: str,
     game_type: str | None = None,
+    mode: str | None = None,
 ) -> list[dict[str, Any]]:
-    """查場次索引表 assessment_result。"""
+    """查場次索引表 assessment_result。
+
+    SELECT 也帶出 mode / pair_id。pair_id 目前組裝時不外露，但取出成本為零，
+    留著給日後「雙人局搭檔對照」用。
+    """
     sql = """
-        SELECT uuid, game_type, current_day, start_time, end_time
+        SELECT uuid, game_type, mode, pair_id, current_day, start_time, end_time
         FROM assessment_result
         WHERE grade = %s AND case_id = %s AND school = %s
     """
@@ -42,6 +47,10 @@ def fetch_assessment_rows(
     if game_type is not None:
         sql += " AND game_type = %s"
         params.append(game_type)
+
+    if mode is not None:
+        sql += " AND mode = %s"
+        params.append(mode)
 
     sql += " ORDER BY start_time DESC"
 

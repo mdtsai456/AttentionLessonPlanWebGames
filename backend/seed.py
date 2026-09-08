@@ -34,6 +34,11 @@ STUDENTS = [("G1", "S01"), ("G1", "S02"), ("G1", "S03"),
 
 # 每日固定順序;game_type 必須精確對上 queries.GAME_RESULT_TABLES 的鍵(TGAME 全大寫)。
 GAMES = ["DCCS", "DAT", "EFT", "IM", "TGAME"]
+
+# 廠商只做這三款的雙人版。這些遊戲在下列 day_in_round 額外多灌一場 mode='double',
+# 讓報告頁「單/雙人並陳」的畫面有東西可畫(每 Round 3 場雙人)。
+DOUBLE_GAMES = {"DCCS", "DAT", "EFT"}
+DOUBLE_DAYS_IN_ROUND = {2, 6, 9}  # 0..11
 GAME_TABLE = {
     "DCCS": "dccs_result",
     "DAT": "dat_result",
@@ -97,9 +102,18 @@ def session_accuracy(rng: random.Random, round_label: str, day_in_round: int,
     return min(0.99, max(0.02, mean + drift + noise))
 
 
-def make_uuid(school: str, grade: str, case_id: str, game: str, current_day: int) -> str:
+def make_uuid(school: str, grade: str, case_id: str, game: str, current_day: int,
+              mode: str = "single") -> str:
     """確定性 uuid(uuid5,同輸入永遠同輸出),36 字元,符合 varchar(36)。"""
     key = f"{school}|{grade}|{case_id}|{game}|{current_day}"
+    if mode == "double":
+        key += "|double"
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, key))
+
+
+def make_pair_id(school: str, grade: str, case_id: str, game: str, current_day: int) -> str:
+    """雙人局識別碼。假資料裡一場雙人局只有這位學生一筆,pair_id 仍給確定性值。"""
+    key = f"{school}|{grade}|{case_id}|{game}|{current_day}|double"
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, key))
 
 
@@ -118,11 +132,12 @@ def generate() -> tuple[list, list, dict[str, list]]:
             trajectory = {game: make_trajectory(rng) for game in GAMES}
 
             for day in play_days:
-                clock = datetime(day["date"].year, day["date"].month, day["date"].day,
-                                 DAILY_START[0], DAILY_START[1])
-                for game in GAMES:
+                def emit(game: str, mode: str, clock: datetime, acc_bonus: float) -> datetime:
                     a0, b_mean = trajectory[game]
-                    acc = session_accuracy(rng, day["round"], day["day_in_round"], a0, b_mean)
+                    acc = session_accuracy(
+                        rng, day["round"], day["day_in_round"], a0, b_mean
+                    )
+                    acc = min(0.99, acc + acc_bonus)
 
                     stage = rng.randint(15, 40)
                     correct = max(0, min(stage, round(acc * stage)))
@@ -132,20 +147,40 @@ def generate() -> tuple[list, list, dict[str, list]]:
 
                     start_dt = clock
                     end_dt = start_dt + timedelta(milliseconds=duration_ms)
-                    game_uuid = make_uuid(school, grade, case_id, game, day["current_day"])
+                    game_uuid = make_uuid(
+                        school, grade, case_id, game, day["current_day"], mode
+                    )
+                    pair_id = (
+                        make_pair_id(school, grade, case_id, game, day["current_day"])
+                        if mode == "double"
+                        else None
+                    )
 
                     session_rows.append((
                         grade, case_id, school, game_uuid,
-                        start_dt, game, day["current_day"], end_dt,
+                        start_dt, game, mode, pair_id, day["current_day"], end_dt,
                     ))
                     # 只填核心 5 欄;其餘遊戲專屬欄位留 NULL。
                     detail_rows[GAME_TABLE[game]].append((
                         grade, case_id, school, game_uuid,
                         correct, wrong, accuracy, duration_ms, stage,
                     ))
+                    return end_dt + timedelta(minutes=rng.uniform(0, 2))  # 小空檔
 
-                    gap = timedelta(minutes=rng.uniform(0, 2))  # 款與款之間小空檔
-                    clock = end_dt + gap
+                # 上午 12:00:5 款單人版一款接一款(整套約 30 分鐘)。
+                clock = datetime(day["date"].year, day["date"].month, day["date"].day,
+                                 DAILY_START[0], DAILY_START[1])
+                for game in GAMES:
+                    clock = emit(game, "single", clock, 0.0)
+
+                # 下午另一時段:DAT/DCCS/EFT 在特定施測日多一場雙人版。
+                # 雙人版通常較簡單 → accuracy 略高,讓圖上看得出單/雙人差異。
+                if day["day_in_round"] in DOUBLE_DAYS_IN_ROUND:
+                    clock = datetime(day["date"].year, day["date"].month,
+                                     day["date"].day, 14, 0)
+                    for game in GAMES:
+                        if game in DOUBLE_GAMES:
+                            clock = emit(game, "double", clock, 0.08)
 
     return student_rows, session_rows, detail_rows
 
@@ -209,8 +244,9 @@ def main() -> None:
             cursor.executemany(
                 """
                 INSERT INTO assessment_result
-                    (grade, case_id, school, uuid, start_time, game_type, current_day, end_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (grade, case_id, school, uuid, start_time, game_type,
+                     mode, pair_id, current_day, end_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 session_rows,
             )

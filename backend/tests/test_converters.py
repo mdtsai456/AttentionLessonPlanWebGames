@@ -11,6 +11,7 @@ from converters import (
     format_optional_datetime,
     normalize_game_type_for_db,
     normalize_game_type_from_db,
+    normalize_mode_for_db,
     normalize_school,
     to_float,
     to_int,
@@ -95,3 +96,19 @@ def test_format_optional_datetime_formats_like_format_datetime():
 )
 def test_normalize_school(given, expected):
     assert normalize_school(given) == expected
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        (None, None),
+        ("", None),
+        ("   ", None),
+        ("Single", "single"),
+        ("DOUBLE", "double"),
+        ("  double  ", "double"),
+        ("foo", "foo"),  # 打錯的值原樣傳回，讓 SQL 查空、不報錯
+    ],
+)
+def test_normalize_mode_for_db(given, expected):
+    assert normalize_mode_for_db(given) == expected

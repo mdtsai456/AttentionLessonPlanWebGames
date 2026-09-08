@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class SessionItem(BaseModel):
     sessionId: str
     gameType: str
+    mode: str  # "single" | "double"；取自 assessment_result.mode
     currentDay: int
     startTime: str
     endTime: str
@@ -35,6 +36,7 @@ class PlayRecord(SessionItem):
 
 class GameSummary(BaseModel):
     gameType: str
+    mode: str  # 該彙總列的模式；(gameType, mode) 為分組鍵
     sessionCount: int
     totalCorrect: int
     totalWrong: int
@@ -54,6 +56,7 @@ class TrendItem(BaseModel):
 
 class GameTrend(BaseModel):
     gameType: str
+    mode: str  # 該趨勢群的模式
     items: list[TrendItem] = Field(default_factory=list)
 
 

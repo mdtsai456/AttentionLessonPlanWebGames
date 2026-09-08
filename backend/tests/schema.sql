@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS `assessment_result` (
   `uuid` varchar(36) NOT NULL,
   `start_time` datetime NOT NULL,
   `game_type` varchar(20) NOT NULL,
+  `mode` enum('single','double') NOT NULL DEFAULT 'single',
+  `pair_id` varchar(36) DEFAULT NULL,
   `current_day` int(11) NOT NULL,
   `end_time` datetime DEFAULT NULL,
   PRIMARY KEY (`grade`,`case_id`,`school`,`uuid`),

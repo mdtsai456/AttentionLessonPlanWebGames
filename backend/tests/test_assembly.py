@@ -17,10 +17,14 @@ from routers.students import (
 )
 
 
-def _assessment_row(uuid: str = "u1", game_type: str = "DCCS") -> dict:
+def _assessment_row(
+    uuid: str = "u1", game_type: str = "DCCS", mode: str = "single"
+) -> dict:
     return {
         "uuid": uuid,
         "game_type": game_type,
+        "mode": mode,
+        "pair_id": None,
         "current_day": 1,
         "start_time": datetime(2026, 7, 1, 9, 0, 0),
         "end_time": datetime(2026, 7, 1, 9, 30, 0),
@@ -59,6 +63,10 @@ def test_session_fields_from_row_normalizes_tgame():
     assert fields["gameType"] == "TGame"
     assert fields["startTime"] == "2026-07-01 09:00:00"
     assert fields["endTime"] == "2026-07-01 09:30:00"
+
+
+def test_session_fields_from_row_carries_mode():
+    assert session_fields_from_row(_assessment_row(mode="double"))["mode"] == "double"
 
 
 def test_session_fields_from_row_of_unfinished_session_has_empty_end_time():
@@ -143,6 +151,31 @@ def test_build_summary_by_game_sorts_by_game_type():
     summaries = build_summary_by_game(records)
 
     assert [s.gameType for s in summaries] == ["DCCS", "TGame"]
+
+
+def test_build_summary_by_game_splits_single_and_double_of_same_game():
+    """同一遊戲的 single 與 double 記錄 → 兩列，各自加總，single 在前。"""
+    records = build_play_records(
+        [
+            _assessment_row("u1", "DAT", mode="single"),
+            _assessment_row("u2", "DAT", mode="single"),
+            _assessment_row("u3", "DAT", mode="double"),
+        ],
+        {
+            "u1": _stats_row("u1", correct=5),
+            "u2": _stats_row("u2", correct=7),
+            "u3": _stats_row("u3", correct=9),
+        },
+    )
+
+    summaries = build_summary_by_game(records)
+
+    assert [(s.gameType, s.mode, s.sessionCount) for s in summaries] == [
+        ("DAT", "single", 2),
+        ("DAT", "double", 1),
+    ]
+    assert summaries[0].totalCorrect == 12
+    assert summaries[1].totalCorrect == 9
 
 
 def test_build_student_list_items_composes_student_key():
@@ -266,3 +299,23 @@ def test_build_trends_of_records_all_without_stats_is_empty():
     records = build_play_records([_assessment_row()], {})
 
     assert build_trends(records) == []
+
+
+def test_build_trends_splits_same_game_by_mode():
+    """同 gameType 的 single / double → 兩個趨勢群，各群只含該模式的點。"""
+    records = build_play_records(
+        [
+            _assessment_row("s1", "DAT", mode="single"),
+            _assessment_row("d1", "DAT", mode="double"),
+        ],
+        {"s1": _stats_row("s1", correct=3), "d1": _stats_row("d1", correct=9)},
+    )
+
+    trends = build_trends(records)
+
+    assert [(t.gameType, t.mode) for t in trends] == [
+        ("DAT", "single"),
+        ("DAT", "double"),
+    ]
+    single_correct = trends[0].items[0]
+    assert [p.value for p in single_correct.stats] == [3]

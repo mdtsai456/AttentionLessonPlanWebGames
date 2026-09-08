@@ -42,6 +42,45 @@ def test_fetch_assessment_rows_orders_by_start_time_descending(db):
     assert [row["uuid"] for row in rows] == ["new", "old"]
 
 
+def test_fetch_assessment_rows_selects_mode_and_pair_id(db):
+    db.insert_student("G1", "S03", "測試場域")
+    db.insert_session(
+        "G1", "S03", "測試場域", uuid="u1", game_type="DAT",
+        mode="double", pair_id="pair-1",
+    )
+
+    rows = queries.fetch_assessment_rows("G1", "S03", "測試場域")
+
+    assert rows[0]["mode"] == "double"
+    assert rows[0]["pair_id"] == "pair-1"
+
+
+def test_fetch_assessment_rows_filters_by_mode(db):
+    db.insert_student("G1", "S03", "測試場域")
+    db.insert_session("G1", "S03", "測試場域", uuid="s1", game_type="DAT", mode="single")
+    db.insert_session(
+        "G1", "S03", "測試場域", uuid="d1", game_type="DAT",
+        mode="double", pair_id="p1",
+    )
+
+    rows = queries.fetch_assessment_rows("G1", "S03", "測試場域", mode="double")
+
+    assert [row["uuid"] for row in rows] == ["d1"]
+
+
+def test_fetch_assessment_rows_combines_game_type_and_mode_filters(db):
+    db.insert_student("G1", "S03", "測試場域")
+    db.insert_session("G1", "S03", "測試場域", uuid="dat_s", game_type="DAT", mode="single")
+    db.insert_session("G1", "S03", "測試場域", uuid="dat_d", game_type="DAT", mode="double")
+    db.insert_session("G1", "S03", "測試場域", uuid="dccs_s", game_type="DCCS", mode="single")
+
+    rows = queries.fetch_assessment_rows(
+        "G1", "S03", "測試場域", game_type="DAT", mode="single"
+    )
+
+    assert [row["uuid"] for row in rows] == ["dat_s"]
+
+
 def test_fetch_stats_for_rows_groups_by_game_type_across_tables(db):
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session("G1", "S03", "測試場域", uuid="u1", game_type="DCCS")

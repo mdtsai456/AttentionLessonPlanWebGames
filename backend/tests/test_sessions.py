@@ -150,8 +150,110 @@ def test_post_session_applies_reference_conversion_rules(write_calls):
                 "duration": -1.0,
                 "stage": 5,
             },
+            "mode": "single",
+            "pair_id": None,
         }
     ]
+
+
+def _dat_double_payload(pair_id: str | None = "6f1c8e2a-3b7d-4e11-9a52-0c9d7f2b1e44") -> dict:
+    payload = dccs_payload()
+    payload["lessonId"] = "lesson25_DAT"
+    for stat in payload["data"]["stats"]:
+        stat["apiname"] = stat["apiname"].replace("DCCS_", "DAT_")
+    payload["data"]["mode"] = "double"
+    if pair_id is None:
+        payload["data"].pop("pairId", None)
+    else:
+        payload["data"]["pairId"] = pair_id
+    return payload
+
+
+def test_post_session_double_mode_passes_mode_and_pair_id_to_writer(write_calls):
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=_dat_double_payload())
+
+    assert response.status_code == 201
+    assert write_calls[0]["mode"] == "double"
+    assert write_calls[0]["pair_id"] == "6f1c8e2a-3b7d-4e11-9a52-0c9d7f2b1e44"
+
+
+def test_post_session_without_mode_defaults_to_single(write_calls):
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=dccs_payload())
+
+    assert response.status_code == 201
+    assert write_calls[0]["mode"] == "single"
+    assert write_calls[0]["pair_id"] is None
+
+
+def test_post_session_double_mode_rejects_non_capable_game(write_calls):
+    payload = dccs_payload()
+    payload["lessonId"] = "lesson25_TGame"
+    for stat in payload["data"]["stats"]:
+        stat["apiname"] = stat["apiname"].replace("DCCS_", "TGame_")
+    payload["data"]["mode"] = "double"
+    payload["data"]["pairId"] = "p1"
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 400
+    assert "雙人版僅支援" in response.json()["detail"]
+    assert write_calls == []
+
+
+def test_post_session_double_mode_without_pair_id_is_accepted(write_calls):
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=_dat_double_payload(pair_id=None))
+
+    assert response.status_code == 201
+    assert write_calls[0]["mode"] == "double"
+    assert write_calls[0]["pair_id"] is None
+
+
+def test_post_session_single_mode_ignores_stray_pair_id(write_calls):
+    payload = dccs_payload()
+    payload["data"]["pairId"] = "should-be-ignored"
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 201
+    assert write_calls[0]["pair_id"] is None
+
+
+def test_post_session_rejects_overlong_pair_id(write_calls):
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/sessions", json=_dat_double_payload(pair_id="x" * 37)
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "pairId 格式錯誤"}
+    assert write_calls == []
+
+
+@pytest.mark.parametrize("bad_mode", ["x", "SOLO", "1"])
+def test_post_session_rejects_invalid_mode(write_calls, bad_mode):
+    payload = dccs_payload()
+    payload["data"]["mode"] = bad_mode
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 422
+    assert write_calls == []
+
+
+def test_post_session_double_mode_persisted_and_retrievable(client, db):
+    response = client.post("/api/sessions", json=_dat_double_payload())
+
+    assert response.status_code == 201
+    session_id = response.json()["sessionId"]
+    assert db.query(
+        "SELECT mode, pair_id FROM assessment_result WHERE uuid = %s", [session_id]
+    ) == [{"mode": "double", "pair_id": "6f1c8e2a-3b7d-4e11-9a52-0c9d7f2b1e44"}]
 
 
 @pytest.mark.parametrize("missing_field", ["currentDay", "endTime", "stats"])
@@ -287,6 +389,7 @@ def test_post_session_writes_session_retrievable_by_existing_api(client, db):
         {
             "sessionId": session_id,
             "gameType": "DCCS",
+            "mode": "single",
             "currentDay": 1,
             "startTime": "2026-07-01 03:40:00",
             "endTime": "2026-07-01 03:46:00",

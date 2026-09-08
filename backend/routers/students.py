@@ -13,6 +13,7 @@ from converters import (
     format_optional_datetime,
     normalize_game_type_for_db,
     normalize_game_type_from_db,
+    normalize_mode_for_db,
     normalize_school,
     to_float,
     to_int,
@@ -65,6 +66,7 @@ def session_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "sessionId": row["uuid"],
         "gameType": normalize_game_type_from_db(row["game_type"]),
+        "mode": row["mode"],
         "currentDay": to_int(row["current_day"]),
         "startTime": format_datetime(row["start_time"]),
         "endTime": format_datetime(row["end_time"]),
@@ -102,18 +104,23 @@ def build_play_records(
 
 
 def build_summary_by_game(records: list[PlayRecord]) -> list[GameSummary]:
-    """依遊戲種類彙總多場次統計。"""
-    grouped: dict[str, list[PlayRecord]] = {}
+    """依 (遊戲種類, 模式) 彙總多場次統計。
+
+    單人版與雙人版難度不同，混在同一列會誤導 —— 故分組鍵是 (gameType, mode)，
+    同一遊戲最多拆成 single + double 兩列。排序先 gameType 再 mode（single 在前）。
+    """
+    grouped: dict[tuple[str, str], list[PlayRecord]] = {}
     for record in records:
-        grouped.setdefault(record.gameType, []).append(record)
+        grouped.setdefault((record.gameType, record.mode), []).append(record)
 
     summaries: list[GameSummary] = []
-    for game_type, game_records in grouped.items():
+    for (game_type, mode), game_records in grouped.items():
         stats_list = [r.stats for r in game_records if r.stats is not None]
         if not stats_list:
             summaries.append(
                 GameSummary(
                     gameType=game_type,
+                    mode=mode,
                     sessionCount=len(game_records),
                     totalCorrect=0,
                     totalWrong=0,
@@ -126,6 +133,7 @@ def build_summary_by_game(records: list[PlayRecord]) -> list[GameSummary]:
         summaries.append(
             GameSummary(
                 gameType=game_type,
+                mode=mode,
                 sessionCount=len(game_records),
                 totalCorrect=sum(s.correctCount for s in stats_list),
                 totalWrong=sum(s.wrongCount for s in stats_list),
@@ -136,28 +144,38 @@ def build_summary_by_game(records: list[PlayRecord]) -> list[GameSummary]:
             )
         )
 
-    summaries.sort(key=lambda item: item.gameType)
+    summaries.sort(key=lambda item: (item.gameType, _mode_sort_key(item.mode)))
     return summaries
 
 
 TREND_METRICS = ("correctCount", "wrongCount", "accuracy")  # 固定順序
 
+# 顯示順序：single 一律排在 double 前（不是字母序 —— 字母序會把 double 排前面）。
+_MODE_ORDER = {"single": 0, "double": 1}
+
+
+def _mode_sort_key(mode: str) -> int:
+    return _MODE_ORDER.get(mode, len(_MODE_ORDER))
+
 
 def build_trends(records: list[PlayRecord]) -> list[GameTrend]:
     """把 records 依 gameType × 指標 pivot 成時間序列。純函式。
 
-    stats 為 None 的場次沒有數值可畫，整筆略過。gameType 依字母排序，
-    每條序列由舊到新（startTime 為 YYYY-MM-DD HH:MM:SS，字典序即時間序）。
+    stats 為 None 的場次沒有數值可畫，整筆略過。分組鍵為 (gameType, mode)，
+    依該 tuple 排序（gameType 字母序、single 在 double 前）。每條序列由舊到新
+    （startTime 為 YYYY-MM-DD HH:MM:SS，字典序即時間序）。
     """
-    grouped: dict[str, list[PlayRecord]] = {}
+    grouped: dict[tuple[str, str], list[PlayRecord]] = {}
     for record in records:
         if record.stats is None:
             continue
-        grouped.setdefault(record.gameType, []).append(record)
+        grouped.setdefault((record.gameType, record.mode), []).append(record)
 
     trends: list[GameTrend] = []
-    for game_type in sorted(grouped):
-        ordered = sorted(grouped[game_type], key=lambda r: r.startTime)
+    for game_type, mode in sorted(
+        grouped, key=lambda k: (k[0], _mode_sort_key(k[1]))
+    ):
+        ordered = sorted(grouped[(game_type, mode)], key=lambda r: r.startTime)
         items = [
             TrendItem(
                 type=metric,
@@ -168,7 +186,7 @@ def build_trends(records: list[PlayRecord]) -> list[GameTrend]:
             )
             for metric in TREND_METRICS
         ]
-        trends.append(GameTrend(gameType=game_type, items=items))
+        trends.append(GameTrend(gameType=game_type, mode=mode, items=items))
     return trends
 
 
@@ -219,12 +237,19 @@ def list_student_sessions(
     game_type: str | None = Query(
         default=None, description="可選，例如 DAT、EFT、TGame"
     ),
+    mode: str | None = Query(
+        default=None, description="可選，single 或 double；不給則回全部"
+    ),
 ) -> SessionsResponse:
     grade, case_id = parse_student_key(student_key)
 
     try:
         rows = queries.fetch_assessment_rows(
-            grade, case_id, school, normalize_game_type_for_db(game_type)
+            grade,
+            case_id,
+            school,
+            normalize_game_type_for_db(game_type),
+            normalize_mode_for_db(mode),
         )
     except Exception as exc:
         raise db_error(exc) from exc
@@ -243,12 +268,19 @@ def get_student_report(
     student_key: str,
     school: str = Query(..., description="場域／學校，例如：測試場域"),
     game_type: str | None = Query(default=None, description="可選，例如 DCCS"),
+    mode: str | None = Query(
+        default=None, description="可選，single 或 double；不給則回全部"
+    ),
 ) -> StudentReportResponse:
     grade, case_id = parse_student_key(student_key)
 
     try:
         rows = queries.fetch_assessment_rows(
-            grade, case_id, school, normalize_game_type_for_db(game_type)
+            grade,
+            case_id,
+            school,
+            normalize_game_type_for_db(game_type),
+            normalize_mode_for_db(mode),
         )
         records = build_play_records(rows, queries.fetch_stats_for_rows(rows))
     except Exception as exc:

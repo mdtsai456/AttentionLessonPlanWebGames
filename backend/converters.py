@@ -22,6 +22,18 @@ def normalize_game_type_from_db(game_type: str) -> str:
     return GAME_TYPE_FROM_DB.get(game_type, game_type)
 
 
+def normalize_mode_for_db(mode: str | None) -> str | None:
+    """把查詢用的 ?mode= 參數正規化成 DB 值。
+
+    鏡像 normalize_game_type_for_db 的角色：None／空白 → None（不加篩選條件）。
+    其他值一律 strip().lower() 後原樣傳回 —— 打錯的值（如 "foo"）會讓 SQL
+    查不到任何列、回空結果，不報錯，與 ?game_type=亂打 的既有行為一致。
+    """
+    if not mode or not mode.strip():
+        return None
+    return mode.strip().lower()
+
+
 def format_datetime(value: Any) -> str:
     if value is None:
         return ""

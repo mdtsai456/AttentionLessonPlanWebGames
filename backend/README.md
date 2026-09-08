@@ -7,13 +7,21 @@
 | 方法 | 路徑 | 說明 |
 |---|---|---|
 | GET | `/health` | 存活檢查 |
-| POST | `/api/sessions` | 接收 Unity GameData，成功後回傳 `sessionId` |
+| POST | `/api/sessions` | 接收 Unity GameData，成功後回傳 `sessionId`。`data.mode`（`single`／`double`，預設 `single`）與 `data.pairId` 選填 |
 | GET | `/api/students` | 學生名單與總數。`?school=` 選填，不給則回傳所有場域 |
-| GET | `/api/students/{studentKey}/sessions` | 單一學生的場次清單。`?school=` 必填 |
-| GET | `/api/students/{studentKey}/report` | 單一學生的場次明細與各遊戲彙總。`?school=` 必填 |
+| GET | `/api/students/{studentKey}/sessions` | 單一學生的場次清單。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
+| GET | `/api/students/{studentKey}/report` | 單一學生的場次明細與各遊戲彙總。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
 
 `studentKey` 的格式是 `grade_caseId`，例如 `G1_S03`。學生的唯一鍵是
 `(grade, case_id, school)` —— 不同場域的 `G1_S03` 是不同的學生。
+
+### 單人版／雙人版（mode）
+
+DAT／DCCS／EFT 有「單人版」與「雙人版」（一台裝置兩個小孩），DAT/DCCS/EFT 以外
+永遠是 `single`。`assessment_result.mode` 記模式、`pair_id` 記同一雙人局的兩筆連結
+（由 Unity 產生，後端只存）。`/report` 與 `/sessions` 每筆回應帶 `mode`；
+`summaryByGame`／`trends` 依 `(gameType, mode)` 分組（`single` 排在 `double` 前）。
+設計見 [`docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md`](docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md)。
 
 ## 開發
 
@@ -51,8 +59,8 @@ uv run pytest -q
 ## 假資料（seed）
 
 `seed.py` 灌一批可重現的假資料，供本機開發／demo 肉眼看 API（3 校 × 6 生 ×
-5 遊戲 × 2 梯次，共 2,160 場，含撐起 trends 折線的進步趨勢）。先清空再灌、固定
-亂數種子，重跑結果一致。設計見
+5 遊戲 × 2 梯次，2,160 場單人版 + 324 場 DAT/DCCS/EFT 雙人版，含撐起 trends 折線
+的進步趨勢）。先清空再灌、固定亂數種子，重跑結果一致。設計見
 [`docs/superpowers/plans/2026-07-10-seed-mock-data.md`](docs/superpowers/plans/2026-07-10-seed-mock-data.md)。
 
 ```bash

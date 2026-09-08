@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["sessions"])
 
 KNOWN_GAME_NAMES = frozenset({"DCCS", "DAT", "EFT", "IM", "TGame"})
+# 廠商只做這三款的雙人版（Q4）。IM／TGame 若日後也要雙人版，放寬這裡即可。
+DOUBLE_CAPABLE_GAMES = frozenset({"DCCS", "DAT", "EFT"})
+PAIR_ID_MAX_LENGTH = 36
 UNITY_CORE_STATS = (
     ("correct", "correct_count", to_int),
     ("wrong", "wrong_count", to_int),
@@ -44,6 +47,8 @@ class UnityGamePayload(BaseModel):
     startTime: int
     endTime: int
     stats: list[UnityStat]
+    mode: str = "single"
+    pairId: str | None = None
 
     @field_validator("grade", "caseId", "school")
     @classmethod
@@ -52,6 +57,14 @@ class UnityGamePayload(BaseModel):
         if not stripped:
             raise ValueError("不可為空白")
         return stripped
+
+    @field_validator("mode")
+    @classmethod
+    def normalize_mode(cls, value: str) -> str:
+        normalized = (value or "single").strip().lower()
+        if normalized not in {"single", "double"}:
+            raise ValueError("mode 必須是 single 或 double")
+        return normalized
 
 
 class UnityGameDataRequest(BaseModel):
@@ -113,6 +126,23 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
     if end_time < start_time:
         raise ValueError("endTime 不可早於 startTime")
 
+    mode = data.mode
+    pair_id: str | None = data.pairId
+
+    if mode == "double" and game_name not in DOUBLE_CAPABLE_GAMES:
+        raise ValueError("雙人版僅支援 DAT／DCCS／EFT")
+
+    if mode == "single":
+        # 單人版忽略誤帶的 pairId，一律存 NULL。
+        pair_id = None
+    elif pair_id is not None and len(pair_id) > PAIR_ID_MAX_LENGTH:
+        raise ValueError("pairId 格式錯誤")
+    elif not pair_id:
+        # 缺 pairId 的雙人筆仍是有效成績，只是少了搭檔連結 —— 接受，記一筆 warning。
+        pair_id = None
+        logger.warning("雙人版場次缺 pairId：school=%s grade=%s caseId=%s",
+                       data.school, data.grade, data.caseId)
+
     session_id = writes.insert_session_with_stats(
         grade=data.grade,
         case_id=data.caseId,
@@ -122,6 +152,8 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
         current_day=data.currentDay,
         end_time=end_time,
         stats=unity_core_stats(game_name, data.stats),
+        mode=mode,
+        pair_id=pair_id,
     )
     return SessionAcceptResponse(sessionId=session_id)
 

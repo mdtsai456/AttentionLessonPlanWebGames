@@ -50,6 +50,7 @@ def test_sessions_returns_student_sessions(client, db):
             {
                 "sessionId": "u1",
                 "gameType": "DCCS",
+                "mode": "single",
                 "currentDay": 1,
                 "startTime": "2026-07-01 09:00:00",
                 "endTime": "2026-07-01 09:30:00",
@@ -117,6 +118,7 @@ def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db):
     assert len(sessions) == 1
     assert sessions[0]["sessionId"] == "u1"
     assert sessions[0]["gameType"] == "TGame"
+    assert sessions[0]["mode"] == "single"
 
 
 def test_report_includes_stats_and_summary(client, db):
@@ -148,6 +150,7 @@ def test_report_includes_stats_and_summary(client, db):
     assert body["summaryByGame"] == [
         {
             "gameType": "DCCS",
+            "mode": "single",
             "sessionCount": 1,
             "totalCorrect": 8,
             "totalWrong": 2,
@@ -174,6 +177,7 @@ def test_report_session_without_stats_row_has_null_stats(client, db):
     assert body["summaryByGame"] == [
         {
             "gameType": "DCCS",
+            "mode": "single",
             "sessionCount": 1,
             "totalCorrect": 0,
             "totalWrong": 0,
@@ -363,6 +367,7 @@ def test_report_includes_trends_ascending_by_time(client, db):
     assert body["trends"] == [
         {
             "gameType": "DCCS",
+            "mode": "single",
             "items": [
                 {
                     "type": "correctCount",
@@ -388,6 +393,105 @@ def test_report_includes_trends_ascending_by_time(client, db):
             ],
         }
     ]
+
+
+def _seed_single_and_double_dat(db):
+    """DAT 單人 3 場、DAT 雙人 2 場，皆帶 stats。"""
+    db.insert_student("G1", "S03", "測試場域")
+    for i in range(3):
+        uuid = f"s{i}"
+        db.insert_session(
+            "G1", "S03", "測試場域", uuid=uuid, game_type="DAT", mode="single",
+            start_time=datetime(2026, 7, 1 + i, 9, 0, 0),
+        )
+        db.insert_result(
+            "dat_result", "G1", "S03", "測試場域", uuid,
+            correct_count=5 + i, wrong_count=2, accuracy=0.7, duration=1000.0, stage=10,
+        )
+    for i in range(2):
+        uuid = f"d{i}"
+        db.insert_session(
+            "G1", "S03", "測試場域", uuid=uuid, game_type="DAT", mode="double",
+            pair_id="pair-x", start_time=datetime(2026, 7, 10 + i, 9, 0, 0),
+        )
+        db.insert_result(
+            "dat_result", "G1", "S03", "測試場域", uuid,
+            correct_count=9, wrong_count=1, accuracy=0.9, duration=1000.0, stage=10,
+        )
+
+
+def test_report_summary_splits_single_and_double(client, db):
+    _seed_single_and_double_dat(db)
+
+    body = client.get(
+        "/api/students/G1_S03/report", params={"school": "測試場域"}
+    ).json()
+
+    summary = {(s["gameType"], s["mode"]): s for s in body["summaryByGame"]}
+    assert summary[("DAT", "single")]["sessionCount"] == 3
+    assert summary[("DAT", "double")]["sessionCount"] == 2
+    assert [r["mode"] for r in body["records"]].count("double") == 2
+
+
+def test_report_trends_split_by_mode_contain_only_that_mode(client, db):
+    _seed_single_and_double_dat(db)
+
+    body = client.get(
+        "/api/students/G1_S03/report", params={"school": "測試場域"}
+    ).json()
+
+    trends = {(t["gameType"], t["mode"]): t for t in body["trends"]}
+    single_correct = next(
+        i for i in trends[("DAT", "single")]["items"] if i["type"] == "correctCount"
+    )
+    assert [p["value"] for p in single_correct["stats"]] == [5, 6, 7]
+    double_correct = next(
+        i for i in trends[("DAT", "double")]["items"] if i["type"] == "correctCount"
+    )
+    assert [p["value"] for p in double_correct["stats"]] == [9, 9]
+
+
+def test_report_mode_filter_returns_only_that_mode(client, db):
+    _seed_single_and_double_dat(db)
+
+    body = client.get(
+        "/api/students/G1_S03/report",
+        params={"school": "測試場域", "mode": "double"},
+    ).json()
+
+    assert {r["mode"] for r in body["records"]} == {"double"}
+    assert [(s["gameType"], s["mode"]) for s in body["summaryByGame"]] == [
+        ("DAT", "double")
+    ]
+
+
+def test_report_game_type_and_mode_filters_combine(client, db):
+    _seed_single_and_double_dat(db)
+    db.insert_session(
+        "G1", "S03", "測試場域", uuid="dccs1", game_type="DCCS", mode="single",
+        start_time=datetime(2026, 8, 1, 9, 0, 0),
+    )
+
+    body = client.get(
+        "/api/students/G1_S03/report",
+        params={"school": "測試場域", "game_type": "DAT", "mode": "single"},
+    ).json()
+
+    assert body["totalSessions"] == 3
+    assert {(s["gameType"], s["mode"]) for s in body["summaryByGame"]} == {
+        ("DAT", "single")
+    }
+
+
+def test_sessions_mode_filter(client, db):
+    _seed_single_and_double_dat(db)
+
+    body = client.get(
+        "/api/students/G1_S03/sessions",
+        params={"school": "測試場域", "mode": "double"},
+    ).json()
+
+    assert [s["mode"] for s in body["sessions"]] == ["double", "double"]
 
 
 def test_report_session_without_stats_has_empty_trends(client, db):

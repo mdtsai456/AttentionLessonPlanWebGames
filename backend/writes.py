@@ -19,8 +19,14 @@ def insert_session_with_stats(
     current_day: int,
     end_time: datetime | None,
     stats: dict[str, Any],
+    mode: str = "single",
+    pair_id: str | None = None,
 ) -> str:
-    """建立 Student、Session 與其五個共同遊戲統計，並回傳 UUID。"""
+    """建立 Student、Session 與其五個共同遊戲統計，並回傳 UUID。
+
+    mode 預設 "single"、pair_id 預設 None —— 現有（只有單人版的）呼叫端不用改。
+    後端對這兩欄完全被動：收到什麼存什麼。
+    """
     table_name = GAME_RESULT_TABLES.get(game_type)
     if table_name is None:
         raise ValueError(f"不支援的遊戲類型：{game_type}")
@@ -31,8 +37,9 @@ def insert_session_with_stats(
     )
     assessment_sql = """
         INSERT INTO assessment_result
-            (grade, case_id, school, uuid, start_time, game_type, current_day, end_time)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (grade, case_id, school, uuid, start_time, game_type,
+             mode, pair_id, current_day, end_time)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     stat_placeholders = ", ".join(["%s"] * len(CORE_STAT_COLUMNS))
     result_sql = f"""
@@ -48,6 +55,8 @@ def insert_session_with_stats(
         session_id,
         start_time,
         game_type,
+        mode,
+        pair_id,
         current_day,
         end_time,
     ]
