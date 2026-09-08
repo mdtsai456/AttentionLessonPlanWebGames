@@ -31,28 +31,27 @@
 > ⚠️ 這代表任何人連到網站都能看任一學生的完整遊玩資料。這是已知的安全債，已向廠商
 > 提出，**不是前端要解的問題**，但別在 UI 上做出「已受保護」的錯誤暗示。
 
-### 0.3 待後端補：CORS（會擋住你）
+### 0.3 CORS（已設定，但你要告訴後端你的網址）
 
-目前後端**沒有開 CORS**。如果你的前端跟 API 不同網域（幾乎一定是），瀏覽器的
-`fetch` 會直接失敗（preflight 被擋）。**開工前請後端加上**：
+後端**已加上 CORS**。放行哪些來源由後端的環境變數 `CORS_ALLOW_ORIGINS` 決定：
 
-```python
-# main.py
-from fastapi.middleware.cors import CORSMiddleware
+| `CORS_ALLOW_ORIGINS` 的值 | 效果 |
+|---|---|
+| 留空（預設） | 放行常見的本機前端 dev server：`http://localhost` 與 `http://127.0.0.1` 的 `3000` / `5173` / `5500` / `8080` 埠 |
+| `*` | 放行**所有**來源（早期開發最省事，正式環境不要用） |
+| `http://localhost:5173,https://foo.example` | 只放行清單裡這幾個（逗號分隔） |
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",              # 你本機開發的 origin
-        "https://<你的前端正式網域>",
-    ],
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
-```
+**你要做的事**：
 
-在後端加好之前，你可以先用 `{BASE_URL}/docs` 或 Postman／curl 對 API，或請後端本機
-開一個放行 `*` 的版本。
+1. **本機開發**：如果你的 dev server 是上表那 4 個常見埠之一（Vite 5173、CRA 3000、
+   Live Server 5500…），**開箱即用，什麼都不用做**。用別的埠就把埠號告訴後端。
+2. **用 `file://` 直接開 HTML**（沒有 dev server）：CORS 對 `file://` 沒用，請至少用
+   `python -m http.server` 或 Live Server 起一個 `http://localhost:...`。
+3. **要部署到正式網域**：把你的正式網址（例如 `https://xxx.pages.dev`）給後端，
+   請他加進 Zeabur 的 `CORS_ALLOW_ORIGINS` 環境變數。
+
+> API 沒有 cookie／session，所以 `fetch` **不要**帶 `credentials: 'include'`（帶了反而會被
+> CORS 擋）。預設的 `fetch(url)` 就對了。
 
 ### 0.4 共通規則
 
@@ -474,6 +473,6 @@ curl "$BASE/api/students/G1_S01/report?school=KMU&mode=double"
 |---|---|---|
 | 8 個場域正式字串 | 無 —— 前端從 `/api/schools` 動態取得 | 佔位代碼，後端重灌時前端不用改 |
 | 16 位老師正式名單 | 無 —— 從 API 動態取得 | 佔位名字（吳老師…） |
-| CORS 設定 | **會擋住 fetch** | 見 §0.3，請後端先加 |
+| CORS 設定 | 本機常見埠開箱即用；正式網域要通知後端 | ✅ 已設定，見 §0.3 |
 | 後端整合測試跑綠 | 低 —— 契約已固定 | 待 DB 帳密 |
 | 登入頁 repo / 分支歸屬 | 專案管理 | 跟後端／PM 講定 |
