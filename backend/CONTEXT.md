@@ -5,7 +5,9 @@
 ## 核心術語
 
 - **Student(學生)** — 唯一鍵是 `(grade, case_id, school)`。同一個 `grade_caseId`(例如 `G1_S03`)在不同 `school` 是**不同的學生**。
-- **School(場域)** — 學生所屬的施測場域,是學生身分的一部分,不只是屬性。
+- **School(場域)** — 學生所屬的施測場域,是學生身分的一部分,不只是屬性。`school` 表把「散落在資料裡的 school 字串」正規化成一份清單(識別字串 + 顯示名稱),是這份字串的唯一真實來源。
+- **Teacher(老師)** — 隸屬於**單一**場域。同場域的老師看得到該場域的**所有**學生(廠商定調,不做老師↔學生對應表)。無密碼欄位:登入=下拉選人。
+- **參照資料(reference data)** — `school`、`teacher` 這種「由人工維護、量少、變動極慢」的資料。用 `seed_directory.py`「冪等補齊、絕不清空」;相對於 `seed.py` 灌的「假成績」是「先清空再灌」。
 - **Session(場次)** — 一位學生某天玩某一個遊戲的一次紀錄,對應 `assessment_result` 一列,唯一鍵 `(grade, case_id, school, uuid)`。帶 `start_time`、`end_time`、`current_day`、`game_type`。
 - **game_type(遊戲類型)** — 一場 Session 玩的是哪一個遊戲,取值為以下五種之一。
 - **五款遊戲** — 每一款在專屬明細表有一列,以 `(grade, case_id, school, uuid)` 外鍵掛在 Session 底下:

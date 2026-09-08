@@ -10,6 +10,9 @@
     GET /api/students?school=測試場域
     GET /api/students/{studentKey}/sessions?school=測試場域
     GET /api/students/{studentKey}/report?school=測試場域
+    GET /api/schools
+    GET /api/schools/{school}/teachers
+    GET /api/teachers/{teacherId}/students
 
 CORS：瀏覽器前端跨網域呼叫需要放行其 origin。用環境變數 CORS_ALLOW_ORIGINS
 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時預設放行常見的本機
@@ -26,7 +29,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import validate_db_settings
-from routers import sessions, students
+from routers import directory, sessions, students
 
 load_dotenv()
 
@@ -74,6 +77,7 @@ app.add_middleware(
 
 app.include_router(sessions.router)
 app.include_router(students.router)
+app.include_router(directory.router)
 
 
 @app.get("/")
