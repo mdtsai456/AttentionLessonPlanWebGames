@@ -14,10 +14,12 @@
     uv run python seed_directory.py                       # 預設:_test 庫
     DB_USER=root DB_PASSWORD=... uv run python seed_directory.py --prod   # 正式庫
 
---- 待廠商確認 ---
+--- 場域字串 ---
 下面 SCHOOLS 的第一欄(school 字串)是六張既有表的 join key、Unity POST 的
-payload 欄位、所有查詢的參數。定案前先放佔位代碼(KMU / NTHU-01..07),中文放
-display_name。字串定案後只改這裡的常數、重跑腳本即可,不動任何邏輯。
+payload 欄位、所有查詢的參數。廠商把命名交給後端決定,故**定案為**短 ASCII 代碼:
+KMU、NTHU-01 … NTHU-07(見 docs/school-directory.md,三方共用的唯一真實來源)。
+中文顯示名稱(display_name)與老師名稱可日後由廠商調整 —— 改這裡的常數重跑即可
+(display_name 會 ON DUPLICATE KEY UPDATE;老師若要改名需先清 teacher 表再重跑)。
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ SCHOOLS: list[tuple[str, str, int]] = [
     ("NTHU-07", "清華大學（第七場）", 7),
 ]
 
-# (場域 school 字串, 老師名稱)。每場域 2 位,共 16 位。顯示名稱待廠商提供實際名單。
+# (場域 school 字串, 老師名稱)。每場域 2 位,共 16 位。老師名稱為佔位,待廠商提供實際 16 位名單。
 TEACHERS: list[tuple[str, str]] = [
     ("KMU", "吳老師"), ("KMU", "林老師"),
     ("NTHU-01", "王老師"), ("NTHU-01", "陳老師"),
