@@ -141,6 +141,7 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 | `mode` 不是 single / double | `422` | Pydantic 驗證錯誤結構 |
 | `mode: "double"` 但遊戲不是 DAT/DCCS/EFT | `400` | `{"detail": "雙人版僅支援 DAT／DCCS／EFT"}` |
 | `pairId` 長度 > 36 | `400` | `{"detail": "pairId 格式錯誤"}` |
+| `data.school` 不在已登記的 8 個場域內（打錯字、送了表外的值） | `400` | `{"detail": "未知的場域（school 尚未登記）"}` —— 這筆成績**不會被儲存**，請修正 `school` 後重送 |
 | 缺 5 個核心 stat 之一 | `400` | `{"detail": "缺少必要統計：DAT_wrong"}` |
 | `endTime` 早於 `startTime` | `400` | `{"detail": "endTime 不可早於 startTime"}` |
 | `grade`／`caseId`／`school` 空白 | `422` | — |
@@ -169,9 +170,9 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 
 ## 6. `school` 字串必須三方對齊 ⚠️（已定案）
 
-`data.school` 是把「學生、成績、場域、老師」串起來的鍵。只要 Unity 端送的字串跟
-中介平台登記的差一個字（全形半形、空白、破折號變體），**兩邊就永遠對不起來，而且
-不會報錯**，只會查出空資料。
+`data.school` 是把「學生、成績、場域、老師」串起來的鍵。從 2026-09-09 起，中介平台
+會**驗證** `school` 必須是下表 8 個已登記的值之一 —— 送了表外的字串（打錯字、全形
+半形、破折號變體），**那筆成績會被拒（回 400），不會被儲存**。所以務必逐字對照。
 
 廠商把命名交給後端決定，**已定案**（完整說明見 `docs/school-directory.md`）：
 
