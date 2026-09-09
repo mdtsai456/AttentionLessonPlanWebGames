@@ -38,6 +38,15 @@ def dccs_payload() -> dict:
     }
 
 
+@pytest.fixture(autouse=True)
+def _register_school(request):
+    """走真實寫入路徑的 POST 測試（帶 db／client fixture）需要 '測試場域'
+    這個場域先登記，否則 student.school 外鍵會擋下寫入。"""
+    if "db" not in request.fixturenames and "client" not in request.fixturenames:
+        return
+    request.getfixturevalue("db").insert_school("測試場域")
+
+
 @pytest.fixture
 def write_calls(monkeypatch):
     calls = []
@@ -342,7 +351,12 @@ def test_post_session_rejects_out_of_range_timestamp(write_calls):
     ("error", "expected_status", "expected_detail"),
     [
         (pymysql.IntegrityError(1062, "duplicate"), 409, "場次已存在"),
-        (pymysql.IntegrityError(1452, "foreign key"), 500, "資料庫寫入失敗"),
+        (
+            pymysql.IntegrityError(1452, "foreign key"),
+            400,
+            "未知的場域（school 尚未登記）",
+        ),
+        (pymysql.IntegrityError(1048, "column cannot be null"), 500, "資料庫寫入失敗"),
         (RuntimeError("host=secret-db user=root"), 500, "資料庫寫入失敗"),
     ],
 )

@@ -170,6 +170,12 @@ def create_session(payload: UnityGameDataRequest) -> SessionAcceptResponse:
         if exc.args and exc.args[0] == 1062:
             logger.exception("場次 UUID 重複")
             raise HTTPException(status_code=409, detail="場次已存在") from exc
+        if exc.args and exc.args[0] == 1452:
+            # student.school → school 的外鍵擋下：Unity 送來的場域字串沒登記。
+            logger.warning("未知場域，拒絕寫入：school=%s", payload.data.school)
+            raise HTTPException(
+                status_code=400, detail="未知的場域（school 尚未登記）"
+            ) from exc
         logger.exception("資料庫完整性檢查失敗")
         raise HTTPException(status_code=500, detail="資料庫寫入失敗") from exc
     except Exception as exc:

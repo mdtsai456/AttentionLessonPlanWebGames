@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS `teacher` (
 並要求 Unity 改送代碼 —— 牽動最大攻擊面，且沒有對應的效益。`school` 表因此定位為
 一份「合法場域字串的登記處 + 顯示名稱對照」，不是重新設計識別方式。
 
+**（2026-09-09 更新：此決定已推翻，外鍵已加 —— 見 [ADR 0003](../../adr/0003-student-school-foreign-key.md)。下段為當初的理由。）**
+
 **不在 `student.school` 上加外鍵指向 `school.school`。**
 兩個具體風險：(1) 正式庫已有 5 筆 `school = "測試場域"` 的舊資料，硬加外鍵會讓建立
 外鍵失敗，或逼我們先把「測試場域」補進 `school` 表。(2) `POST /api/sessions` 會

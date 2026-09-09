@@ -110,6 +110,18 @@ def db_available(point_app_at_test_db: Any) -> str:
     return point_app_at_test_db
 
 
+# schema.sql 的 CREATE TABLE IF NOT EXISTS 對「表已存在但缺某個約束」的情形無感。
+# 這些外鍵是後來才補的，既有的 _test 庫不會自己長出來 —— 在這裡冪等補齊。
+_RETROFIT_CONSTRAINTS = (
+    (
+        "student",
+        "fk_student_school",
+        "ALTER TABLE student ADD CONSTRAINT fk_student_school "
+        "FOREIGN KEY (school) REFERENCES school (school) ON UPDATE CASCADE",
+    ),
+)
+
+
 @pytest.fixture(scope="session")
 def _schema(db_available: str) -> None:
     from db import get_connection
@@ -118,6 +130,15 @@ def _schema(db_available: str) -> None:
         with connection.cursor() as cursor:
             for statement in _schema_statements():
                 cursor.execute(statement)
+            for table, constraint, alter_sql in _RETROFIT_CONSTRAINTS:
+                cursor.execute(
+                    "SELECT COUNT(*) AS n FROM information_schema.TABLE_CONSTRAINTS "
+                    "WHERE CONSTRAINT_SCHEMA = %s AND TABLE_NAME = %s "
+                    "AND CONSTRAINT_NAME = %s",
+                    [os.environ["DB_NAME"], table, constraint],
+                )
+                if cursor.fetchone()["n"] == 0:
+                    cursor.execute(alter_sql)
         connection.commit()
 
 
@@ -155,7 +176,18 @@ class DbHelper:
                 cursor.execute(sql, params or [])
             connection.commit()
 
+    def ensure_school(self, school: str) -> None:
+        """冪等登記一個場域字串。student.school 有外鍵指向 school，
+        所以插學生／場次前該場域必須先存在。多數測試不在乎場域本身，
+        故插學生時自動補上；真正要驗場域行為的測試自己呼叫 insert_school。"""
+        self.execute(
+            "INSERT INTO school (school, display_name, sort_order) VALUES (%s, %s, 0) "
+            "ON DUPLICATE KEY UPDATE school = school",
+            [school, school],
+        )
+
     def insert_student(self, grade: str, case_id: str, school: str) -> None:
+        self.ensure_school(school)
         self.execute(
             "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
             [grade, case_id, school],
@@ -165,7 +197,9 @@ class DbHelper:
         self, school: str, display_name: str | None = None, sort_order: int = 0
     ) -> None:
         self.execute(
-            "INSERT INTO school (school, display_name, sort_order) VALUES (%s, %s, %s)",
+            "INSERT INTO school (school, display_name, sort_order) VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), "
+            "sort_order = VALUES(sort_order)",
             [school, display_name if display_name is not None else school, sort_order],
         )
 

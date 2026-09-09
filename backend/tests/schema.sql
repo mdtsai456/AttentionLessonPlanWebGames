@@ -1,11 +1,23 @@
 -- 測試資料庫的結構，取自正式庫 DDL。
--- 建表順序必須是父表在前，否則外鍵建立會失敗。
+-- 建表順序必須是父表在前，否則外鍵建立會失敗：
+--   school ← student ← assessment_result ← 五張 *_result
+--   school ← teacher
+
+-- 參照資料：場域清單。student / teacher 都以外鍵掛在它底下，故必須最先建。
+CREATE TABLE IF NOT EXISTS `school` (
+  `school` varchar(100) NOT NULL,        -- 與 student.school 完全相同的字串
+  `display_name` varchar(100) NOT NULL,  -- 前端下拉顯示用
+  `sort_order` int NOT NULL DEFAULT 0,
+  PRIMARY KEY (`school`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `student` (
   `grade` varchar(20) NOT NULL,
   `case_id` varchar(50) NOT NULL,
   `school` varchar(100) NOT NULL,
-  PRIMARY KEY (`grade`,`case_id`,`school`)
+  PRIMARY KEY (`grade`,`case_id`,`school`),
+  CONSTRAINT `fk_student_school` FOREIGN KEY (`school`)
+    REFERENCES `school` (`school`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `assessment_result` (
@@ -146,14 +158,7 @@ CREATE TABLE IF NOT EXISTS `tgame_result` (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 參照資料：場域清單與老師名錄。school 必須在 teacher 之前（外鍵）。
-CREATE TABLE IF NOT EXISTS `school` (
-  `school` varchar(100) NOT NULL,        -- 與 student.school 完全相同的字串
-  `display_name` varchar(100) NOT NULL,  -- 前端下拉顯示用
-  `sort_order` int NOT NULL DEFAULT 0,
-  PRIMARY KEY (`school`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
+-- 老師名錄。掛在 school 底下（外鍵）。
 CREATE TABLE IF NOT EXISTS `teacher` (
   `teacher_id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(50) NOT NULL,

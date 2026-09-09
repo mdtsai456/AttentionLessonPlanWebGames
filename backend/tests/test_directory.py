@@ -141,6 +141,14 @@ def test_teacher_with_nonexistent_school_is_rejected_by_foreign_key(db):
         )
 
 
+def test_student_with_nonexistent_school_is_rejected_by_foreign_key(db):
+    with pytest.raises(pymysql.IntegrityError):
+        db.execute(
+            "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
+            ["G1", "S01", "沒登記"],
+        )
+
+
 def test_duplicate_teacher_in_same_school_is_rejected(db):
     db.insert_school("A")
     db.insert_teacher("吳老師", "A")

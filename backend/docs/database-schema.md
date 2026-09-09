@@ -16,6 +16,7 @@ MariaDB。9 張表：3 張「參照 / 名冊」+ 1 張「場次索引」+ 5 張�
 ```mermaid
 erDiagram
     school            ||--o{ teacher           : "1 場域對 N 老師"
+    school            ||--o{ student           : "1 場域對 N 學生"
     student           ||--o{ assessment_result : "1 學生對 N 場次"
     assessment_result ||--o| dat_result        : "game_type=DAT"
     assessment_result ||--o| dccs_result       : "game_type=DCCS"
@@ -36,7 +37,7 @@ erDiagram
     student {
         varchar grade PK "年級 例 G1"
         varchar case_id PK "個案編號 例 S03"
-        varchar school PK "場域"
+        varchar school PK "場域 FK 到 school"
     }
     assessment_result {
         varchar grade PK "FK 到 student"
@@ -91,9 +92,14 @@ erDiagram
 | 關係 | 意義 |
 |---|---|
 | `school` → `teacher` | 一個場域有多位老師（目前每場域 2 位）。老師掛在不存在的場域 → 外鍵擋下 |
+| `school` → `student` | 一個場域有多位學生。`student.school` 有外鍵 `fk_student_school` 指向 `school.school`（`ON UPDATE CASCADE`）—— 場域字串沒登記就插不進學生 |
 | `student` → `assessment_result` | 一位學生有多場遊玩紀錄。學生唯一鍵是 `(grade, case_id, school)` 三欄複合 —— **不同場域的 `G1_S03` 是不同的學生** |
 | `assessment_result` → 五張 `*_result` | 一場 = 一列 `assessment_result`（索引 + 共同欄位）+ 一列對應遊戲的細部表。`game_type` 決定掛哪張。刪 `assessment_result` 會連帶刪細部列（`ON DELETE CASCADE`） |
-| `school` ↔ `student.school` | **刻意不加外鍵**（正式庫可能有舊資料、Unity 寫入不該被參照資料擋下）。`school` 表當「合法場域字串的登記處」用 |
+
+> `school → teacher → student` 是「大到小」的階層，三者靠 `school` 字串（`KMU`、`NTHU-01`…`07`）串起來。
+> 「某老師的學生」= 該老師 `teacher.school` 所對應的全部 `student`（同場域兩位老師看同一批）。
+> 老師與學生之間**不需要**中介表：這層關係完全由兩邊的 `school` 值決定，可推導、無額外資訊。
+> 若日後要「每位老師各帶一部分學生」，才需要 `student.teacher_id` 或 `teacher_student` 表。
 
 ---
 
@@ -115,6 +121,25 @@ erDiagram
 
 - `school.school` = 與 `student.school` 完全相同的字串。目前定案為 `KMU`、`NTHU-01`…`NTHU-07`
 - `teacher` 沒有密碼欄位（不驗證）；`UNIQUE(school, name)` 防同場域重名
+
+### `student.school` 加外鍵 `fk_student_school`
+
+原本 `student.school` 只是一段自由字串，跟 `school` 表沒有資料庫層級的關聯，
+所以 ER 圖上 `school` 與 `student` 之間沒有連線、打錯場域字串也不會報錯（那位學生
+會從所有老師的清單裡消失）。本輪補上：
+
+```sql
+ALTER TABLE student
+  ADD CONSTRAINT fk_student_school FOREIGN KEY (school)
+  REFERENCES school (school) ON UPDATE CASCADE;
+```
+
+影響：
+
+- Unity POST `/api/sessions` 帶未登記的 `school` → 寫入被擋，回 **400「未知的場域（school 尚未登記）」**（原本會 500）。
+- 灌學生資料前，場域必須先存在（`seed.py` 已改成先冪等補上它用到的場域；
+  測試輔助 `DbHelper.insert_student` 會自動 `ensure_school`）。
+- 順帶替 `student.school` 建了索引，`fetch_students(school)` 不再全表掃描。
 
 ---
 

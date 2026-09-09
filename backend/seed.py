@@ -239,6 +239,13 @@ def main() -> None:
             for table in TABLES_CHILD_FIRST:
                 cursor.execute(f"DELETE FROM {table}")
 
+            # student.school 有外鍵指向 school。灌假學生前先冪等補上這幾個場域
+            # （不清空 school，正式的顯示名稱／排序由 seed_directory.py 負責）。
+            cursor.executemany(
+                "INSERT INTO school (school, display_name, sort_order) "
+                "VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE school = school",
+                [(name, name, order) for order, name in enumerate(SCHOOLS)],
+            )
             cursor.executemany(
                 "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
                 student_rows,
