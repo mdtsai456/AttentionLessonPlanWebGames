@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>DCCS 賽道攔截・雙人版</title><link rel="stylesheet" href="DCCS_double.css"><script src="DCCS_double.js" defer></script></head>
+<body><main class="game" aria-label="DCCS 雙人賽道攔截">
+<!-- 固定題目：星形＋跑步；兩排皆答對，每輪加一分。 -->
+<section class="player player-1" aria-label="玩家一">
+ <div class="score"><span class="score-label">玩家一 得分</span><span class="score-value" id="score-p1">0 分</span></div>
+ <aside class="progress-panel" aria-label="玩家一賽道進度"><span class="progress-label">賽道進度</span><div class="progress-track" id="progress-p1"></div></aside>
+ <div class="center-object" id="center-object-p1"><img class="target-shape" data-answer="star" src="assets/賽道攔截物件/star.png" alt="星形" draggable="false"><img class="target-sport" data-answer="running" src="assets/賽道攔截物件/running.png" alt="跑步" draggable="false"></div>
+ <div class="row-window shape-window"><div class="object-row" id="shape-row-p1"><img class="shape" data-answer="trapezoid" src="assets/賽道攔截物件/trapezoid.png" alt="梯形" draggable="false">
+<img class="shape" data-answer="triangle" src="assets/賽道攔截物件/triangle.png" alt="三角形" draggable="false">
+<img class="shape" data-answer="ring" src="assets/賽道攔截物件/ring.png" alt="圓環" draggable="false">
+<img class="shape" data-answer="star" src="assets/賽道攔截物件/star.png" alt="星形" draggable="false">
+<img class="shape" data-answer="square" src="assets/賽道攔截物件/square.png" alt="方形" draggable="false"></div></div>
+ <div class="row-window sport-window"><div class="object-row" id="sport-row-p1"><img class="sport" data-answer="running" src="assets/賽道攔截物件/running.png" alt="跑步" draggable="false">
+<img class="sport" data-answer="cycling" src="assets/賽道攔截物件/cycling.png" alt="騎腳踏車" draggable="false">
+<img class="sport" data-answer="swimming" src="assets/賽道攔截物件/swimming.png" alt="游泳" draggable="false">
+<img class="sport" data-answer="basketball" src="assets/賽道攔截物件/basketball.png" alt="籃球" draggable="false">
+<img class="sport" data-answer="jump-rope" src="assets/賽道攔截物件/jump-rope.png" alt="跳繩" draggable="false"></div></div>
+ <div class="controls"><button type="button" data-row="shape-row-p1" data-direction="1" aria-label="玩家一形狀向右移動"><kbd>D</kbd> 形狀 →</button><button type="button" data-row="sport-row-p1" data-direction="-1" aria-label="玩家一運動物件向左移動"><kbd>A</kbd> 運動 ←</button></div>
+ </section>
+<section class="player player-2" aria-label="玩家二">
+ <div class="score"><span class="score-label">玩家二 得分</span><span class="score-value" id="score-p2">0 分</span></div>
+ <aside class="progress-panel" aria-label="玩家二賽道進度"><span class="progress-label">賽道進度</span><div class="progress-track" id="progress-p2"></div></aside>
+ <div class="center-object" id="center-object-p2"><img class="target-shape" data-answer="star" src="assets/賽道攔截物件/star.png" alt="星形" draggable="false"><img class="target-sport" data-answer="running" src="assets/賽道攔截物件/running.png" alt="跑步" draggable="false"></div>
+ <div class="row-window shape-window"><div class="object-row" id="shape-row-p2"><img class="shape" data-answer="trapezoid" src="assets/賽道攔截物件/trapezoid.png" alt="梯形" draggable="false">
+<img class="shape" data-answer="triangle" src="assets/賽道攔截物件/triangle.png" alt="三角形" draggable="false">
+<img class="shape" data-answer="ring" src="assets/賽道攔截物件/ring.png" alt="圓環" draggable="false">
+<img class="shape" data-answer="star" src="assets/賽道攔截物件/star.png" alt="星形" draggable="false">
+<img class="shape" data-answer="square" src="assets/賽道攔截物件/square.png" alt="方形" draggable="false"></div></div>
+ <div class="row-window sport-window"><div class="object-row" id="sport-row-p2"><img class="sport" data-answer="running" src="assets/賽道攔截物件/running.png" alt="跑步" draggable="false">
+<img class="sport" data-answer="cycling" src="assets/賽道攔截物件/cycling.png" alt="騎腳踏車" draggable="false">
+<img class="sport" data-answer="swimming" src="assets/賽道攔截物件/swimming.png" alt="游泳" draggable="false">
+<img class="sport" data-answer="basketball" src="assets/賽道攔截物件/basketball.png" alt="籃球" draggable="false">
+<img class="sport" data-answer="jump-rope" src="assets/賽道攔截物件/jump-rope.png" alt="跳繩" draggable="false"></div></div>
+ <div class="controls"><button type="button" data-row="shape-row-p2" data-direction="1" aria-label="玩家二形狀向右移動"><kbd>→</kbd> 形狀 →</button><button type="button" data-row="sport-row-p2" data-direction="-1" aria-label="玩家二運動物件向左移動"><kbd>←</kbd> 運動 ←</button></div>
+ </section>
+</main></body></html>
