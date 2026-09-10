@@ -1,0 +1,192 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #243f46;
+  font-family: "Microsoft JhengHei", sans-serif;
+}
+
+/* 遊戲區保持背景原始比例，所有位置都以遊戲區為基準。 */
+.game {
+  position: relative;
+  width: min(100vw, 177.68vh);
+  aspect-ratio: 1672 / 941;
+  background: url("assets/DCCS_background_high_horizon.png") center / 100% 100% no-repeat;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* 分數由 JavaScript 更新，進度條目前為靜態。 */
+.score {
+  position: absolute;
+  top: 3%;
+  left: 8%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 3px solid white;
+  border-radius: 14px;
+  background: #fffdf2;
+  color: #67471f;
+  font-size: 2.3cqw;
+  font-weight: bold;
+}
+.score-label { padding: 0.4em 0.8em; background: #ffc52e; }
+.score-value { padding: 0.4em 2em; }
+.progress-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5.2%;
+  padding: 2% 0;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 3%;
+  background: #fffbeeee;
+  border-radius: 0 0 28px 0;
+}
+.progress-label {
+  writing-mode: vertical-rl;
+  font-size: 1.6cqw;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+}
+.progress-track {
+  flex: 1;
+  width: 36%;
+  border-radius: 30px;
+  background: #cfd8ca;
+}
+
+.player {
+  --accent: #ffc52e;
+  --start-x: 50%;
+  --end-x: 50%;
+}
+
+.center-object {
+  position: absolute;
+  width: 12%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  top: 24.5%;
+  left: var(--start-x);
+  transform: translate(-50%, -50%) scale(.3);
+  transform-origin: center;
+}
+
+.center-object::before {
+  content: "";
+  position: absolute;
+  inset: -15%;
+  border-radius: 50%;
+  background: #ffffff30;
+}
+
+.target-shape, .target-sport {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+
+.row-window {
+  position: absolute;
+  width: 80%;
+  left: 10%;
+  overflow: hidden;
+  padding-block: .5cqw;
+}
+
+.shape-window {
+  top: 46%;
+}
+
+.sport-window {
+  top: 61%;
+}
+
+.object-row {
+  display: grid;
+  grid-template-columns: repeat(5, 20%);
+  align-items: center;
+  justify-items: center;
+}
+
+.shape {
+  width: 6cqw;
+  height: 6cqw;
+  object-fit: contain;
+}
+
+.sport {
+  width: 6cqw;
+  height: 6cqw;
+  object-fit: contain;
+}
+
+.controls {
+  position: absolute;
+  bottom: 1.5%;
+  left: 10%;
+  width: 80%;
+  display: flex;
+  justify-content: center;
+  gap: 1cqw;
+}
+
+button {
+  font: bold 1.5cqw "Microsoft JhengHei", sans-serif;
+  color: #67471f;
+  border: 2px solid white;
+  border-radius: .6cqw;
+  background: #fffdf2ee;
+  padding: .35em .65em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:hover {
+  background: var(--accent);
+}
+
+button:focus-visible {
+  outline: 3px solid #243f46;
+  outline-offset: 2px;
+}
+
+kbd {
+  font: inherit;
+}
+
+/* The line marks the moment the question is checked against each row. */
+.row-window::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed #fff9;
+  pointer-events: none;
+}
+.row-window[data-result="correct"] { background: #dcfce7bb; }
+.row-window[data-result="wrong"] { background: #fee2e2bb; }
+.row-window[data-result="correct"]::after { border-color: #15803d; }
+.row-window[data-result="wrong"]::after { border-color: #b91c1c; }
+.round-feedback {
+  position: absolute;
+  top: 83%;
+  left: 10%;
+  width: 80%;
+  text-align: center;
+  font-size: 1.7cqw;
+  font-weight: bold;
+  color: #493315;
+  background: #fffdf2dd;
+  border-radius: .6cqw;
+  padding: .4em;
+}
