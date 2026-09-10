@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EFT 漂浮泡泡・單人版</title>
+  <link rel="stylesheet" href="EFT_single.css">
+  <script src="EFT_single.js" defer></script>
+</head>
+<body>
+  <main class="game" aria-label="漂浮泡泡單人遊戲">
+    <aside class="progress-panel">
+      <span class="progress-label">漂浮泡泡</span>
+      <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0"><div id="progress-fill"></div></div>
+    </aside>
+    <header class="score"><span>得分</span><strong id="score">0 分</strong></header>
+    <div class="round" id="round">第 1 / 20 題</div>
+    <div class="bubble-field" id="bubble-field" aria-label="請觀察黃色亮起的目標泡泡"></div>
+    <section class="answer-panel" aria-label="作答區">
+      <h1>作答</h1>
+      <p id="feedback" role="status" aria-live="polite">請看亮起的泡泡</p>
+      <p class="keyboard-hint">點選按鈕或按鍵盤 ← →</p>
+    </section>
+    <button class="direction left" data-direction="left" type="button" aria-label="向左作答" disabled><span>⬅</span></button>
+    <button class="direction right" data-direction="right" type="button" aria-label="向右作答" disabled><span>➡</span></button>
+    <div class="overlay" id="results" hidden>
+      <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <h2 id="result-title">挑戰完成！</h2><p>你成功完成了這次泡泡冒險</p>
+        <strong id="final-score"></strong><p id="accuracy"></p>
+        <button class="primary" id="restart" type="button">再玩一次</button>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
