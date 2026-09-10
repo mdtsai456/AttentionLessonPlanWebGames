@@ -1,0 +1,380 @@
+/* 基本設定 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  background: #594331;
+  color: #65462f;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:focus-visible {
+  outline: 4px solid #215cc1;
+  outline-offset: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* 整張雙人背景依原始比例呈現，不切割或重複鋪圖。 */
+.game {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(100vw, 177.68svh);
+  aspect-ratio: 1672 / 941;
+  overflow: hidden;
+  container-type: inline-size;
+  background: #ffd39d url("assets/background.png") center / 100% 100% no-repeat;
+}
+
+/* 每位玩家占一半；1cqw 為各自區域寬度的 1%。 */
+.player {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* 玩家二進度條靠最右邊，保留背景中央分隔線。 */
+.player-2 .progress-panel {
+  inset: 0 0 0 auto;
+  border-radius: 3cqw 0 0 3cqw;
+}
+
+.player-2 .pause {
+  right: 7%;
+}
+
+/* 左側進度條 */
+.progress-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4.8%;
+  padding: 2% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2cqw;
+  border-radius: 0 3cqw 3cqw 0;
+  background: #fffbeeee;
+}
+
+.progress-label {
+  writing-mode: vertical-rl;
+  font-size: 2.6cqw;
+  font-weight: bold;
+  letter-spacing: .15em;
+}
+
+.progress-track {
+  position: relative;
+  width: 40%;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 2cqw;
+  background: #e0d4bd;
+}
+
+[data-ui="progress-fill"] {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background: #e3a344;
+  transition: height .3s;
+}
+
+/* 分數、題數與暫停 */
+.score {
+  position: absolute;
+  left: 8%;
+  top: 3%;
+  width: 43%;
+  height: 8%;
+  display: flex;
+  align-items: center;
+  border: .5cqw solid white;
+  border-radius: 1cqw;
+  background: #fff8e9;
+  font-size: 3cqw;
+}
+
+.score span {
+  display: grid;
+  place-items: center;
+  width: 36%;
+  height: 125%;
+  border-radius: .8cqw;
+  background: #efac2f;
+  color: white;
+  font-weight: bold;
+}
+
+.score strong {
+  flex: 1;
+  text-align: center;
+}
+
+.round,
+.pause {
+  position: absolute;
+  top: 4%;
+  padding: .5em 1em;
+  border: 0;
+  border-radius: 2em;
+  background: #fff9e9;
+  font-size: 2.1cqw;
+  color: #65462f;
+}
+
+.round {
+  right: 19%;
+}
+
+.pause {
+  right: 4%;
+}
+
+/* 題目卡：色名字色與算式並排 */
+.question-panel {
+  position: absolute;
+  top: 15%;
+  left: 12%;
+  width: 78%;
+  height: 20%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1cqw;
+  padding: 1cqw 2cqw 2cqw;
+  border: .3cqw solid #fff;
+  border-radius: 2cqw;
+  background: #fffaf1f5;
+  box-shadow: 0 .3cqw 1cqw #ab613521;
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.caption {
+  font-size: 2cqw;
+  color: #7f6953;
+}
+
+.question strong {
+  font-size: 4.8cqw;
+}
+
+.time {
+  position: absolute;
+  bottom: .6cqw;
+  left: 8%;
+  width: 84%;
+  display: flex;
+  align-items: center;
+  gap: 1cqw;
+  font-size: 1.8cqw;
+}
+
+.time-track {
+  flex: 1;
+  height: .5cqw;
+  border-radius: 1cqw;
+  overflow: hidden;
+  background: #edddc6;
+}
+
+[data-ui="time-fill"] {
+  width: 100%;
+  height: 100%;
+  background: #df9b35;
+}
+
+/* 動物移動區：各幀位置由 JS 的 updateScene 設定。 */
+.animal-field {
+  position: absolute;
+  left: 9%;
+  top: 35%;
+  width: 86%;
+  height: 40%;
+}
+
+.animal {
+  position: absolute;
+  width: 23%;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+}
+
+.animal-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.crosshair {
+  position: absolute;
+  width: 10%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 1px 3px #543720);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.animal[data-result="correct"] {
+  filter: drop-shadow(0 0 .7cqw #328647);
+}
+
+.animal[data-result="wrong"] {
+  filter: drop-shadow(0 0 .7cqw #bc3b32);
+}
+
+/* 正確時按下作答按鈕，不正確則等待。 */
+.answer-panel {
+  position: absolute;
+  left: 12%;
+  bottom: 3%;
+  width: 80%;
+  text-align: center;
+}
+
+.rule {
+  margin: 0;
+  font-size: 2.2cqw;
+  font-weight: bold;
+}
+
+[data-ui="feedback"] {
+  min-height: 1.4em;
+  margin: .4em 0 .7em;
+  font-size: 2.2cqw;
+}
+
+.capture {
+  min-width: 28%;
+  padding: .25em 1.4em;
+  border: .55cqw solid #fffaf2;
+  border-radius: 2cqw;
+  background: #a253d5;
+  box-shadow: 0 .3cqw .4cqw #8d623733;
+  color: #fff;
+  font-size: 3.5cqw;
+  font-weight: bold;
+}
+
+
+.capture span {
+  display: block;
+  font-size: 1.8cqw;
+  font-weight: normal;
+}
+
+.capture:active:not(:disabled) {
+  transform: translateY(.2cqw);
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* 結算畫面 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+  background: #67442975;
+}
+
+.result-card {
+  width: 76%;
+  padding: 4cqw;
+  border: .5cqw solid white;
+  border-radius: 4cqw;
+  background: #fff8e9;
+  text-align: center;
+}
+
+.result-card h1 {
+  margin: 0 0 1cqw;
+  font-size: 3.5cqw;
+}
+
+[data-ui="final-score"] {
+  font-size: 5cqw;
+  color: #c48221;
+}
+
+.result-card p {
+  font-size: 2.6cqw;
+}
+
+.primary {
+  padding: .5em 2em;
+  border: 0;
+  border-radius: 2em;
+  background: #359d59;
+  color: white;
+  font-size: 2cqw;
+  font-weight: bold;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* 觸控方向鍵：按住持續移動，可同時按作答按鈕。 */
+.movement {
+  position: absolute;
+  left: 7%;
+  bottom: 4%;
+  display: grid;
+  grid-template-columns: repeat(3, 4.5cqw);
+  gap: .35cqw;
+}
+
+.movement button {
+  aspect-ratio: 1;
+  border: .2cqw solid white;
+  border-radius: .7cqw;
+  background: #fff5e6;
+  color: #65462f;
+  font-size: 2cqw;
+  touch-action: none;
+}
+
+.movement [data-move="up"] {
+  grid-column: 2;
+}
+
+.movement [data-move="left"] {
+  grid-column: 1;
+}
+
+.answer-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1cqw;
+}
