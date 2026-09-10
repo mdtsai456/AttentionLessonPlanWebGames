@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAT 動物追擊令・單人版</title>
+  <link rel="stylesheet" href="DAT_single.css">
+  <script src="assets/animals/rabbit-hit-mask.js" defer></script>
+  <script src="DAT_single.js" defer></script>
+</head>
+<body>
+  <main class="game" aria-label="動物追擊令單人遊戲">
+    <aside class="progress-panel">
+      <span class="progress-label">動物追擊令</span>
+      <div class="progress-track" id="progress" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0">
+        <div id="progress-fill"></div>
+      </div>
+    </aside>
+    <header class="score"><span>得分</span><strong id="score">0 分</strong></header>
+    <div class="round" id="round">第 1 / 4 題</div>
+    <button class="pause" id="pause" type="button" disabled>暫停</button>
+    <section class="question-panel" aria-label="判斷題目">
+      <div class="question"><span class="caption" id="question-type">等待瞄準</span><strong id="question-text">—</strong></div>
+      <div class="time"><span id="time-text">尚未開始</span><div class="time-track"><div id="time-fill"></div></div></div>
+    </section>
+    <div class="animal-field" id="field" aria-label="動物與玩家準心">
+      <div class="animal" id="animal">
+        <img class="animal-image" id="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+      </div>
+      <img class="crosshair" id="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
+    </div>
+    <section class="answer-panel" aria-label="作答區">
+      <p class="rule">方向鍵 / WASD 移動準心 · 正確按空白鍵，不正確不按</p>
+      <p id="feedback" role="status" aria-live="polite">素材載入中…</p>
+      <div class="answer-buttons">
+        <button class="capture" id="answer-true" type="button" disabled>正確 <span>空白鍵 / 點選</span></button>
+      </div>
+    </section>
+    <div class="movement" aria-label="準心方向控制">
+      <button data-move="up" aria-label="準心向上">↑</button>
+      <button data-move="left" aria-label="準心向左">←</button>
+      <button data-move="down" aria-label="準心向下">↓</button>
+      <button data-move="right" aria-label="準心向右">→</button>
+    </div>
+    <div class="overlay" id="results" hidden>
+      <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <h1 id="result-title">挑戰完成！</h1>
+        <strong id="final-score"></strong>
+        <p id="summary"></p>
+        <p id="accuracy"></p>
+        <button class="primary" id="restart" type="button">再玩一次</button>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
