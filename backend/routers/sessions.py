@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 import writes
 from converters import normalize_game_type_for_db, to_float, to_int
+from models import GameItem, GameListResponse
 
 logger = logging.getLogger(__name__)
 
@@ -184,3 +185,18 @@ def create_session(payload: UnityGameDataRequest) -> SessionAcceptResponse:
 
     logger.info("寫入 Unity 場次：sessionId=%s", response.sessionId)
     return response
+
+
+@router.get("/api/games", response_model=GameListResponse)
+def list_games() -> GameListResponse:
+    """靜態遊戲清單，給遊戲大廳頁用。公開端點，不含任何學生資料。
+
+    直接重用 KNOWN_GAME_NAMES / DOUBLE_CAPABLE_GAMES —— 前端不該自己另外寫死一份
+    遊戲清單，重演 school 曾經在前端寫死、後端一改前端就跟著壞的教訓。
+    """
+    return GameListResponse(
+        games=[
+            GameItem(gameType=name, doubleCapable=name in DOUBLE_CAPABLE_GAMES)
+            for name in sorted(KNOWN_GAME_NAMES)
+        ]
+    )

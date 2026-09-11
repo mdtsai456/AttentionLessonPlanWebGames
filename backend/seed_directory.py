@@ -25,6 +25,7 @@ KMU、NTHU-01 … NTHU-07(見 docs/school-directory.md,三方共用的唯一真�
 from __future__ import annotations
 
 import os
+import secrets
 import sys
 
 from dotenv import load_dotenv
@@ -69,8 +70,11 @@ CREATE TABLE IF NOT EXISTS `teacher` (
   `teacher_id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(50) NOT NULL,
   `school` varchar(100) NOT NULL,
+  `password_hash` varchar(255) NOT NULL DEFAULT '',
+  `account` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`teacher_id`),
   UNIQUE KEY `uq_teacher_school_name` (`school`, `name`),
+  UNIQUE KEY `uq_teacher_account` (`account`),
   CONSTRAINT `fk_teacher_school` FOREIGN KEY (`school`)
     REFERENCES `school` (`school`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -97,8 +101,24 @@ def _resolve_target() -> str:
     return name
 
 
-def seed(connection) -> tuple[int, int]:
-    """冪等灌入 SCHOOLS / TEACHERS。回傳 (school 總筆數, teacher 總筆數)。"""
+def _generate_readable_password() -> str:
+    """人可讀長度的隨機密碼，給要手動抄給老師的場景用。"""
+    return secrets.token_urlsafe(9)
+
+
+def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
+    """冪等灌入 SCHOOLS / TEACHERS。
+
+    回傳 (school 總筆數, teacher 總筆數, 新指派的帳密清單)。帳密清單只包含這次
+    新指派的（原本 account 是 NULL 的老師）——已經有帳號的老師不會被覆蓋，
+    重跑這支腳本不會讓既有帳密失效。
+
+    account 不能跟 school+name 一起在 INSERT 時算好：帳號用 T0001 這種格式，
+    需要 teacher_id（AUTO_INCREMENT，insert 當下才知道），所以分兩步——
+    先 upsert school/name，再對 account 還是 NULL 的列補上 account + 密碼。
+    """
+    from auth import hash_password
+
     with connection.cursor() as cursor:
         cursor.execute(CREATE_SCHOOL)
         cursor.execute(CREATE_TEACHER)
@@ -122,12 +142,26 @@ def seed(connection) -> tuple[int, int]:
             TEACHERS,
         )
 
+        cursor.execute(
+            "SELECT teacher_id, name, school FROM teacher WHERE account IS NULL"
+        )
+        teachers_needing_credentials = cursor.fetchall()
+        new_credentials: list[tuple[str, str, str, str]] = []
+        for row in teachers_needing_credentials:
+            account = f"T{row['teacher_id']:04d}"
+            plaintext = _generate_readable_password()
+            cursor.execute(
+                "UPDATE teacher SET account = %s, password_hash = %s WHERE teacher_id = %s",
+                [account, hash_password(plaintext), row["teacher_id"]],
+            )
+            new_credentials.append((row["school"], row["name"], account, plaintext))
+
         cursor.execute("SELECT COUNT(*) AS n FROM school")
         school_count = cursor.fetchone()["n"]
         cursor.execute("SELECT COUNT(*) AS n FROM teacher")
         teacher_count = cursor.fetchone()["n"]
     connection.commit()
-    return school_count, teacher_count
+    return school_count, teacher_count, new_credentials
 
 
 def main() -> None:
@@ -136,9 +170,17 @@ def main() -> None:
     from db import get_connection
 
     with get_connection() as connection:
-        school_count, teacher_count = seed(connection)
+        school_count, teacher_count, new_credentials = seed(connection)
 
     print(f"已補齊 {target_db}：school {school_count} 筆、teacher {teacher_count} 筆。")
+
+    if new_credentials:
+        print()
+        print(f"新指派了 {len(new_credentials)} 組老師帳密（只印一次，請自行記錄；")
+        print("這個腳本不會把明碼寫進任何檔案）：")
+        print(f"{'場域':<10} {'姓名':<8} {'帳號':<8} 密碼")
+        for school, name, account, plaintext in new_credentials:
+            print(f"{school:<10} {name:<8} {account:<8} {plaintext}")
 
 
 if __name__ == "__main__":

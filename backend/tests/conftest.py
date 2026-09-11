@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import secrets
 from datetime import datetime
 from typing import Any
 
@@ -26,6 +27,7 @@ TABLES_CHILD_FIRST = (
     "im_result",
     "tgame_result",
     "assessment_result",
+    "login_session",  # 外鍵同時指向 teacher 與 student，兩者都要在它之後刪
     "student",
     "teacher",  # 參照資料：teacher 掛在 school 底下，先刪 teacher
     "school",
@@ -121,6 +123,21 @@ _RETROFIT_CONSTRAINTS = (
     ),
 )
 
+# 同上，但補的是欄位不是約束（帳密登入是後補的，既有 _test 庫的 teacher/student
+# 表不會自己長出 password_hash）。
+_RETROFIT_COLUMNS = (
+    ("teacher", "password_hash", "ALTER TABLE teacher ADD COLUMN password_hash "
+     "varchar(255) NOT NULL DEFAULT ''"),
+    ("student", "password_hash", "ALTER TABLE student ADD COLUMN password_hash "
+     "varchar(255) NOT NULL DEFAULT ''"),
+    ("teacher", "account", "ALTER TABLE teacher ADD COLUMN account varchar(20) "
+     "DEFAULT NULL, ADD CONSTRAINT uq_teacher_account UNIQUE (account)"),
+    ("student", "student_id", "ALTER TABLE student ADD COLUMN student_id int "
+     "NOT NULL AUTO_INCREMENT, ADD CONSTRAINT uq_student_id UNIQUE (student_id)"),
+    ("student", "account", "ALTER TABLE student ADD COLUMN account varchar(20) "
+     "DEFAULT NULL, ADD CONSTRAINT uq_student_account UNIQUE (account)"),
+)
+
 
 @pytest.fixture(scope="session")
 def _schema(db_available: str) -> None:
@@ -136,6 +153,14 @@ def _schema(db_available: str) -> None:
                     "WHERE CONSTRAINT_SCHEMA = %s AND TABLE_NAME = %s "
                     "AND CONSTRAINT_NAME = %s",
                     [os.environ["DB_NAME"], table, constraint],
+                )
+                if cursor.fetchone()["n"] == 0:
+                    cursor.execute(alter_sql)
+            for table, column, alter_sql in _RETROFIT_COLUMNS:
+                cursor.execute(
+                    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+                    [os.environ["DB_NAME"], table, column],
                 )
                 if cursor.fetchone()["n"] == 0:
                     cursor.execute(alter_sql)
@@ -186,11 +211,21 @@ class DbHelper:
             [school, school],
         )
 
-    def insert_student(self, grade: str, case_id: str, school: str) -> None:
+    def insert_student(
+        self,
+        grade: str,
+        case_id: str,
+        school: str,
+        password: str | None = None,
+        account: str | None = None,
+    ) -> None:
+        from auth import hash_password
+
         self.ensure_school(school)
         self.execute(
-            "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
-            [grade, case_id, school],
+            "INSERT INTO student (grade, case_id, school, password_hash, account) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            [grade, case_id, school, hash_password(password) if password else "", account],
         )
 
     def insert_school(
@@ -203,13 +238,22 @@ class DbHelper:
             [school, display_name if display_name is not None else school, sort_order],
         )
 
-    def insert_teacher(self, name: str, school: str) -> int:
+    def insert_teacher(
+        self,
+        name: str,
+        school: str,
+        password: str | None = None,
+        account: str | None = None,
+    ) -> int:
+        from auth import hash_password
         from db import get_connection
 
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "INSERT INTO teacher (name, school) VALUES (%s, %s)", [name, school]
+                    "INSERT INTO teacher (name, school, password_hash, account) "
+                    "VALUES (%s, %s, %s, %s)",
+                    [name, school, hash_password(password) if password else "", account],
                 )
                 teacher_id = cursor.lastrowid
             connection.commit()
@@ -281,6 +325,58 @@ def client(db: DbHelper) -> Any:
 
     with TestClient(main.app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def login_as_teacher(client: Any, db: DbHelper) -> Any:
+    """回傳一個工廠函式：建一位帳密已知的老師、登入，回傳 (teacher_id, headers)。
+
+    account 帳號預設自動產生亂數字串——登入帳密改用全域唯一的 account 之後
+    （見 docs/adr/0004），不再靠 school+name 登入，這裡跟著換。
+    """
+
+    def _login(
+        name: str = "吳老師",
+        school: str = "A",
+        password: str = "test-pw-1",
+        account: str | None = None,
+    ) -> Any:
+        account = account or f"t-{secrets.token_hex(4)}"
+        db.insert_school(school)
+        teacher_id = db.insert_teacher(name, school, password=password, account=account)
+        response = client.post(
+            "/api/auth/teacher/login",
+            json={"account": account, "password": password},
+        )
+        assert response.status_code == 200, response.text
+        token = response.json()["token"]
+        return teacher_id, {"Authorization": f"Bearer {token}"}
+
+    return _login
+
+
+@pytest.fixture
+def login_as_student(client: Any, db: DbHelper) -> Any:
+    """回傳一個工廠函式：建一位帳密已知的學生、登入，回傳 (studentKey, headers)。"""
+
+    def _login(
+        grade: str = "G1",
+        case_id: str = "S01",
+        school: str = "A",
+        password: str = "test-pw-1",
+        account: str | None = None,
+    ) -> Any:
+        account = account or f"s-{secrets.token_hex(4)}"
+        db.insert_student(grade, case_id, school, password=password, account=account)
+        response = client.post(
+            "/api/auth/student/login",
+            json={"account": account, "password": password},
+        )
+        assert response.status_code == 200, response.text
+        token = response.json()["token"]
+        return f"{grade}_{case_id}", {"Authorization": f"Bearer {token}"}
+
+    return _login
 
 
 @pytest.fixture

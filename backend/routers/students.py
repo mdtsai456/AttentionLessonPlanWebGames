@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 import queries
 from converters import (
@@ -31,6 +31,13 @@ from models import (
     TrendItem,
     TrendPoint,
 )
+from errors import db_error
+from routers.identity import (
+    Identity,
+    get_current_identity,
+    require_own_student_or_same_school_teacher,
+    require_teacher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +45,6 @@ router = APIRouter(tags=["students"])
 
 
 # --- 工具函式 ---
-
-
-def db_error(exc: Exception) -> HTTPException:
-    """回給呼叫端一句通用訊息，完整例外寫進 server log。
-
-    PyMySQL 的例外訊息可能包含表名、欄位名，連線失敗時甚至包含主機位址與
-    使用者名稱。這個 API 部署在公開網路上，那些資訊不該出現在 HTTP 回應裡。
-    """
-    logger.exception("資料庫查詢失敗")
-    return HTTPException(status_code=500, detail="資料庫查詢失敗")
 
 
 def parse_student_key(student_key: str) -> tuple[str, str]:
@@ -211,10 +208,18 @@ def build_student_list_items(rows: list[dict[str, Any]]) -> list[StudentListItem
 @router.get("/api/students", response_model=StudentListResponse)
 def list_students(
     school: str | None = Query(
-        default=None, description="可選，場域／學校，例如：測試場域。不給則回傳所有場域"
+        default=None, description="可選，場域／學校。不給則預設為登入老師自己的場域"
     ),
+    identity: Identity = Depends(require_teacher),
 ) -> StudentListResponse:
-    normalized_school = normalize_school(school)
+    """老師專用。不管有沒有帶 school，一律只回登入老師自己場域的學生——
+
+    帶了別的場域字串一律 403，不是靜默改查自己場域，才不會讓呼叫端誤以為查到了
+    別人的資料卻其實悄悄被換掉。
+    """
+    normalized_school = normalize_school(school) or identity.school
+    if normalized_school != identity.school:
+        raise HTTPException(status_code=403, detail="無權查看其他場域資料")
 
     try:
         rows = queries.fetch_students(normalized_school)
@@ -240,8 +245,10 @@ def list_student_sessions(
     mode: str | None = Query(
         default=None, description="可選，single 或 double；不給則回全部"
     ),
+    identity: Identity = Depends(get_current_identity),
 ) -> SessionsResponse:
     grade, case_id = parse_student_key(student_key)
+    require_own_student_or_same_school_teacher(identity, grade, case_id, school)
 
     try:
         rows = queries.fetch_assessment_rows(
@@ -271,8 +278,10 @@ def get_student_report(
     mode: str | None = Query(
         default=None, description="可選，single 或 double；不給則回全部"
     ),
+    identity: Identity = Depends(get_current_identity),
 ) -> StudentReportResponse:
     grade, case_id = parse_student_key(student_key)
+    require_own_student_or_same_school_teacher(identity, grade, case_id, school)
 
     try:
         rows = queries.fetch_assessment_rows(

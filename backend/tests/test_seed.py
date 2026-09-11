@@ -31,6 +31,15 @@ def test_generate_is_deterministic():
     assert seed.generate() == seed.generate()
 
 
+def test_student_password_hash_constant_matches_plaintext():
+    # TEST_STUDENT_PASSWORD_HASH 是手動算好硬編碼的（見 seed.py 裡的說明：
+    # hash_password() 每次都用新的隨機 salt，現算會讓 generate() 失去決定性）。
+    # 若 TEST_STUDENT_PASSWORD 改了卻忘記重算雜湊，這個測試會抓到。
+    from auth import verify_password
+
+    assert verify_password(seed.TEST_STUDENT_PASSWORD, seed.TEST_STUDENT_PASSWORD_HASH)
+
+
 def test_row_counts():
     students, sessions, details = seed.generate()
     n_students = len(seed.SCHOOLS) * len(seed.STUDENTS)

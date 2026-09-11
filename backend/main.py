@@ -6,14 +6,19 @@
     uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 端點：
-    POST /api/sessions
-    GET /api/students?school=測試場域
-    GET /api/students/{studentKey}/sessions?school=測試場域
-    GET /api/students/{studentKey}/report?school=測試場域
-    GET /api/schools
-    GET /api/schools/{school}/teachers
-    GET /api/teachers/{teacherId}/students
-    GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端）
+    POST /api/sessions                              ← Unity 用，無驗證
+    POST /api/auth/teacher/login
+    POST /api/auth/student/login
+    POST /api/auth/logout
+    GET /api/schools                                ← 公開，登入前要用
+    GET /api/schools/{school}/teachers               ← 公開，登入前要用
+    GET /api/me/students                             ← 老師專用，須帶 token
+    GET /api/students?school=測試場域                  ← 須帶 token（老師）
+    GET /api/students/{studentKey}/sessions?school=…  ← 須帶 token
+    GET /api/students/{studentKey}/report?school=…    ← 須帶 token
+    GET /api/teachers/{teacherId}/students            ← 須帶 token（老師本人）
+    GET /api/games                                   ← 公開，靜態遊戲清單
+    GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端，帳密登入後會壞掉）
 
 CORS：瀏覽器前端跨網域呼叫需要放行其 origin。用環境變數 CORS_ALLOW_ORIGINS
 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時預設放行常見的本機
@@ -32,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from db import validate_db_settings
-from routers import directory, sessions, students
+from routers import auth, directory, sessions, students
 
 load_dotenv()
 
@@ -83,6 +88,7 @@ app.add_middleware(
 app.include_router(sessions.router)
 app.include_router(students.router)
 app.include_router(directory.router)
+app.include_router(auth.router)
 
 
 @app.get("/")

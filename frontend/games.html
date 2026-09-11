@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AttentionLessonPlan - 遊戲大廳</title>
+  <link rel="stylesheet" href="css/games.css">
+</head>
+<body>
+  <div class="lobby-container">
+    <header class="lobby-header">
+      <div class="lobby-title">
+        <h1>遊戲大廳</h1>
+        <span id="mode-badge" class="mode-badge">--</span>
+      </div>
+      <div class="players" id="players">
+        <!-- 動態插入目前登入的學生 1（單人）或學生 1+2（雙人） -->
+      </div>
+      <button id="btn-logout" class="btn-text">登出</button>
+    </header>
+
+    <main class="lobby-main">
+      <div id="games-grid" class="games-grid">
+        <!-- 動態插入遊戲卡片 -->
+      </div>
+      <p id="loading-hint" class="hint">載入遊戲清單中...</p>
+    </main>
+
+    <!-- 點擊卡片的提示（不用 alert，避免像登入頁那次一樣讓人以為沒反應） -->
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <script type="module" src="js/games.js"></script>
+</body>
+</html>

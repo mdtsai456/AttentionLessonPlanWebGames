@@ -2,6 +2,11 @@
 
 這些測試描述重構前的實際行為，包含不理想的部分（例如 endTime 的空字串），
 目的是讓 Task 3–6 的搬移一旦改變行為就立刻失敗。
+
+2026-09-11：帳密登入上線後（見 docs/adr/0004-teacher-student-password-login.md），
+/api/students、/sessions、/report 都要求 Authorization header。這裡統一用
+login_as_teacher fixture 登入一位「測試場域」的老師，取得 headers 帶給每個請求——
+這些測試原本驗證的行為（回應形狀、篩選、排序……）本身沒變，只是現在要先登入。
 """
 
 from __future__ import annotations
@@ -23,7 +28,8 @@ def test_health_returns_ok(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_sessions_returns_student_sessions(client, db):
+def test_sessions_returns_student_sessions(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1",
@@ -37,7 +43,7 @@ def test_sessions_returns_student_sessions(client, db):
     )
 
     response = client.get(
-        "/api/students/G1_S03/sessions", params={"school": "測試場域"}
+        "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.status_code == 200
@@ -59,27 +65,32 @@ def test_sessions_returns_student_sessions(client, db):
     }
 
 
-def test_sessions_rejects_malformed_student_key(client, db):
-    response = client.get("/api/students/G1/sessions", params={"school": "測試場域"})
+def test_sessions_rejects_malformed_student_key(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
+    response = client.get(
+        "/api/students/G1/sessions", params={"school": "測試場域"}, headers=headers
+    )
 
     assert response.status_code == 400
     assert "studentKey" in response.json()["detail"]
 
 
-def test_sessions_of_unknown_student_is_empty_not_404(client, db):
+def test_sessions_of_unknown_student_is_empty_not_404(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     response = client.get(
-        "/api/students/G9_S99/sessions", params={"school": "測試場域"}
+        "/api/students/G9_S99/sessions", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.status_code == 200
     assert response.json()["sessions"] == []
 
 
-def test_unfinished_session_end_time_is_empty_string(client, db):
+def test_unfinished_session_end_time_is_empty_string(client, db, login_as_teacher):
     """記錄既有行為：end_time 為 NULL 時回傳空字串，而非 null。
 
     這是已知債務，本次不修改。新端點的 lastPlayedAt 使用 null。
     """
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1",
@@ -91,14 +102,15 @@ def test_unfinished_session_end_time_is_empty_string(client, db):
     )
 
     response = client.get(
-        "/api/students/G1_S03/sessions", params={"school": "測試場域"}
+        "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.json()["sessions"][0]["endTime"] == ""
 
 
-def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db):
+def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db, login_as_teacher):
     """Unity 送 TGame，資料庫存 TGAME，回應要送回 TGame。"""
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="u1", game_type="TGAME",
@@ -112,6 +124,7 @@ def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db):
     response = client.get(
         "/api/students/G1_S03/sessions",
         params={"school": "測試場域", "game_type": "TGame"},
+        headers=headers,
     )
 
     sessions = response.json()["sessions"]
@@ -121,7 +134,8 @@ def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db):
     assert sessions[0]["mode"] == "single"
 
 
-def test_report_includes_stats_and_summary(client, db):
+def test_report_includes_stats_and_summary(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="u1", game_type="DCCS",
@@ -134,7 +148,7 @@ def test_report_includes_stats_and_summary(client, db):
     )
 
     response = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.status_code == 200
@@ -160,8 +174,9 @@ def test_report_includes_stats_and_summary(client, db):
     ]
 
 
-def test_report_session_without_stats_row_has_null_stats(client, db):
+def test_report_session_without_stats_row_has_null_stats(client, db, login_as_teacher):
     """assessment_result 有列，但細部表沒有對應列。"""
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="u1", game_type="DCCS",
@@ -169,7 +184,7 @@ def test_report_session_without_stats_row_has_null_stats(client, db):
     )
 
     response = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     )
 
     body = response.json()
@@ -187,7 +202,8 @@ def test_report_session_without_stats_row_has_null_stats(client, db):
     ]
 
 
-def test_sessions_are_ordered_by_start_time_descending(client, db):
+def test_sessions_are_ordered_by_start_time_descending(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="old",
@@ -199,7 +215,7 @@ def test_sessions_are_ordered_by_start_time_descending(client, db):
     )
 
     response = client.get(
-        "/api/students/G1_S03/sessions", params={"school": "測試場域"}
+        "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers
     )
 
     ids = [s["sessionId"] for s in response.json()["sessions"]]
@@ -207,12 +223,13 @@ def test_sessions_are_ordered_by_start_time_descending(client, db):
 
 
 def test_sessions_db_error_returns_500_without_leaking_exception(
-    client, db, break_query
+    client, db, login_as_teacher, break_query
 ):
+    _, headers = login_as_teacher(school="測試場域")
     break_query("fetch_assessment_rows")
 
     response = client.get(
-        "/api/students/G1_S03/sessions", params={"school": "測試場域"}
+        "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.status_code == 500
@@ -222,12 +239,13 @@ def test_sessions_db_error_returns_500_without_leaking_exception(
 
 
 def test_report_db_error_returns_500_without_leaking_exception(
-    client, db, break_query
+    client, db, login_as_teacher, break_query
 ):
+    _, headers = login_as_teacher(school="測試場域")
     break_query("fetch_assessment_rows")
 
     response = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     )
 
     assert response.status_code == 500
@@ -236,29 +254,46 @@ def test_report_db_error_returns_500_without_leaking_exception(
 
 
 # --- GET /api/students ---
+#
+# 老師登入後只能查自己場域（見 routers/students.py 的 list_students）：不帶
+# school 參數時預設是自己的場域，帶了別的場域一律 403，不再有「查全部場域」模式。
 
 
-def test_list_students_without_school_returns_all_schools(client, db):
+def test_list_students_without_school_defaults_to_own_school(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="SchoolA")
     db.insert_student("G1", "S03", "SchoolA")
     db.insert_student("G1", "S03", "SchoolB")
 
-    response = client.get("/api/students")
+    response = client.get("/api/students", headers=headers)
 
     assert response.status_code == 200
     body = response.json()
-    assert body["school"] is None
-    assert body["studentCount"] == 2
+    assert body["school"] == "SchoolA"
+    assert body["studentCount"] == 1
     assert [(s["studentKey"], s["school"]) for s in body["students"]] == [
         ("G1_S03", "SchoolA"),
-        ("G1_S03", "SchoolB"),
     ]
 
 
-def test_list_students_with_school_filters_and_echoes_it(client, db):
+def test_list_students_rejects_other_school(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="SchoolA")
+    db.insert_student("G1", "S03", "SchoolB")
+
+    response = client.get(
+        "/api/students", params={"school": "SchoolB"}, headers=headers
+    )
+
+    assert response.status_code == 403
+
+
+def test_list_students_with_school_filters_and_echoes_it(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="SchoolA")
     db.insert_student("G1", "S03", "SchoolA")
     db.insert_student("G1", "S03", "SchoolB")
 
-    response = client.get("/api/students", params={"school": "SchoolA"})
+    response = client.get(
+        "/api/students", params={"school": "SchoolA"}, headers=headers
+    )
 
     body = response.json()
     assert body["school"] == "SchoolA"
@@ -266,7 +301,8 @@ def test_list_students_with_school_filters_and_echoes_it(client, db):
     assert body["students"][0]["school"] == "SchoolA"
 
 
-def test_list_students_includes_zero_session_students(client, db):
+def test_list_students_includes_zero_session_students(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_student("G1", "S04", "測試場域")
     db.insert_session(
@@ -274,7 +310,9 @@ def test_list_students_includes_zero_session_students(client, db):
         start_time=datetime(2026, 7, 8, 14, 30, 0),
     )
 
-    response = client.get("/api/students", params={"school": "測試場域"})
+    response = client.get(
+        "/api/students", params={"school": "測試場域"}, headers=headers
+    )
 
     assert response.json()["students"] == [
         {
@@ -296,52 +334,60 @@ def test_list_students_includes_zero_session_students(client, db):
     ]
 
 
-def test_list_students_blank_school_is_treated_as_not_given(client, db):
+def test_list_students_blank_school_is_treated_as_not_given(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="SchoolA")
     db.insert_student("G1", "S03", "SchoolA")
-    db.insert_student("G1", "S03", "SchoolB")
 
-    response = client.get("/api/students", params={"school": "   "})
+    response = client.get(
+        "/api/students", params={"school": "   "}, headers=headers
+    )
 
     body = response.json()
-    assert body["school"] is None
-    assert body["studentCount"] == 2
+    assert body["school"] == "SchoolA"  # 空白視同沒給，落回自己的場域
+    assert body["studentCount"] == 1
 
 
-def test_list_students_of_unknown_school_is_200_with_empty_list(client, db):
-    db.insert_student("G1", "S03", "測試場域")
+def test_list_students_of_own_empty_school_is_200_with_empty_list(client, db, login_as_teacher):
+    """自己場域目前沒有任何學生，仍是 200 + 空陣列，不是錯誤。"""
+    _, headers = login_as_teacher(school="空場域")
 
-    response = client.get("/api/students", params={"school": "不存在的場域"})
+    response = client.get(
+        "/api/students", params={"school": "空場域"}, headers=headers
+    )
 
     assert response.status_code == 200
     assert response.json() == {
-        "school": "不存在的場域",
+        "school": "空場域",
         "studentCount": 0,
         "students": [],
     }
 
 
-def test_list_students_student_count_matches_list_length(client, db):
+def test_list_students_student_count_matches_list_length(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     for index in range(3):
         db.insert_student("G1", f"S0{index}", "測試場域")
 
-    body = client.get("/api/students").json()
+    body = client.get("/api/students", headers=headers).json()
 
     assert body["studentCount"] == len(body["students"]) == 3
 
 
 def test_list_students_db_error_returns_500_without_leaking_exception(
-    client, db, break_query
+    client, db, login_as_teacher, break_query
 ):
+    _, headers = login_as_teacher(school="測試場域")
     break_query("fetch_students")
 
-    response = client.get("/api/students")
+    response = client.get("/api/students", headers=headers)
 
     assert response.status_code == 500
     assert response.json() == {"detail": "資料庫查詢失敗"}
     assert "43.163.233.40" not in response.text
 
 
-def test_report_includes_trends_ascending_by_time(client, db):
+def test_report_includes_trends_ascending_by_time(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="u_old", game_type="DCCS",
@@ -361,7 +407,7 @@ def test_report_includes_trends_ascending_by_time(client, db):
     )
 
     body = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     ).json()
 
     assert body["trends"] == [
@@ -420,11 +466,12 @@ def _seed_single_and_double_dat(db):
         )
 
 
-def test_report_summary_splits_single_and_double(client, db):
+def test_report_summary_splits_single_and_double(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     _seed_single_and_double_dat(db)
 
     body = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     ).json()
 
     summary = {(s["gameType"], s["mode"]): s for s in body["summaryByGame"]}
@@ -433,11 +480,12 @@ def test_report_summary_splits_single_and_double(client, db):
     assert [r["mode"] for r in body["records"]].count("double") == 2
 
 
-def test_report_trends_split_by_mode_contain_only_that_mode(client, db):
+def test_report_trends_split_by_mode_contain_only_that_mode(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     _seed_single_and_double_dat(db)
 
     body = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     ).json()
 
     trends = {(t["gameType"], t["mode"]): t for t in body["trends"]}
@@ -451,12 +499,14 @@ def test_report_trends_split_by_mode_contain_only_that_mode(client, db):
     assert [p["value"] for p in double_correct["stats"]] == [9, 9]
 
 
-def test_report_mode_filter_returns_only_that_mode(client, db):
+def test_report_mode_filter_returns_only_that_mode(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     _seed_single_and_double_dat(db)
 
     body = client.get(
         "/api/students/G1_S03/report",
         params={"school": "測試場域", "mode": "double"},
+        headers=headers,
     ).json()
 
     assert {r["mode"] for r in body["records"]} == {"double"}
@@ -465,7 +515,8 @@ def test_report_mode_filter_returns_only_that_mode(client, db):
     ]
 
 
-def test_report_game_type_and_mode_filters_combine(client, db):
+def test_report_game_type_and_mode_filters_combine(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     _seed_single_and_double_dat(db)
     db.insert_session(
         "G1", "S03", "測試場域", uuid="dccs1", game_type="DCCS", mode="single",
@@ -475,6 +526,7 @@ def test_report_game_type_and_mode_filters_combine(client, db):
     body = client.get(
         "/api/students/G1_S03/report",
         params={"school": "測試場域", "game_type": "DAT", "mode": "single"},
+        headers=headers,
     ).json()
 
     assert body["totalSessions"] == 3
@@ -483,18 +535,21 @@ def test_report_game_type_and_mode_filters_combine(client, db):
     }
 
 
-def test_sessions_mode_filter(client, db):
+def test_sessions_mode_filter(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     _seed_single_and_double_dat(db)
 
     body = client.get(
         "/api/students/G1_S03/sessions",
         params={"school": "測試場域", "mode": "double"},
+        headers=headers,
     ).json()
 
     assert [s["mode"] for s in body["sessions"]] == ["double", "double"]
 
 
-def test_report_session_without_stats_has_empty_trends(client, db):
+def test_report_session_without_stats_has_empty_trends(client, db, login_as_teacher):
+    _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="u1", game_type="DCCS",
@@ -502,7 +557,7 @@ def test_report_session_without_stats_has_empty_trends(client, db):
     )  # 無對應 dccs_result 列
 
     body = client.get(
-        "/api/students/G1_S03/report", params={"school": "測試場域"}
+        "/api/students/G1_S03/report", params={"school": "測試場域"}, headers=headers
     ).json()
 
     assert body["trends"] == []

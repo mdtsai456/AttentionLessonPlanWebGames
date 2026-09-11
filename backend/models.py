@@ -114,3 +114,40 @@ class TeacherStudentsResponse(BaseModel):
     school: str
     studentCount: int  # 等同 students 長度，Python 端計算
     students: list[StudentListItem] = Field(default_factory=list)
+
+
+class GameItem(BaseModel):
+    gameType: str
+    doubleCapable: bool
+
+
+class GameListResponse(BaseModel):
+    games: list[GameItem] = Field(default_factory=list)
+
+
+# --- 帳密登入（見 docs/adr/0004-teacher-student-password-login.md） ---
+
+
+class TeacherLoginRequest(BaseModel):
+    account: str
+    password: str
+
+
+class StudentLoginRequest(BaseModel):
+    account: str
+    password: str
+
+
+class TeacherLoginResponse(BaseModel):
+    token: str
+    teacherId: int
+    teacherName: str
+    school: str
+
+
+class StudentLoginResponse(BaseModel):
+    token: str
+    studentKey: str
+    grade: str
+    caseId: str
+    school: str

@@ -97,3 +97,58 @@ def test_seed_preserves_manually_added_teacher(db):
         for row in db.query("SELECT name FROM teacher WHERE school = 'KMU'")
     }
     assert "手動老師" in names
+
+
+def test_seed_assigns_account_and_password_to_every_teacher_without_one(db):
+    from db import get_connection
+
+    with get_connection() as connection:
+        _, _, new_credentials = seed_directory.seed(connection)
+
+    assert len(new_credentials) == 16  # 全部都是新的，account 欄位原本是 NULL
+    rows = db.query("SELECT account, password_hash FROM teacher")
+    assert all(row["account"] for row in rows)  # 每位老師都有非空的 account
+    assert len({row["account"] for row in rows}) == 16  # 全域唯一，沒有重複
+    assert all(row["password_hash"] for row in rows)
+
+
+def test_seed_does_not_reassign_or_leak_existing_credentials(db):
+    from db import get_connection
+
+    with get_connection() as connection:
+        seed_directory.seed(connection)
+
+    before = {
+        row["teacher_id"]: (row["account"], row["password_hash"])
+        for row in db.query("SELECT teacher_id, account, password_hash FROM teacher")
+    }
+
+    with get_connection() as connection:
+        _, _, new_credentials = seed_directory.seed(connection)
+
+    assert new_credentials == []  # 第二次跑，沒有人需要新帳密
+    after = {
+        row["teacher_id"]: (row["account"], row["password_hash"])
+        for row in db.query("SELECT teacher_id, account, password_hash FROM teacher")
+    }
+    assert before == after  # 既有帳密完全沒變
+
+
+def test_seed_generated_credentials_actually_verify(db):
+    from auth import verify_password
+    from db import get_connection
+
+    with get_connection() as connection:
+        _, _, new_credentials = seed_directory.seed(connection)
+
+    school, name, account, plaintext = new_credentials[0]
+    stored = db.query(
+        "SELECT password_hash FROM teacher WHERE school = %s AND name = %s",
+        [school, name],
+    )[0]["password_hash"]
+    assert verify_password(plaintext, stored)
+
+    stored_by_account = db.query(
+        "SELECT password_hash FROM teacher WHERE account = %s", [account]
+    )[0]["password_hash"]
+    assert stored_by_account == stored

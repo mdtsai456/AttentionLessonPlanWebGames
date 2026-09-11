@@ -37,6 +37,18 @@ STUDENTS = [("G1", "S01"), ("G1", "S02"), ("G1", "S03"),
 # 每日固定順序;game_type 必須精確對上 queries.GAME_RESULT_TABLES 的鍵(TGAME 全大寫)。
 GAMES = ["DCCS", "DAT", "EFT", "IM", "TGAME"]
 
+# 假學生統一用這組密碼登入（純測試/本機 demo 用，不代表正式密碼政策——
+# 正式老師密碼由 seed_directory.py 隨機產生，見該檔）。
+TEST_STUDENT_PASSWORD = "test1234"
+# hash_password() 每次呼叫都會生成新的隨機 salt，若在 generate() 裡現算，會讓
+# 「同樣的 SEED 兩次呼叫 generate() 必須完全相同」這個不變式（test_seed.py 的
+# test_generate_is_deterministic）失敗。這裡直接硬編碼算好的結果，等同
+# hash_password(TEST_STUDENT_PASSWORD)，避免每次呼叫都在算。
+TEST_STUDENT_PASSWORD_HASH = (
+    "pbkdf2_sha256$260000$6d14c6d77b17caf8da908e6e35bf1787$"
+    "0aa3fbae00fe840815feecee3ec4a5a7ba703e8a62feb369a6edc08042b780e9"
+)
+
 # 廠商只做這三款的雙人版。這些遊戲在下列 day_in_round 額外多灌一場 mode='double',
 # 讓報告頁「單/雙人並陳」的畫面有東西可畫(每 Round 3 場雙人)。
 DOUBLE_GAMES = {"DCCS", "DAT", "EFT"}
@@ -130,7 +142,7 @@ def generate() -> tuple[list, list, dict[str, list]]:
 
     for school in SCHOOLS:
         for grade, case_id in STUDENTS:
-            student_rows.append((grade, case_id, school))
+            student_rows.append((grade, case_id, school, TEST_STUDENT_PASSWORD_HASH))
             trajectory = {game: make_trajectory(rng) for game in GAMES}
 
             for day in play_days:
@@ -247,9 +259,26 @@ def main() -> None:
                 [(name, name, order) for order, name in enumerate(SCHOOLS)],
             )
             cursor.executemany(
-                "INSERT INTO student (grade, case_id, school) VALUES (%s, %s, %s)",
+                "INSERT INTO student (grade, case_id, school, password_hash) "
+                "VALUES (%s, %s, %s, %s)",
                 student_rows,
             )
+
+            # 假學生的 account（登入帳號）沒辦法在上面的 INSERT 裡一起算好：
+            # 格式是 S0001 這種，要用 student_id（AUTO_INCREMENT，insert 當下
+            # 才知道），所以 insert 完再補一次 UPDATE（跟 seed_directory.py
+            # 補老師 account 的手法一樣）。
+            cursor.execute("SELECT grade, case_id, school, student_id FROM student")
+            sample_account = None
+            for row in cursor.fetchall():
+                account = f"S{row['student_id']:04d}"
+                cursor.execute(
+                    "UPDATE student SET account = %s "
+                    "WHERE grade = %s AND case_id = %s AND school = %s",
+                    [account, row["grade"], row["case_id"], row["school"]],
+                )
+                if sample_account is None:
+                    sample_account = account
             cursor.executemany(
                 """
                 INSERT INTO assessment_result
@@ -275,6 +304,9 @@ def main() -> None:
     print(f"  student           {len(student_rows):>5}")
     print(f"  assessment_result {len(session_rows):>5}")
     print(f"  各遊戲明細合計      {detail_total:>5}")
+    print(f"所有假學生密碼統一是：{TEST_STUDENT_PASSWORD}（測試/本機 demo 用）")
+    print(f"帳號依 student_id 依序指派為 S0001、S0002……（帳號不會出現在任何 API 回應裡，")
+    print(f"要看完整清單請直接查 DB 的 student.account 欄位）；隨便挑一個試登入，例如：{sample_account}")
 
 
 if __name__ == "__main__":

@@ -377,7 +377,9 @@ def test_post_session_maps_write_errors_without_leaking_details(
     assert "root" not in response.text
 
 
-def test_post_session_writes_session_retrievable_by_existing_api(client, db):
+def test_post_session_writes_session_retrievable_by_existing_api(
+    client, db, login_as_teacher
+):
     payload = dccs_payload()
     payload["data"]["startTime"] += 123
     payload["data"]["endTime"] += 456
@@ -395,8 +397,11 @@ def test_post_session_writes_session_retrievable_by_existing_api(client, db):
         [session_id],
     ) == [{"correct_count": 10, "frameWrongCount": None}]
 
+    # POST /api/sessions 是 Unity 用的，無驗證；GET /sessions 是人看的，帳密登入後
+    # 要帶 token —— 這裡登入一位「測試場域」的老師來查剛才 Unity 寫入的場次。
+    _, headers = login_as_teacher(school="測試場域")
     get_response = client.get(
-        "/api/students/G1_S03/sessions", params={"school": "測試場域"}
+        "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers
     )
     assert get_response.status_code == 200
     assert get_response.json()["sessions"] == [

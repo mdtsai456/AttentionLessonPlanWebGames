@@ -193,3 +193,50 @@ def fetch_teacher(teacher_id: int) -> dict[str, Any] | None:
                 [teacher_id],
             )
             return cursor.fetchone()
+
+
+# --- 帳密登入（見 docs/adr/0004-teacher-student-password-login.md） ---
+
+
+def fetch_teacher_by_account(account: str) -> dict[str, Any] | None:
+    """登入用：依全域唯一的 account 查老師，含 password_hash。None 表示查無此人。
+
+    teacher.name 只在 school 內唯一（uq_teacher_school_name），不能拿來登入；
+    account 才是全域唯一、真正拿來登入的欄位（見 ADR 0004）。
+    """
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT teacher_id, name, school, password_hash FROM teacher "
+                "WHERE account = %s",
+                [account],
+            )
+            return cursor.fetchone()
+
+
+def fetch_student_by_account(account: str) -> dict[str, Any] | None:
+    """登入用：依全域唯一的 account 查學生，含 password_hash。None 表示查無此人。
+
+    grade_caseId（studentKey）每個場域都會重複，不能拿來登入；account 才是
+    全域唯一、真正拿來登入的欄位（見 ADR 0004）。
+    """
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT grade, case_id, school, password_hash FROM student "
+                "WHERE account = %s",
+                [account],
+            )
+            return cursor.fetchone()
+
+
+def fetch_login_session(token: str) -> dict[str, Any] | None:
+    """查登入 token。None 表示 token 不存在（router 轉 401，不分辨是否過期）。"""
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT token, subject_type, teacher_id, grade, case_id, school, "
+                "expires_at FROM login_session WHERE token = %s",
+                [token],
+            )
+            return cursor.fetchone()
