@@ -1,0 +1,215 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Nunito", "Microsoft JhengHei", sans-serif;
+  color: #2f5d3a;
+}
+
+.stage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 1.5rem 14vh;
+  background:
+    url("img/HomeBack.png") center / cover no-repeat,
+    #8ecff0;
+}
+
+.panel {
+  width: min(420px, 100%);
+  padding: 1.6rem 1.5rem 1.4rem;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 10px 0 rgba(90, 170, 210, 0.22),
+    0 22px 36px rgba(80, 140, 90, 0.18);
+  backdrop-filter: blur(6px);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 1rem;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #3f8f4e;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+.step {
+  margin-bottom: 1rem;
+}
+
+.label {
+  margin: 0 0 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #4a7c52;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.72rem 1.6rem;
+  min-width: 7.2rem;
+  font-family: inherit;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+}
+
+.btn:active {
+  transform: translateY(4px);
+}
+
+.btn-green {
+  background: linear-gradient(#9ee36a, #6ec94a);
+  box-shadow: 0 6px 0 #4aa43a, 0 10px 14px rgba(70, 140, 60, 0.28);
+}
+
+.btn-green:active {
+  box-shadow: 0 2px 0 #4aa43a, 0 4px 8px rgba(70, 140, 60, 0.22);
+}
+
+.btn-green.is-selected {
+  box-shadow:
+    0 6px 0 #4aa43a,
+    0 0 0 3px #fff,
+    0 10px 14px rgba(70, 140, 60, 0.28);
+}
+
+.btn-sky {
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+}
+
+.btn-sky:active {
+  box-shadow: 0 2px 0 #3494c4, 0 4px 8px rgba(60, 140, 180, 0.22);
+}
+
+.btn-sky.is-selected {
+  box-shadow:
+    0 6px 0 #3494c4,
+    0 0 0 3px #fff,
+    0 10px 14px rgba(60, 140, 180, 0.28);
+}
+
+.btn-leaf {
+  background: linear-gradient(#7ed89a, #4cba72);
+  box-shadow: 0 6px 0 #2f9a55, 0 10px 14px rgba(50, 130, 80, 0.28);
+}
+
+.btn-leaf:active {
+  box-shadow: 0 2px 0 #2f9a55, 0 4px 8px rgba(50, 130, 80, 0.22);
+}
+
+.btn-leaf.is-selected {
+  box-shadow:
+    0 6px 0 #2f9a55,
+    0 0 0 3px #fff,
+    0 10px 14px rgba(50, 130, 80, 0.28);
+}
+
+.btn-enter {
+  width: 100%;
+  margin-top: 0.35rem;
+  min-width: 0;
+  background: linear-gradient(#ffe27a, #f0c84a);
+  color: #3d6b2e;
+  box-shadow: 0 6px 0 #d4a017, 0 10px 14px rgba(180, 140, 30, 0.28);
+}
+
+.btn-enter:hover {
+  filter: brightness(1.03);
+}
+
+.btn-enter:active {
+  box-shadow: 0 2px 0 #d4a017, 0 4px 8px rgba(180, 140, 30, 0.22);
+}
+
+.slot {
+  margin-bottom: 0.85rem;
+  text-align: left;
+}
+
+.slot-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #4a7c52;
+}
+
+.field {
+  margin-bottom: 0.5rem;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.7rem 0.95rem;
+  border: 2px solid #b7e3c0;
+  border-radius: 16px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2f5d3a;
+}
+
+.field input::placeholder {
+  color: #8fb896;
+  font-weight: 700;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #7ed36a;
+  box-shadow: 0 0 0 3px rgba(126, 211, 106, 0.35);
+}
+
+.error {
+  min-height: 1.2rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #d35a4a;
+}
+
+.is-hidden {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .btn-row {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
