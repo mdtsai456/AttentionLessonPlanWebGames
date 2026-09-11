@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WedGame</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="panel" aria-label="登入選單">
+        <h1 class="title">AttentionLessonPlan</h1>
+
+        <div class="step" id="role-step">
+          <p class="label">請選擇身份</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-green" data-role="student">
+              學生
+            </button>
+            <button type="button" class="btn btn-sky" data-role="teacher">
+              老師
+            </button>
+          </div>
+        </div>
+
+        <div class="step is-hidden" id="mode-step">
+          <p class="label">請選擇模式</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-green" data-mode="single">
+              單人
+            </button>
+            <button type="button" class="btn btn-leaf" data-mode="dual">
+              雙人
+            </button>
+          </div>
+        </div>
+
+        <form id="login-form" class="is-hidden" autocomplete="off">
+          <div id="credential-slots"></div>
+          <p class="error" id="error-msg" role="alert"></p>
+          <button type="submit" class="btn btn-enter">ENTER</button>
+        </form>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
