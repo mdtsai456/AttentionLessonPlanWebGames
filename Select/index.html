@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WedGame · 選擇遊戲</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="panel" aria-label="選擇遊戲">
+        <h1 class="title">選擇遊戲</h1>
+        <p class="label">請選擇要遊玩的遊戲</p>
+
+        <div class="game-list" id="game-list"></div>
+
+        <p class="error" id="error-msg" role="alert"></p>
+        <button type="button" class="btn btn-enter" id="enter-btn">ENTER</button>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
