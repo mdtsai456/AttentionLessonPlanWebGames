@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WedGame · 學生進度</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="panel" aria-label="學生進度">
+        <h1 class="title">學生進度</h1>
+        <p class="label">選擇學生與天數，查看當日五個遊戲進度</p>
+
+        <div class="filters">
+          <label class="field">
+            <span class="field-label">選擇學生</span>
+            <select id="student-select">
+              <option value="">請選擇學生</option>
+            </select>
+          </label>
+
+          <div class="field">
+            <span class="field-label">選擇第幾天</span>
+            <div class="day-row" id="day-row" role="group" aria-label="選擇第幾天"></div>
+          </div>
+        </div>
+
+        <div class="game-list" id="game-list"></div>
+        <p class="hint" id="empty-hint">請先選擇學生與天數</p>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
