@@ -1,3 +1,9 @@
+// =============================================================================
+// Home / 登入頁
+// 流程：選身份（學生／老師）→ 學生再選模式（單人／雙人）→ 填帳密 → 送出
+// 老師登入後進 Back；學生登入後進 Select。後端 API 尚未接上。
+// =============================================================================
+
 const panel = document.querySelector(".panel");
 const roleStep = document.getElementById("role-step");
 const modeStep = document.getElementById("mode-step");
@@ -10,6 +16,7 @@ const state = {
   mode: null, // "single" | "dual" | null（老師不需要模式）
 };
 
+// 點「學生／老師」時，用 closest 讓點到按鈕內文字也能算點到按鈕
 roleStep.addEventListener("click", (event) => {
   const button = event.target.closest("[data-role]");
   if (!button) return;
@@ -23,13 +30,18 @@ modeStep.addEventListener("click", (event) => {
 });
 
 loginForm.addEventListener("submit", (event) => {
-  event.preventDefault();
+  event.preventDefault(); // 攔截原生送出，改由 submitLogin 處理
   submitLogin();
 });
 
+/**
+ * 選擇身份。
+ * 老師：直接顯示一組帳密欄位。
+ * 學生：先隱藏表單，再顯示單人／雙人步驟。
+ */
 function selectRole(role) {
   state.role = role;
-  state.mode = null;
+  state.mode = null; // 換身份時清掉先前選的模式
   setSelected("[data-role]", `[data-role="${role}"]`);
   errorMsg.textContent = "";
   panel.classList.remove("is-dual");
@@ -47,6 +59,10 @@ function selectRole(role) {
   modeStep.classList.remove("is-hidden");
 }
 
+/**
+ * 選擇單人／雙人。
+ * 雙人會加上 is-dual，讓版面改成兩欄帳密。
+ */
 function selectMode(mode) {
   state.mode = mode;
   setSelected("[data-mode]", `[data-mode="${mode}"]`);
@@ -62,6 +78,11 @@ function selectMode(mode) {
   loginForm.classList.remove("is-hidden");
 }
 
+/**
+ * 依人數畫出帳號／密碼欄位。
+ * @param {number} count 要顯示幾組帳密
+ * @param {string[]} titles 每組上方標題，例如「學生 1」
+ */
 function renderCredentialSlots(count, titles) {
   credentialSlots.innerHTML = titles
     .slice(0, count)
@@ -93,6 +114,7 @@ function renderCredentialSlots(count, titles) {
     .join("");
 }
 
+/** 從畫面上的欄位收集帳密；帳號會去掉前後空白。 */
 function collectAccounts() {
   const slots = [...credentialSlots.querySelectorAll(".slot")];
   return slots.map((slot, index) => ({
@@ -101,6 +123,10 @@ function collectAccounts() {
   }));
 }
 
+/**
+ * 前端基本檢查。有錯誤回傳訊息字串；通過則回傳空字串。
+ * 雙人必須剛好兩組帳密，其餘情況一組即可。
+ */
 function validate(accounts) {
   if (!state.role) return "請先選擇身份";
   if (state.role === "student" && !state.mode) return "請選擇單人或雙人";
@@ -114,6 +140,7 @@ function validate(accounts) {
   return "";
 }
 
+/** 驗證通過後組 payload；目前先導向下一頁，之後改呼叫後端登入 API。 */
 async function submitLogin() {
   const accounts = collectAccounts();
   const message = validate(accounts);
@@ -157,14 +184,23 @@ async function submitLogin() {
 
   console.log("[login payload 待接後端]", payload);
   errorMsg.textContent = "";
+
+  // 純前端暫用導向；之後改成後端回傳的 redirectUrl
+  if (state.role === "teacher") {
+    location.href = "../Back/index.html";
+    return;
+  }
+  location.href = "../Select/index.html";
 }
 
+/** 同一組按鈕只讓目前選到的那個加上 is-selected（按下的視覺）。 */
 function setSelected(allSelector, activeSelector) {
   document.querySelectorAll(allSelector).forEach((button) => {
     button.classList.toggle("is-selected", button.matches(activeSelector));
   });
 }
 
+/** 清掉指定按鈕上的選取樣式（例如老師不需要模式，就要清掉單人／雙人）。 */
 function clearSelected(selector) {
   document.querySelectorAll(selector).forEach((button) => {
     button.classList.remove("is-selected");
