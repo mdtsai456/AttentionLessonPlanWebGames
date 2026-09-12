@@ -1,9 +1,14 @@
 # 資料庫結構（中介平台 `AttentionLessonPlan`）
 
-MariaDB。9 張表：3 張「參照 / 名冊」+ 1 張「場次索引」+ 5 張「各遊戲細部成績」。
+MariaDB。10 張表：3 張「參照 / 名冊」+ 1 張「登入憑證」+ 1 張「場次索引」+
+5 張「各遊戲細部成績」。
 
 - 精確 DDL：[`tests/schema.sql`](../tests/schema.sql)（正式庫與測試庫都照這份建）
-- 本輪新增：`assessment_result` 加 `mode` / `pair_id`（單雙人版）；新增 `school` / `teacher`（選單登入）
+- API 層的濃縮總覽（含端點）：[`backend-reference.md`](backend-reference.md)
+- 2026-09-11：`teacher`/`student` 各加 `account`（全域唯一登入帳號）/
+  `password_hash`；`student` 另加代理鍵 `student_id`；新增 `login_session`
+  （登入 token）。決策脈絡見 [`adr/0004`](adr/0004-teacher-student-password-login.md)。
+- 更早：`assessment_result` 加 `mode` / `pair_id`（單雙人版）；新增 `school` / `teacher`（選單登入）
 
 ---
 
@@ -23,6 +28,8 @@ erDiagram
     assessment_result ||--o| eft_result        : "game_type=EFT"
     assessment_result ||--o| im_result         : "game_type=IM"
     assessment_result ||--o| tgame_result      : "game_type=TGAME"
+    teacher           ||--o{ login_session     : "老師登入的 token（0 或多筆）"
+    student           ||--o{ login_session     : "學生登入的 token（0 或多筆）"
 
     school {
         varchar school PK "場域代碼 KMU NTHU-01..07"
@@ -31,13 +38,27 @@ erDiagram
     }
     teacher {
         int teacher_id PK "自動編號"
-        varchar name "老師姓名"
+        varchar name "老師姓名 UNIQUE(school,name)"
         varchar school FK "所屬場域"
+        varchar password_hash "帳密登入 2026-09"
+        varchar account "全域唯一登入帳號 T0001 2026-09"
     }
     student {
         varchar grade PK "年級 例 G1"
         varchar case_id PK "個案編號 例 S03"
         varchar school PK "場域 FK 到 school"
+        varchar password_hash "帳密登入 2026-09"
+        int student_id "代理鍵 UNIQUE 2026-09"
+        varchar account "全域唯一登入帳號 S0001 2026-09"
+    }
+    login_session {
+        varchar token PK "Authorization Bearer 帶這個"
+        varchar subject_type "teacher 或 student"
+        int teacher_id FK "老師登入才填"
+        varchar grade FK "學生登入才填 三欄一組"
+        varchar case_id FK "學生登入才填"
+        varchar school FK "學生登入才填"
+        datetime expires_at "8 小時後過期"
     }
     assessment_result {
         varchar grade PK "FK 到 student"
@@ -95,6 +116,7 @@ erDiagram
 | `school` → `student` | 一個場域有多位學生。`student.school` 有外鍵 `fk_student_school` 指向 `school.school`（`ON UPDATE CASCADE`）—— 場域字串沒登記就插不進學生 |
 | `student` → `assessment_result` | 一位學生有多場遊玩紀錄。學生唯一鍵是 `(grade, case_id, school)` 三欄複合 —— **不同場域的 `G1_S03` 是不同的學生** |
 | `assessment_result` → 五張 `*_result` | 一場 = 一列 `assessment_result`（索引 + 共同欄位）+ 一列對應遊戲的細部表。`game_type` 決定掛哪張。刪 `assessment_result` 會連帶刪細部列（`ON DELETE CASCADE`） |
+| `teacher`／`student` → `login_session` | 帳密登入後發的 token（2026-09）。一筆 `login_session` 只填其中一組外鍵（`teacher_id` 或 `grade`+`case_id`+`school`），另一組全 NULL——MySQL/MariaDB 的複合外鍵只要有一欄 NULL 就不檢查該筆，所以兩種登入共用一張表不用拆開。登出或帳號被刪會連帶清掉 token（`ON DELETE CASCADE`） |
 
 > `school → teacher → student` 是「大到小」的階層，三者靠 `school` 字串（`KMU`、`NTHU-01`…`07`）串起來。
 > 「某老師的學生」= 該老師 `teacher.school` 所對應的全部 `student`（同場域兩位老師看同一批）。
@@ -103,7 +125,36 @@ erDiagram
 
 ---
 
-## 本輪的結構變更
+## 2026-09-11：帳密登入加的結構
+
+廠商改口，老師/學生都要帳號+密碼登入（原本是選單式免密碼），且老師只能查自己
+場域的學生。決策脈絡見 [`adr/0004`](adr/0004-teacher-student-password-login.md)。
+
+### `teacher`／`student` 各加 `password_hash`、`account`
+
+- `password_hash`：pbkdf2 雜湊過的密碼，`varchar(255) NOT NULL DEFAULT ''`。
+- `account`：**全域唯一**的登入帳號（`varchar(20) DEFAULT NULL` + `UNIQUE`），跟
+  `teacher.name`／`studentKey`（`grade_caseId`）是分開的兩回事——後兩者都只在
+  單一 `school` 內唯一，撐不住登入表單「不選場域、單靠一個欄位查到唯一一人」的
+  需求。`DEFAULT NULL` 而不是空字串：同時多筆還沒指派帳號時，`UNIQUE` 索引才不會
+  因為「多個空字串重複」而炸掉。
+
+### `student` 另加代理鍵 `student_id`
+
+`(grade, case_id)` 每個場域都會重複（每場域都有 `G1_S01`），沒辦法單獨當全域唯一
+的登入帳號來源，所以加一個 `student_id int AUTO_INCREMENT UNIQUE`，純粹拿來推導
+`account`（格式 `S0001`）。**不動**原本 `(grade, case_id, school)` 複合主鍵，
+`assessment_result` 等表的外鍵完全不受影響。
+
+### 新增 `login_session`
+
+帳密登入後發的不透明 token，8 小時過期。故意不叫 `session`——這系統的 `session`
+已經是「遊戲場次」（`assessment_result`）的代稱，混在一起會搞混。詳細欄位見上面
+ER 圖，關係見「關係說明」表。
+
+---
+
+## 較早的結構變更
 
 ### `assessment_result` 加兩欄
 

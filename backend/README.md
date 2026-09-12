@@ -4,17 +4,16 @@
 
 ## 端點
 
-| 方法 | 路徑 | 說明 |
-|---|---|---|
-| GET | `/health` | 存活檢查 |
-| POST | `/api/sessions` | 接收 Unity GameData，成功後回傳 `sessionId`。`data.mode`（`single`／`double`，預設 `single`）與 `data.pairId` 選填 |
-| GET | `/api/students` | 學生名單與總數。`?school=` 選填，不給則回傳所有場域 |
-| GET | `/api/students/{studentKey}/sessions` | 單一學生的場次清單。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
-| GET | `/api/students/{studentKey}/report` | 單一學生的場次明細與各遊戲彙總。`?school=` 必填；`?game_type=`、`?mode=` 選填 |
-| GET | `/api/schools` | 場域清單（第一層下拉）。永遠回 200 |
-| GET | `/api/schools/{school}/teachers` | 某場域的老師清單。未知場域回 200 + 空陣列 |
-| GET | `/api/teachers/{teacherId}/students` | 某老師名下（＝該場域全部）學生概況。未知 `teacherId` 回 404 |
-| GET | `/demo` | 開發／驗收用的簡易檢視畫面（非正式前端，原始碼 `demo/index.html`） |
+完整清單（含帳密登入、驗證規則、錯誤碼）見 **[`docs/backend-reference.md`](docs/backend-reference.md)**——
+一站式的 API + 資料庫結構總覽。這裡只列最常用的幾支：
+
+| 方法 | 路徑 | 驗證 | 說明 |
+|---|---|---|---|
+| GET | `/health` | 公開 | 存活檢查 |
+| POST | `/api/sessions` | 無（Unity） | 接收 Unity GameData，成功後回傳 `sessionId` |
+| POST | `/api/auth/teacher/login` / `/api/auth/student/login` | 公開 | 帳密登入，回 `token`（見 `docs/adr/0004`） |
+| GET | `/api/me/students` | 老師 | 登入中老師名下的學生概況 |
+| GET | `/api/students/{studentKey}/report` | 老師或學生 | ★主要端點：場次明細＋各遊戲彙總＋趨勢 |
 
 `studentKey` 的格式是 `grade_caseId`，例如 `G1_S03`。學生的唯一鍵是
 `(grade, case_id, school)` —— 不同場域的 `G1_S03` 是不同的學生。
@@ -27,20 +26,29 @@ DAT／DCCS／EFT 有「單人版」與「雙人版」（一台裝置兩個小孩
 `summaryByGame`／`trends` 依 `(gameType, mode)` 分組（`single` 排在 `double` 前）。
 設計見 [`docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md`](docs/superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md)。
 
-### 選單式登入 / 參照資料
+### 帳密登入 / 參照資料
 
-「登入」＝下拉選人，無帳號密碼、無驗證（廠商定調）。`school`、`teacher` 兩張
-表是**由人工維護、量少、變動極慢**的參照資料，用 `seed_directory.py` 冪等灌注
-（不像 `seed.py` 是「先清空再灌的假成績」）：
+老師與學生都要帳號＋密碼登入（2026-09-11 廠商改口，取代原本的選單式免密碼），
+且老師只能查看自己場域的學生（後端強制擋，不只前端 UI 藏）。帳號是後端另外指派
+的全域唯一字串（`T0001`／`S0001` 格式），不是老師姓名或 `studentKey`。完整規格見
+[`docs/backend-reference.md`](docs/backend-reference.md) §1.2、決策脈絡見
+[ADR-0004](docs/adr/0004-teacher-student-password-login.md)。
+
+`school`、`teacher` 兩張表是**由人工維護、量少、變動極慢**的參照資料，用
+`seed_directory.py` 冪等灌注（不像 `seed.py` 是「先清空再灌的假成績」），順便
+幫還沒帳號的老師指派 `account` + 密碼並印出一次：
 
 ```bash
 uv run python seed_directory.py          # → TEST_DB_NAME 的 _test 庫
 DB_USER=root DB_PASSWORD='<root密碼>' uv run python seed_directory.py --prod
 ```
 
+單一老師/學生要重設密碼用 `manage_passwords.py`（見 `docs/backend-reference.md` §3.4）。
+
 8 個場域字串（`school` 表主鍵）目前是**佔位代碼**（`KMU`、`NTHU-01`…），待廠商
 確認正式字串後只改 `seed_directory.py` 的常數、重跑即可。設計見
-[`docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md`](docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md)。
+[`docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md`](docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md)
+（**注意**：該文件的「無密碼」章節已被 ADR-0004 推翻，場域字串定案等其餘內容仍有效）。
 
 ## 開發
 
@@ -117,16 +125,24 @@ DB_USER=root DB_PASSWORD='<root密碼>' uv run python seed.py --prod
 
 ## 模組
 
+完整清單（含每個 router 掛哪些端點）見
+[`docs/backend-reference.md`](docs/backend-reference.md) §3.1。
+
 | 檔案 | 職責 |
 |---|---|
-| `main.py` | 建立 app、掛載 router、`/` 與 `/health` |
+| `main.py` | 建立 app、掛載 router、CORS、`/` 與 `/health` |
 | `db.py` | MariaDB 連線設定 |
+| `auth.py` | 密碼雜湊、登入 token 產生（純函式） |
+| `errors.py` | 共用的資料庫錯誤轉換（避免 router 間循環匯入） |
 | `converters.py` | 純轉換工具 |
 | `models.py` | Pydantic 回應模型 |
 | `queries.py` | 讀取資料的 SQL |
-| `writes.py` | 以單一 transaction 建立學生、場次與遊戲結果 |
-| `routers/sessions.py` | 接收 Unity GameData 的 `/api/sessions` 路由 |
-| `routers/students.py` | `/api/students` 路由與組裝邏輯 |
-| `routers/directory.py` | `/api/schools`、`/api/teachers/...` 場域／老師名錄路由 |
+| `writes.py` | 以單一 transaction 建立學生、場次、遊戲結果、登入 token |
+| `routers/sessions.py` | 接收 Unity GameData 的 `/api/sessions`、`/api/games` |
+| `routers/students.py` | `/api/students`、`/sessions`、`/report` 路由與組裝邏輯 |
+| `routers/directory.py` | `/api/schools`、`/api/me/students`、`/api/teachers/...` |
+| `routers/auth.py` | 登入／登出端點 |
+| `routers/identity.py` | token 驗證與授權檢查（`Depends`） |
 | `seed.py` | 灌假資料到 `_test`（`--prod` 才碰正式庫）。獨立 dev 工具 |
-| `seed_directory.py` | 冪等灌注 `school`／`teacher` 參照資料。獨立工具 |
+| `seed_directory.py` | 冪等灌注 `school`／`teacher` 參照資料 + 指派帳密。獨立工具 |
+| `manage_passwords.py` | 手動重設單一老師/學生密碼的 CLI |

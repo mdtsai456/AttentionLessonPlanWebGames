@@ -4,32 +4,93 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AttentionLessonPlan - 遊戲大廳</title>
+  <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/games.css">
 </head>
 <body>
-  <div class="lobby-container">
-    <header class="lobby-header">
-      <div class="lobby-title">
-        <h1>遊戲大廳</h1>
-        <span id="mode-badge" class="mode-badge">--</span>
+  <div class="main-container">
+    <div class="lobby-card">
+      <div class="lobby-header">
+        <h1 class="lobby-title">注意力訓練遊戲大廳</h1>
+        <div class="user-info-tag" id="user-info-tag">載入資訊中...</div>
       </div>
-      <div class="players" id="players">
-        <!-- 動態插入目前登入的學生 1（單人）或學生 1+2（雙人） -->
-      </div>
-      <button id="btn-logout" class="btn-text">登出</button>
-    </header>
 
-    <main class="lobby-main">
-      <div id="games-grid" class="games-grid">
-        <!-- 動態插入遊戲卡片 -->
-      </div>
-      <p id="loading-hint" class="hint">載入遊戲清單中...</p>
-    </main>
+      <!-- 3 大核心評測遊戲 -->
+      <div class="games-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <!-- 1. DAT 動物追擊令 -->
+        <div class="game-item" data-game="DAT">
+          <div class="game-icon">🐾</div>
+          <div class="game-name">動物追擊令 (DAT)</div>
+          <div class="game-desc" id="desc-dat">持續性注意力與反應時間評測</div>
+          <button class="btn-play">開始挑戰</button>
+        </div>
 
-    <!-- 點擊卡片的提示（不用 alert，避免像登入頁那次一樣讓人以為沒反應） -->
-    <div id="toast" class="toast" hidden></div>
+        <!-- 2. DCCS 賽道攔截 -->
+        <div class="game-item" data-game="DCCS">
+          <div class="game-icon">🏎️</div>
+          <div class="game-name">賽道攔截 (DCCS)</div>
+          <div class="game-desc" id="desc-dccs">維度轉換與認知彈性評測</div>
+          <button class="btn-play">開始挑戰</button>
+        </div>
+
+        <!-- 3. EFT 漂浮泡泡 -->
+        <div class="game-item" data-game="EFT">
+          <div class="game-icon">🫧</div>
+          <div class="game-name">漂浮泡泡 (EFT)</div>
+          <div class="game-desc" id="desc-eft">視覺搜尋與鑲嵌圖形認知評測</div>
+          <button class="btn-play">開始挑戰</button>
+        </div>
+      </div>
+
+      <div class="lobby-footer">
+        <button id="btn-view-my-progress" class="btn-outline">📊 查看我的訓練進度</button>
+        <button id="btn-logout" class="btn-outline">登出返回</button>
+      </div>
+    </div>
   </div>
 
-  <script type="module" src="js/games.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const mode = sessionStorage.getItem("game_mode") || "single";
+      const s1School = sessionStorage.getItem("student1_school") || "KMU";
+      const s1Id = sessionStorage.getItem("student1_key") || "訪客學生";
+      const s2School = sessionStorage.getItem("student2_school");
+      const s2Id = sessionStorage.getItem("student2_key");
+
+      const infoTag = document.getElementById("user-info-tag");
+      const isDouble = (mode === "double" && s2Id);
+
+      if (isDouble) {
+        infoTag.innerText = `雙人合作模式：[${s1School}] ${s1Id} ＆ [${s2School}] ${s2Id}`;
+      } else {
+        infoTag.innerText = `單人挑戰模式：[${s1School}] ${s1Id}`;
+      }
+
+      // 點擊「查看我的訓練進度」-> 跳轉到 dms.html
+      document.getElementById("btn-view-my-progress").addEventListener("click", () => {
+        window.location.href = "dms.html?view=student";
+      });
+
+      // 登出返回
+      document.getElementById("btn-logout").addEventListener("click", () => {
+        sessionStorage.clear();
+        window.location.href = "index.html";
+      });
+
+      // 點擊開始挑戰：依據單雙人帶入對應頁面編號
+      document.querySelectorAll(".btn-play").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const gameType = e.target.closest(".game-item").getAttribute("data-game");
+          let pageNum = 0;
+
+          if (gameType === "DAT")  pageNum = isDouble ? 5 : 2;
+          if (gameType === "DCCS") pageNum = isDouble ? 6 : 3;
+          if (gameType === "EFT")  pageNum = isDouble ? 7 : 4;
+
+          alert(`【啟動 Unity 遊戲】\n項目：${gameType} (${isDouble ? "雙人" : "單人"})\n對應頁面：頁面 ${pageNum}\n學生代號：${s1Id} ${isDouble ? "與 " + s2Id : ""}`);
+        });
+      });
+    });
+  </script>
 </body>
 </html>
