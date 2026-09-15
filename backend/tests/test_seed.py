@@ -10,6 +10,9 @@ tuple 欄位順序沿用 seed.generate():
 import seed
 
 # session tuple 欄位索引
+S_GRADE = 0
+S_CASE_ID = 1
+S_SCHOOL = 2
 S_UUID = 3
 S_START = 4
 S_GAME_TYPE = 5
@@ -17,13 +20,6 @@ S_MODE = 6
 S_PAIR_ID = 7
 S_CURRENT_DAY = 8
 S_END = 9
-
-
-def _expected_double_session_count() -> int:
-    n_students = len(seed.SCHOOLS) * len(seed.STUDENTS)
-    # 每個 day_in_round 值在 24 個施測日裡出現兩次(A、B 各一)。
-    double_days = len(seed.DOUBLE_DAYS_IN_ROUND) * 2
-    return n_students * len(seed.DOUBLE_GAMES) * double_days
 
 
 def test_generate_is_deterministic():
@@ -43,15 +39,25 @@ def test_student_password_hash_constant_matches_plaintext():
 def test_row_counts():
     students, sessions, details = seed.generate()
     n_students = len(seed.SCHOOLS) * len(seed.STUDENTS)
-    n_single = n_students * len(seed.GAMES) * 24  # 24 個施測日
-    n_double = _expected_double_session_count()
 
     assert n_students == 18
     assert len(students) == n_students
-    assert n_single == 2160
-    assert n_double == 324
-    assert len(sessions) == n_single + n_double == 2484
     assert sum(len(rows) for rows in details.values()) == len(sessions)
+
+
+def test_sessions_per_student_within_configured_range():
+    # 每位學生的場次數(單人+雙人合計)要落在 seed.py 設定的區間內,
+    # 貼近「設計上最多 24 次,但實際到課率更低」的真實使用量。
+    _, sessions, _ = seed.generate()
+    counts: dict[tuple[str, str, str], int] = {}
+    for row in sessions:
+        key = (row[S_GRADE], row[S_CASE_ID], row[S_SCHOOL])
+        counts[key] = counts.get(key, 0) + 1
+
+    n_students = len(seed.SCHOOLS) * len(seed.STUDENTS)
+    assert len(counts) == n_students
+    for count in counts.values():
+        assert seed.MIN_SESSIONS_PER_STUDENT <= count <= seed.MAX_SESSIONS_PER_STUDENT
 
 
 def test_single_and_double_session_split():
@@ -60,7 +66,9 @@ def test_single_and_double_session_split():
     for row in sessions:
         by_mode[row[S_MODE]] = by_mode.get(row[S_MODE], 0) + 1
 
-    assert by_mode == {"single": 2160, "double": 324}
+    # 抽樣後的確切數字不再是固定公式,只斷言兩種模式都還有資料可看。
+    assert by_mode.keys() == {"single", "double"}
+    assert by_mode["single"] + by_mode["double"] == len(sessions)
 
 
 def test_double_sessions_only_for_capable_games_and_carry_pair_id():

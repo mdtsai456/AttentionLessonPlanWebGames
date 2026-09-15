@@ -53,6 +53,13 @@ TEST_STUDENT_PASSWORD_HASH = (
 # 讓報告頁「單/雙人並陳」的畫面有東西可畫(每 Round 3 場雙人)。
 DOUBLE_GAMES = {"DCCS", "DAT", "EFT"}
 DOUBLE_DAYS_IN_ROUND = {2, 6, 9}  # 0..11
+
+# 遊戲設計上一位學生最多只會玩 24 次(= build_play_days() 的 24 個施測日)。
+# 但實際到課率不會每次都玩滿(不是每天都把 5 款單人版全破關),所以每位學生
+# 最終灌入的場次數(單人+雙人合計)從「理論上所有可能的場次」中隨機抽樣到
+# 這個區間,貼近真實使用量。調這兩個常數就能放大縮小資料量。
+MIN_SESSIONS_PER_STUDENT = 10
+MAX_SESSIONS_PER_STUDENT = 20
 GAME_TABLE = {
     "DCCS": "dccs_result",
     "DAT": "dat_result",
@@ -132,7 +139,13 @@ def make_pair_id(school: str, grade: str, case_id: str, game: str, current_day: 
 
 
 def generate() -> tuple[list, list, dict[str, list]]:
-    """產生 (student_rows, session_rows, detail_rows_by_table)。"""
+    """產生 (student_rows, session_rows, detail_rows_by_table)。
+
+    每位學生先照原本規則展開「理論上所有可能的場次」(24 個施測日 × 5 款單人 +
+    特定施測日的雙人場),再從中隨機抽樣到 MIN_SESSIONS_PER_STUDENT..
+    MAX_SESSIONS_PER_STUDENT 筆(單人+雙人合計),按時間排序後才灌入,貼近
+    「設計上最多 24 次,但實際到課率更低」的真實使用量。
+    """
     rng = random.Random(SEED)
     play_days = build_play_days()
 
@@ -144,6 +157,9 @@ def generate() -> tuple[list, list, dict[str, list]]:
         for grade, case_id in STUDENTS:
             student_rows.append((grade, case_id, school, TEST_STUDENT_PASSWORD_HASH))
             trajectory = {game: make_trajectory(rng) for game in GAMES}
+
+            possible_sessions: list[tuple] = []
+            possible_details: dict[str, tuple[str, tuple]] = {}  # uuid -> (table, row)
 
             for day in play_days:
                 def emit(game: str, mode: str, clock: datetime, acc_bonus: float) -> datetime:
@@ -170,12 +186,12 @@ def generate() -> tuple[list, list, dict[str, list]]:
                         else None
                     )
 
-                    session_rows.append((
+                    possible_sessions.append((
                         grade, case_id, school, game_uuid,
                         start_dt, game, mode, pair_id, day["current_day"], end_dt,
                     ))
                     # 只填核心 5 欄;其餘遊戲專屬欄位留 NULL。
-                    detail_rows[GAME_TABLE[game]].append((
+                    possible_details[game_uuid] = (GAME_TABLE[game], (
                         grade, case_id, school, game_uuid,
                         correct, wrong, accuracy, duration_ms, stage,
                     ))
@@ -195,6 +211,17 @@ def generate() -> tuple[list, list, dict[str, list]]:
                     for game in GAMES:
                         if game in DOUBLE_GAMES:
                             clock = emit(game, "double", clock, 0.08)
+
+            # 從所有可能場次中抽樣成這位學生實際玩過的場次。
+            target = rng.randint(MIN_SESSIONS_PER_STUDENT, MAX_SESSIONS_PER_STUDENT)
+            target = min(target, len(possible_sessions))
+            chosen = rng.sample(possible_sessions, target)
+            chosen.sort(key=lambda row: row[4])  # 按 start_time 排序,時間軸合理
+
+            session_rows.extend(chosen)
+            for row in chosen:
+                table, detail_row = possible_details[row[3]]  # row[3] = uuid
+                detail_rows[table].append(detail_row)
 
     return student_rows, session_rows, detail_rows
 
