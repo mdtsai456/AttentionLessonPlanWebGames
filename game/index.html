@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>賽道攔截 DCCS</title>
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+<div id="app">
+  <form id="setup-form" hidden>
+    <h1>賽道攔截 · DCCS</h1>
+    <p class="hint">請填寫場次資訊以開始（也可以在網址列加上 <code>?grade=&caseId=&school=&currentDay=</code>）</p>
+    <label>年級 grade <input name="grade" required autocomplete="off"></label>
+    <label>個案編號 caseId <input name="caseId" required autocomplete="off"></label>
+    <label>場域 school <input name="school" required autocomplete="off"></label>
+    <label>第幾天 currentDay <input name="currentDay" type="number" min="1" step="1" required autocomplete="off"></label>
+    <button type="submit">開始</button>
+  </form>
+
+  <div id="game-root"></div>
+</div>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
