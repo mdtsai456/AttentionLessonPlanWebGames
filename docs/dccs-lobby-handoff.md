@@ -22,7 +22,35 @@ DCCS 已經接上 `frontend/games.html` 的大廳，這份文件說明**怎麼�
 
 對應程式碼：`frontend/dccs/js/lobby.js`。
 
-## 2. 動了你哪一行
+## 2. 動了你哪些東西
+
+### `backend/main.py`：前端改由你這支服務一併提供
+
+原本我們另外有一支 `serve.py`（純標準函式庫的靜態伺服器），與你的 FastAPI
+併存，造成兩個 server、兩個 port、需要 CORS。現已整併掉：
+
+```python
+if _FRONTEND_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
+```
+
+- 掛在 `/app`，**不遮蔽** `/api/*`、`/health`、`/demo`、`GET /`，也不會跟
+  日後新增的 API 路由相撞。入口是 `/app/`。
+- **只掛 `frontend/` 一個目錄**，後端原始碼與 `.env` 不在其中。這比先前
+  「伺服整個 repo 根、再用黑名單擋掉 `backend/`」安全。
+- 前端與 `/api/*` 同源 → **瀏覽器端不再需要任何 CORS 放行**。
+  `CORS_ALLOW_ORIGINS` 只在前端哪天獨立部署到別的網域時才需要。
+- `backend/serve.py` 已刪除；原本的 `POST /api/results`（成績寫成 txt）
+  一併移除——雲端部署上檔案是暫存性質，留著會讓人誤以為資料安全。送出
+  失敗改由瀏覽器 `localStorage` 暫存、下次開場自動重送。
+- 新增 `backend/tests/test_frontend_static.py`（4 項，不碰資料庫），涵蓋
+  `/app/` 進入點、ES module 的 content-type、既有路由未被遮蔽、以及後端
+  原始碼與 `.env` 透過各種 `..` 寫法都拿不到。
+
+部署不需要改 `Procfile`：`uvicorn main:app` 照舊，只要 `frontend/` 跟
+`backend/` 一起部署即可。目錄不存在時會跳過掛載，不會啟動失敗。
+
+## 3. 動了你哪一行（前端）
 
 只有 `frontend/games.html` 裡「開始挑戰」的 click handler。原本五款遊戲
 一律跳 `alert()` 佔位；現在多一張 `GAME_PAGES` 對照表，**已接上的遊戲導向
@@ -36,7 +64,7 @@ const GAME_PAGES = {
 
 DAT／EFT 之後接上時，在這張表加一行就好，不必再動 handler 邏輯。
 
-## 3. 想請你接手的一件事：`currentDay`
+## 4. 想請你接手的一件事：`currentDay`
 
 ### 現況（遊戲端的權宜做法）
 
@@ -71,7 +99,7 @@ DAT／EFT 之後接上時，在這張表加一行就好，不必再動 handler �
 任一種都行，遊戲端只要把 `resolveCurrentDay()` 換成讀那個值即可，
 其餘不用動。
 
-## 4. 順帶一提：`grade` / `caseId` 已經有了
+## 5. 順帶一提：`grade` / `caseId` 已經有了
 
 `backend/routers/auth.py:85-87` 的登入回應其實就有回 `grade` 和 `caseId`，
 只是 `frontend/js/app.js:162` 只存了 `studentKey`。遊戲端目前自己用 `_` 切

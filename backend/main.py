@@ -20,9 +20,13 @@
     GET /api/games                                   ← 公開，靜態遊戲清單
     GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端，帳密登入後會壞掉）
 
-CORS：瀏覽器前端跨網域呼叫需要放行其 origin。用環境變數 CORS_ALLOW_ORIGINS
-設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時預設放行常見的本機
-前端 dev server（localhost 的 3000 / 5173 / 5500 / 8080）。
+靜態前端：正式前端（登入頁、DMS、遊戲大廳與網頁版遊戲）掛在 /app，由本服務
+一併提供，入口是 /app/。因為與 /api/* 同源，瀏覽器端不需要任何 CORS 放行，
+也不必另外起一個靜態伺服器。
+
+CORS：前端若部署在別的網域（不走 /app）才需要放行其 origin。用環境變數
+CORS_ALLOW_ORIGINS 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時
+預設放行常見的本機前端 dev server（localhost 的 3000 / 5173 / 5500 / 8080）。
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from db import validate_db_settings
 from routers import auth, directory, sessions, students
@@ -42,6 +47,9 @@ from routers import auth, directory, sessions, students
 load_dotenv()
 
 _DEMO_HTML = Path(__file__).parent / "demo" / "index.html"
+
+# 正式前端在 repo 的 frontend/，與 backend/ 平行。
+_FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 # 未設定 CORS_ALLOW_ORIGINS 時放行的本機前端 dev server。
 _DEFAULT_DEV_ORIGINS = [
@@ -116,6 +124,22 @@ def demo() -> str:
     if not _DEMO_HTML.exists():
         return "<h1>demo/index.html 不存在</h1>"
     return _DEMO_HTML.read_text(encoding="utf-8")
+
+
+# 靜態前端掛在最後，路徑固定為 /app，不會遮蔽 /api/*、/health、/demo，
+# 也不會跟日後新增的 API 路由相撞。
+#
+# 只掛 frontend/ 這一個目錄：後端原始碼與 .env 不在其中，沒有外流風險——
+# 這點比先前那支「伺服整個 repo 根、再用黑名單擋掉 backend/」的靜態伺服器
+# 安全，白名單本來就比黑名單可靠。
+#
+# html=True 讓 /app/ 直接吐 frontend/index.html（登入頁）。
+if _FRONTEND_DIR.is_dir():
+    app.mount(
+        "/app",
+        StaticFiles(directory=_FRONTEND_DIR, html=True),
+        name="frontend",
+    )
 
 
 if __name__ == "__main__":

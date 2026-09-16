@@ -260,9 +260,8 @@ lane = -direction * off * SLOT_LANE_SPACING                   // SLOT_LANE_SPACI
 
 ```
 AttentionLessonPlanWebGames/
-├── backend/
-│   ├── serve.py                                     ← 靜態伺服器 + 成績接收
-│   └── results/                                     ← 成績 txt 輸出（自動建立）
+├── backend/                                         ← 中介平台（FastAPI）
+│   └── main.py                                      ← 一併把 frontend/ 掛在 /app
 ├── tools/
 │   └── build_manifest.py                            ← 掃 assets/ 產生 manifest
 └── frontend/
@@ -763,14 +762,15 @@ export function resolveSubmitUrl() -> string
 單人與雙人**共用同一套端點解析**，任何一邊都不得自己寫死網址。
 `resolveSubmitUrl()` 的優先序：
 
-1. `window.DCCS_SUBMIT_URL`——整支端點覆寫。用 `backend/serve.py` 做離線
-   落地（第 6、7 節）時設成 `'/api/results'`。
+1. `window.DCCS_SUBMIT_URL`——整支端點覆寫。
 2. `window.API_BASE_URL`——只換 API 前綴，端點仍是 `<base>/sessions`。
    與中介平台前端 `frontend/js/api.js` 同名同義。
-3. 依 `window.location.hostname` 推導：`localhost` / `127.0.0.1` 指向同
-   hostname 的 `:5001/api`，其餘一律指向正式站。
+3. 同源：`${window.location.origin}/api`。
 
-第 3 條是關鍵：**本機測試不得把成績送進正式庫**。
+第 3 條是關鍵。前端由中介平台後端一併提供（`backend/main.py` 把
+`frontend/` 掛在 `/app`），API 必然與頁面同源，因此**本模組不得出現任何
+硬寫的網域或 port**——硬寫過一次正式站網址，結果是本機測雙人把成績灌進
+正式庫。同源也讓 CORS 完全不需要設定。
 
 ### 4.13c `js/lobby.js`
 
@@ -1001,63 +1001,38 @@ export function createOverlays(container) -> {
 > 素材來源寫在這裡、而不是靠資料夾名稱推導，是刻意的：改素材對應只要改這個檔，
 > 而且新增一個類別資料夾**不會**憑空多出一個關卡。
 
-## 6. 成績 txt 格式
+## 6. 成績去向
 
-`backend/serve.py` 收到 `POST /api/results` 後，寫到
-`backend/results/<YYYYMMDD-HHMMSS>_<grade>_<caseId>_<school>.txt`（檔名中的
-非 ASCII 與空白要換成底線）。
+成績 `POST` 到中介平台的 `POST /api/sessions`（見 `backend/routers/sessions.py`），
+由後端寫進 MariaDB。端點解析見 4.13b。
 
-TXT 是「將實際 request body 做 2 格縮排」的 JSON，**只能保存平台收到的
-同一份 payload**。除了空白、換行與檔尾換行外，解析後的物件必須與送出的
-request body 深度相等；不得加入標題、摘要、逐題紀錄或其他本機欄位。
+送不出去時整包 JSON 留在瀏覽器 `localStorage`（key 前綴 `dccs_pending_`），
+下次開場由 `flushPendingResults()` 重送（見 4.13）。**不再有本機 txt 落地**
+——先前那支 `serve.py` 已整併進中介平台後端，落地檔在雲端部署上也是暫存性質，
+留著只會讓人誤以為資料安全。
 
-內容形如：
+payload 的欄位與型別要求見 4.13；遊戲端須完整輸出全部 12 筆 stats，平台暫時
+不寫入 DCCS 專屬欄位也沒關係。
 
-```json
-{
-  "lessonId": "lesson_DCCS",
-  "data": {
-    "grade": "G1",
-    "caseId": "S03",
-    "school": "KMU",
-    "currentDay": 1,
-    "startTime": 1725000000000,
-    "endTime": 1725000600000,
-    "mode": "single",
-    "stats": [
-      { "apiname": "DCCS_correct", "value": 53 },
-      { "apiname": "DCCS_wrong", "value": 13 },
-      { "apiname": "DCCS_accuracy", "value": 0.803030303030303 },
-      { "apiname": "DCCS_duration", "value": 600000 },
-      { "apiname": "DCCS_stage", "value": 5 },
-      { "apiname": "DCCS_levelsPlayed", "value": "1,2,3,4,5" }
-    ]
-  }
-}
+## 7. 前端怎麼被提供
+
+由中介平台後端一併提供，**不另外起靜態伺服器**：`backend/main.py` 結尾把
+repo 的 `frontend/` 以 `StaticFiles(html=True)` 掛在 `/app`。
+
+- 入口 `/app/`（登入頁）；大廳 `/app/games.html`；本遊戲
+  `/app/dccs/index.html`、`/app/dccs/double.html`。
+- 掛載點固定為 `/app`，**不得改掛在 `/`**：那會遮蔽 `/api/*`、`/health`、
+  `/demo`，也會跟日後新增的 API 路由相撞。
+- **只掛 `frontend/` 一個目錄**。後端原始碼與 `.env` 不在其中，因此不需要
+  任何黑名單——白名單本來就比「伺服整個 repo 再擋掉 backend/」可靠。
+- 因為同源，瀏覽器端不需要任何 CORS 放行。
+
+啟動：
+
+```bash
+cd backend
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 ```
-
-（上面的 `stats` 省略了 6 筆專屬計數
-`DCCS_{frame,category,model}{Correct,Wrong}Count`；實際必須完整輸出 12 筆。）
-
-- TXT 不保存 `sessionId`、`seed`、`rows`、`summary`、`warnings`、`notes`。
-- `DCCSResult` 仍可在記憶體中回傳上述除錯資訊供呼叫端使用，但不得混入
-  `payload`，也不得寫入 TXT 或送到平台。
-- 平台暫時不寫入 DCCS 專屬 stats 也沒關係；遊戲端仍須完整輸出全部 12 筆。
-
-## 7. `backend/serve.py`
-
-**只用 Python 標準函式庫**（`http.server`），不得要求 pip 安裝任何套件。
-
-- 靜態伺服專案根目錄，預設 port 8080。
-- `GET /` 以 302 導向 `/frontend/dccs/index.html`，**必須原封不動帶上 query string**
-  （否則 `main.js` 讀不到受試者資料，會退回填表畫面）。
-- **不要改成把 `index.html` 直接掛在根路徑**：它用相對路徑載入 `./js/main.js`，
-  從 `/` 提供會 404；資源必須在 `/frontend/dccs/` 底下解析。
-- `POST /api/results`：讀取 JSON body，依第 6 節寫檔，回 `201` 與
-  `{"file": "backend/results/...txt"}`。
-- **必須拒絕任何指向 `backend/` 的請求**
-  （回 403），避免不小心把後端原始碼透過瀏覽器暴露出去。
-- 必須防止路徑穿越（`..`）。
 
 ## 8. 驗收條件
 
@@ -1169,9 +1144,9 @@ request body 深度相等；不得加入標題、摘要、逐題紀錄或其他�
 
 ### 其他
 
-- `python3 backend/serve.py` 啟動後，瀏覽
-  `http://127.0.0.1:8080/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`
-  可以進入遊戲並實際遊玩。
+- 後端啟動後（見第 7 節），瀏覽
+  `http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`
+  可以進入遊戲並實際遊玩；從 `/app/games.html` 點 DCCS 亦可（見 4.13c）。
 - 逐題紀錄的每一個 `#` 都恰好有兩列（`shape` 與 `object` 各一），
   且 `object` 那列的規則等於該關設計表的 `objectRule`：
   第 1、2、4、5 關為 `model`，第 3 關為 `category`。

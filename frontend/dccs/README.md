@@ -6,8 +6,7 @@
 ## 目錄
 
 ```
-backend/serve.py            ← 靜態伺服器 + 成績接收（純標準函式庫）
-backend/results/            ← 成績 txt 輸出（自動建立）
+backend/                    ← 中介平台（FastAPI）。也負責提供前端，掛在 /app
 tools/build_manifest.py     ← 讀 levels.json + 掃 assets/，產生 manifest.json
 frontend/dccs/              ← 本遊戲（index.html / double.html / js / css / assets）
 ```
@@ -27,25 +26,30 @@ python3 tools/build_manifest.py
 （例如 `assets/2/xxx.png`，不以 `/` 開頭），實際網址由前端以
 `new URL(src, assetBase)` 算出，`assetBase` 預設是 `frontend/dccs/`。
 
-## 2. 啟動伺服器（開發／除錯用）
+## 2. 啟動（開發／除錯用）
+
+前端由中介平台後端一併提供，**不需要另外起靜態伺服器**：
 
 ```bash
-python3 backend/serve.py             # 預設監聽 8080
-python3 backend/serve.py --port 9000 # 自訂 port
+cd backend
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 ```
 
-- `http://127.0.0.1:8080/` 會 302 導向 `/frontend/dccs/index.html`
-  （query string 原封不動帶過去）。
-- 任何指向 `backend/` 的請求一律回 `403`（不把伺服器原始碼與成績檔
-  透過瀏覽器暴露出去）；路徑含 `..` 的請求同樣回 `403`。
+- 入口 `http://127.0.0.1:5001/app/`（登入頁）
+- 遊戲大廳 `http://127.0.0.1:5001/app/games.html`
+- 本遊戲 `http://127.0.0.1:5001/app/dccs/index.html`
+
+後端只把 `frontend/` 這個目錄掛出去，後端原始碼與 `.env` 不在其中。因為與
+`/api/*` 同源，**不需要設定任何 CORS**。
 
 ### 帶入受試者資訊（URL 參數）
 
-`grade`、`caseId`、`school`、`currentDay` 四個 query 參數齊全才會直接開始，
-缺任一項會顯示表單讓使用者手動輸入。另可加 `seed` 固定亂數種子：
+從大廳進來時不需要（見下節）。直接開遊戲頁除錯時，`grade`、`caseId`、
+`school`、`currentDay` 四個參數齊全才會直接開始，缺任一項會顯示表單。
+另可加 `seed` 固定亂數種子：
 
 ```
-http://127.0.0.1:8080/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42
+http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42
 ```
 
 ## 2b. 從遊戲大廳進場
@@ -83,36 +87,22 @@ http://127.0.0.1:8080/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42
 
 ## 4. 成績存在哪
 
-一場結束後，遊戲會把整包結果 `POST` 到中介平台的 `POST /api/sessions`。
-端點由 `js/net/apiBase.js` 統一解析，**單人與雙人共用同一套規則**：
+一場結束後，遊戲把整包結果 `POST` 到中介平台的 `POST /api/sessions`，
+由後端寫進 MariaDB。
+
+端點由 `js/net/apiBase.js` 解析，**單人與雙人共用**：
 
 | 優先序 | 來源 | 用途 |
 |---|---|---|
-| 1 | `window.DCCS_SUBMIT_URL` | 整支端點覆寫（離線落地用，見下） |
+| 1 | `window.DCCS_SUBMIT_URL` | 整支端點覆寫 |
 | 2 | `window.API_BASE_URL` | 只換 API 前綴，端點仍是 `<base>/sessions` |
-| 3 | 依 hostname 推導 | 本機 → `:5001/api/sessions`；其餘 → 正式站 |
+| 3 | 同源 `${location.origin}/api/sessions` | 預設 |
 
-第 3 條保證**本機測試不會把成績灌進正式庫**。本機開發時請一併啟動中介平台
-後端（預設 `:5001`）；`serve.py` 預設 port 用 8080，是因為後端 CORS 白名單
-放行的本機 port 是 3000 / 5173 / 5500 / 8080，用 8000 會被 preflight 擋掉。
+因為前端就是後端提供的，第 3 條必然正確——本機、正式站、之後換網域都不用
+改程式碼，也不可能發生「本機測試把成績灌進正式庫」。
 
 ### 送失敗怎麼辦
 
-送不出去時，整包 JSON 會暫存在瀏覽器的 `localStorage`（key 前綴
-`dccs_pending_`）。**下次開啟遊戲時會自動重送**（每次載入頁面只跑一次，
-成功的才刪掉，失敗的留到再下次），所以斷線或後端沒開都不會掉資料。
-
-### 離線落地（不經網路）
-
-現場沒網路、或後端還沒就緒時，可以讓 `serve.py` 把成績寫成 txt。在載入遊戲
-的 HTML 裡、`<script type="module">` 之前加一行：
-
-```html
-<script>window.DCCS_SUBMIT_URL = '/api/results';</script>
-```
-
-`serve.py` 收到後依 `SPEC.md` 第 6 節格式寫成：
-
-```
-backend/results/<YYYYMMDD-HHMMSS>_<grade>_<caseId>_<school>.txt
-```
+送不出去時整包 JSON 暫存在瀏覽器的 `localStorage`（key 前綴
+`dccs_pending_`）。**下次開啟遊戲時會自動重送**（每次載入只跑一次，成功的
+才刪掉），所以後端或資料庫短暫不通都不會掉資料。
