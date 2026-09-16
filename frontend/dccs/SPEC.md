@@ -841,7 +841,8 @@ export function mountDCCS(options) -> DCCSHandle
 | `showResultScreen` | `true` | `false` 則結束後不顯示結算畫面（由 main 自己畫） |
 | `submit` | `true` | 是否自己送出成績（**預設照舊自己送**） |
 | `submitUrl` | `resolveSubmitUrl()` | 傳給 `submitResult`，見 4.13b |
-| `onPhase` | `null` | `(phase) => void`，phase 為 `'loading' \| 'title' \| 'level-prompt' \| 'playing' \| 'submitting' \| 'done' \| 'error'` |
+| `showTutorial` | `true` | 開始前顯示單頁操作說明（見 4.16b）；`autoStart` 時一律不顯示 |
+| `onPhase` | `null` | `(phase) => void`，phase 為 `'loading' \| 'tutorial' \| 'title' \| 'level-prompt' \| 'playing' \| 'submitting' \| 'done' \| 'error'` |
 
 #### DCCSHandle
 
@@ -908,6 +909,43 @@ export function createOverlays(container) -> {
   才不會跟 main 的樣式互撞。`frontend/dccs/css/style.css` 只留殼（body、表單）的樣式。
 
 ---
+
+### 4.16b 操作說明（`overlays.showTutorial`）
+
+標題畫面之前顯示的**單一頁面**說明，內容由 `dccs.js` 的
+`buildTutorialContent()` 依 `manifest` 產生，圖用**真實素材**（形狀閥前 3 個
+shape、物件閥第一個類別的前 3 張），不另外畫示意圖。
+
+版面做成上下兩張操作卡，對應遊戲畫面裡形狀閥在上、物件閥在下的位置。
+每張卡將控制對象、可用按鍵、「按一下轉一格」與實際素材分開呈現；作答時機與安心
+提示另用訊息區塊呈現，不把所有文字擠成一段。教學面板最寬 900px，並限制高度、
+允許捲動，確保小螢幕上的文字與圖片仍有足夠尺寸。
+
+**說明只講操作，絕對不得講答題規則。** 第 1.4 節已經定了「規則不顯示給
+玩家，要自己從畫面推」——推論規則、以及規則改變時能不能跟著轉，正是 DCCS
+要測的東西。把「形狀閥選相同形狀」或「這關物件閥是 model 還是 category」
+寫進說明，等於把受測項目直接告訴受試者，資料就失去意義。同理，**不得放
+實際遊玩的錄影**：示範比文字更有效地把規則教出去。
+
+因此內容限於：兩排各自用哪些按鍵、按一下轉一格、穿過當下停在中央的即為
+作答、答錯不扣分也不重來。
+
+教學畫面不放大型開始按鈕；鍵盤收 `Enter`、`NumpadEnter` 或空白鍵後直接
+開始，不再停留於另一個標題畫面。方向鍵仍只用於遊戲內轉動選項。監聽器在
+settle 時解除，不得殘留到遊戲中。
+
+### 4.17 離開頁面保護
+
+場次進行中（`level-prompt` / `playing` / `submitting`）掛上 `beforeunload`，
+離開頁面時由瀏覽器跳確認。結束（`done`）或 `destroy()` 時解除——`emitPhase('done')`
+**必須**在 `settleDone()` 之前呼叫，否則從大廳進場的場次跑完自動導回大廳時
+會誤跳確認框。
+
+兩個瀏覽器限制：提示文字**不可自訂**；使用者必須先與頁面互動過才會觸發
+（標題畫面要按空白鍵，此條件天然成立）。
+
+另：標題畫面的空白鍵要 `preventDefault()`，否則遊戲嵌在別人的頁面裡時
+會整頁捲動。
 
 ## 5. `manifest.json` 格式
 

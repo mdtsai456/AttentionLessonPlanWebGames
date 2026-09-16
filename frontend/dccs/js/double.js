@@ -1,4 +1,6 @@
-import { mountDCCS } from './dccs.js';
+import { mountDCCS, buildTutorialContent } from './dccs.js';
+import { loadManifest } from './core/assets.js';
+import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js';
 import { readLobbySession, resolveCurrentDay } from './lobby.js';
 
@@ -19,6 +21,12 @@ const sharedLoading =
 
 const sharedTitle =
   document.getElementById('shared-title');
+
+const sharedTutorial =
+  document.getElementById('shared-tutorial');
+
+const sharedTutorialBody =
+  document.getElementById('shared-tutorial-body');
 
 const sharedLevel =
   document.getElementById('shared-level');
@@ -64,6 +72,7 @@ function createPairId() {
 function showSharedScreen(target) {
   const screens = [
     sharedLoading,
+    sharedTutorial,
     sharedTitle,
     sharedLevel,
     sharedError,
@@ -82,6 +91,11 @@ function showSharedScreen(target) {
     target === sharedLevel
   );
 
+  sharedOverlay.classList.toggle(
+    'tutorial-mode',
+    target === sharedTutorial
+  );
+
   sharedOverlay.hidden = false;
 }
 
@@ -92,7 +106,8 @@ function hideSharedOverlay() {
   sharedOverlay.hidden = true;
 
   sharedOverlay.classList.remove(
-    'level-mode'
+    'level-mode',
+    'tutorial-mode'
   );
 }
 
@@ -168,6 +183,71 @@ function submissionMessage(
 }
 
 /*
+  顯示共用的操作說明，等兩位玩家看完。
+
+  雙人版**不能**讓左右兩個 mountDCCS 各自顯示教學——那會同時跑出兩個教學層，
+  各自等自己那一半被操作，而且都被這片共用畫面蓋住，遊戲永遠開不了。
+  因此兩側一律 showTutorial: false，改由這裡統一顯示一份。
+
+  內容與單人版完全相同（共用 buildTutorialContent），版面沿用 .dccs-* 樣式。
+*/
+async function showSharedTutorial() {
+  ensureOverlayStyles();
+
+  try {
+    const manifestUrl =
+      new URL('../manifest.json', import.meta.url).href;
+
+    const assetBase =
+      new URL('../', import.meta.url).href;
+
+    const manifest =
+      await loadManifest(manifestUrl);
+
+    renderTutorialInto(
+      sharedTutorialBody,
+      buildTutorialContent(manifest, assetBase)
+    );
+  } catch (error) {
+    // 說明畫不出來不該擋住遊戲——記一筆就跳過。
+    console.warn('操作說明載入失敗，略過：', error);
+    return;
+  }
+
+  showSharedScreen(sharedTutorial);
+
+  await new Promise((resolve) => {
+    let settled = false;
+
+    function finish() {
+      if (settled) return;
+      settled = true;
+
+      window.removeEventListener('keydown', onKeyDown);
+      resolve();
+    }
+
+    // 操作說明以 Enter 或空白鍵結束；方向鍵留給遊戲操作。
+    function onKeyDown(event) {
+      if (
+        event.code !== 'Enter' &&
+        event.code !== 'NumpadEnter' &&
+        event.code !== 'Space'
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      finish();
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+  });
+
+  showSharedScreen(sharedLoading);
+}
+
+/*
   開始一場雙人遊戲。受試者資料有兩個來源——大廳（frontend/games.html）的
   sessionStorage，或本頁的手動表單——兩邊都組出同樣形狀的 player 物件
   （{ grade, caseId, school, currentDay }）之後走同一條路。
@@ -182,6 +262,9 @@ async function startSession(player1, player2) {
 
     showSharedScreen(sharedLoading);
 
+    // 先看說明，再載入遊戲——兩側的 mountDCCS 都不顯示自己的教學。
+    await showSharedTutorial();
+
     sharedPlayerInfo.textContent =
       `玩家 1：${player1.caseId}　｜　` +
       `玩家 2：${player2.caseId}`;
@@ -194,7 +277,9 @@ async function startSession(player1, player2) {
       2: 'loading',
     };
 
-    let bothPlayersReady = false;
+    // 共用教學已經取得開始意圖；兩側掛載後直接進入第 1 關提示，
+    // 不再額外顯示一次標題開始畫面。
+    let bothPlayersReady = true;
     let continueLocked = false;
 
     /*
@@ -559,6 +644,8 @@ async function startSession(player1, player2) {
 
         submit: false,
         showResultScreen: false,
+        showTutorial: false,
+        autoStart: true,
       });
 
     /*
@@ -592,6 +679,8 @@ async function startSession(player1, player2) {
 
         submit: false,
         showResultScreen: false,
+        showTutorial: false,
+        autoStart: true,
       });
 
     try {

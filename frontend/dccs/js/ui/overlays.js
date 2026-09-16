@@ -44,6 +44,224 @@ const CSS = `
   font-size: 0.8rem;
   color: #6b7280;
 }
+/* 教學是單一頁面。上下兩張操作卡對應遊戲裡的兩排選項；小螢幕可捲動，
+   避免為了塞進一屏而把文字與按鈕縮得太小。 */
+.dccs-overlay-tutorial {
+  padding: clamp(10px, 2.4vw, 28px);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(50, 184, 229, 0.28), transparent 32%),
+    radial-gradient(circle at 88% 90%, rgba(255, 190, 53, 0.24), transparent 30%),
+    #0b1324;
+}
+
+.dccs-overlay-tutorial .dccs-panel {
+  width: min(94vw, 900px);
+  min-width: 0;
+  max-width: 900px;
+  max-height: 94%;
+  overflow-y: auto;
+  padding: clamp(1.15rem, 3vh, 2.25rem) clamp(1rem, 3.6vw, 3rem);
+  color: #152238;
+  background: #f8fbff;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: clamp(20px, 3vw, 32px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+.dccs-tutorial-header {
+  margin: 0 auto clamp(0.85rem, 2vh, 1.35rem);
+  max-width: 680px;
+  text-align: center;
+}
+
+.dccs-tutorial-eyebrow {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  color: #087ead;
+  background: #dff5ff;
+  border-radius: 999px;
+  font-size: clamp(0.78rem, 1.5vw, 0.9rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.dccs-panel .dccs-tutorial-title {
+  margin: 0;
+  color: #14223a;
+  font-size: clamp(1.55rem, 3.2vw, 2.35rem);
+  letter-spacing: 0.03em;
+}
+
+.dccs-tutorial-lead {
+  margin: 0.45rem 0 0;
+  color: #5b6980;
+  font-size: clamp(0.95rem, 1.8vw, 1.12rem);
+  line-height: 1.55;
+}
+
+.dccs-tutorial-rows {
+  display: grid;
+  gap: clamp(0.65rem, 1.6vh, 1rem);
+  width: 100%;
+}
+
+.dccs-tutorial-row {
+  display: grid;
+  grid-template-columns: minmax(165px, 0.72fr) 1.45fr;
+  gap: clamp(0.8rem, 2.2vw, 1.6rem);
+  align-items: center;
+  width: 100%;
+  padding: clamp(0.75rem, 1.8vw, 1rem);
+  background: #eef5ff;
+  border: 2px solid #dce9fb;
+  border-radius: 20px;
+}
+
+.dccs-tutorial-rowcopy {
+  min-width: 0;
+}
+
+.dccs-tutorial-rowtitle {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #273650;
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 800;
+}
+
+.dccs-tutorial-keys {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  flex-wrap: wrap;
+}
+
+.dccs-tutorial-keyword {
+  color: #6a7890;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dccs-tutorial-key {
+  display: inline-grid;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  padding: 0 0.55rem;
+  color: #fff;
+  background: #1c9ccd;
+  border: 1px solid #087ead;
+  border-bottom-width: 4px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dccs-tutorial-rownote {
+  margin: 0.45rem 0 0;
+  color: #64728a;
+  font-size: clamp(0.8rem, 1.5vw, 0.92rem);
+  line-height: 1.45;
+}
+
+.dccs-tutorial-strip {
+  display: flex;
+  gap: clamp(0.4rem, 1.2vw, 0.8rem);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.dccs-tutorial-strip img {
+  width: clamp(54px, 8vw, 88px);
+  height: clamp(54px, 8vw, 88px);
+  object-fit: contain;
+  background: #fff;
+  border: 2px solid #d8e2f0;
+  border-radius: 14px;
+  padding: 7px;
+}
+
+.dccs-tutorial-strip .dccs-tutorial-frame {
+  border: 5px solid #f2b72b;
+  border-radius: 18px;
+  padding: 4px;
+}
+
+.dccs-tutorial-answer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+  margin: clamp(0.75rem, 1.8vh, 1.1rem) 0 0;
+  padding: 0.7rem 0.9rem;
+  color: #3b4961;
+  background: #fff6d9;
+  border: 1px solid #f2dda0;
+  border-radius: 14px;
+  font-size: clamp(0.9rem, 1.7vw, 1.05rem);
+  line-height: 1.55;
+}
+
+.dccs-tutorial-answer strong {
+  padding: 0.28rem 0.6rem;
+  color: #815800;
+  background: #ffe19a;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 0.84em;
+}
+
+.dccs-tutorial-answer p {
+  margin: 0;
+}
+
+.dccs-tutorial-reassurance {
+  margin: 0.6rem 0 0;
+  color: #68758a;
+  font-size: clamp(0.82rem, 1.55vw, 0.95rem);
+  text-align: center;
+}
+
+.dccs-tutorial-keyhint {
+  color: #5b6980;
+  font-size: clamp(0.9rem, 1.7vw, 1.05rem);
+  font-weight: 700;
+  margin: clamp(0.75rem, 2vh, 1.1rem) 0 0;
+  text-align: center;
+}
+
+.dccs-overlay-tutorial .dccs-kbd {
+  color: #344057;
+  background: #fff;
+  border-color: #b9c4d4;
+}
+
+@media (max-width: 560px) {
+  .dccs-overlay-tutorial .dccs-panel {
+    width: 96vw;
+    max-height: 96%;
+    padding: 1rem 0.85rem;
+    border-radius: 20px;
+  }
+
+  .dccs-tutorial-row {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .dccs-tutorial-strip {
+    justify-content: flex-start;
+  }
+
+  .dccs-tutorial-answer {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+}
+
 .dccs-kbd {
   display: inline-block;
   padding: 0.1em 0.5em;
@@ -188,6 +406,7 @@ function renderSummaryFields(dl, summary) {
  *   showLoading(detail: string): void,
  *   showTitle(meta: object): void,
  *   showLevelPrompt(levelNo: number): Promise<void>,
+ *   showTutorial(pages: Array<object>): Promise<void>,
  *   showResult(summary: object, statusText: string): void,
  *   setResultStatus(text: string): void,
  *   showError(message: string): void,
@@ -195,6 +414,127 @@ function renderSummaryFields(dl, summary) {
  *   destroy(): void,
  * }}
  */
+/** 供雙人版等外部畫面使用：確保 .dccs-* 樣式已注入。 */
+export function ensureOverlayStyles() {
+  injectStyleOnce();
+}
+
+/**
+ * 把單頁操作說明的內容畫進指定元素（只建 DOM，不管顯示與互動）。
+ * 單人版由 showTutorial() 使用；雙人版自己有一套共用畫面，直接用這支，
+ * 才不會變成左右兩側各跑一次教學。
+ *
+ * @param {HTMLElement} element 目標容器，內容會被清空
+ * @param {object} content 見 showTutorial 的 content 參數
+ */
+export function renderTutorialInto(element, content) {
+  injectStyleOnce();
+  element.replaceChildren();
+  if (!content) return;
+
+  const headerEl = document.createElement('header');
+  headerEl.className = 'dccs-tutorial-header';
+
+  const eyebrowEl = document.createElement('span');
+  eyebrowEl.className = 'dccs-tutorial-eyebrow';
+  eyebrowEl.textContent = '操作說明';
+  headerEl.appendChild(eyebrowEl);
+
+  const titleEl = document.createElement('h1');
+  titleEl.className = 'dccs-tutorial-title';
+  titleEl.textContent = content.title || '';
+  headerEl.appendChild(titleEl);
+
+  const leadEl = document.createElement('p');
+  leadEl.className = 'dccs-tutorial-lead';
+  leadEl.textContent = content.lead || '';
+  headerEl.appendChild(leadEl);
+  element.appendChild(headerEl);
+
+  const rowsEl = document.createElement('div');
+  rowsEl.className = 'dccs-tutorial-rows';
+  for (const row of content.rows || []) {
+    rowsEl.appendChild(buildTutorialRowElement(row));
+  }
+  element.appendChild(rowsEl);
+
+  const answerEl = document.createElement('div');
+  answerEl.className = 'dccs-tutorial-answer';
+
+  const answerLabelEl = document.createElement('strong');
+  answerLabelEl.textContent = '怎麼作答';
+  answerEl.appendChild(answerLabelEl);
+
+  const answerTextEl = document.createElement('p');
+  answerTextEl.textContent = content.answer || '';
+  answerEl.appendChild(answerTextEl);
+  element.appendChild(answerEl);
+
+  const reassuranceEl = document.createElement('p');
+  reassuranceEl.className = 'dccs-tutorial-reassurance';
+  reassuranceEl.textContent = content.reassurance || '';
+  element.appendChild(reassuranceEl);
+}
+
+/** 一排：操作按鍵與選項圖。單人與雙人共用。 */
+function buildTutorialRowElement(row) {
+  const rowEl = document.createElement('div');
+  rowEl.className = 'dccs-tutorial-row';
+
+  const copyEl = document.createElement('div');
+  copyEl.className = 'dccs-tutorial-rowcopy';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'dccs-tutorial-rowtitle';
+  labelEl.textContent = row.label;
+  copyEl.appendChild(labelEl);
+
+  const keysEl = document.createElement('div');
+  keysEl.className = 'dccs-tutorial-keys';
+
+  const keywordEl = document.createElement('span');
+  keywordEl.className = 'dccs-tutorial-keyword';
+  keywordEl.textContent = '按';
+  keysEl.appendChild(keywordEl);
+
+  for (const [index, key] of (row.keys || []).entries()) {
+    if (index > 0) {
+      const orEl = document.createElement('span');
+      orEl.className = 'dccs-tutorial-keyword';
+      orEl.textContent = '或';
+      keysEl.appendChild(orEl);
+    }
+
+    const keyEl = document.createElement('span');
+    keyEl.className = 'dccs-tutorial-key';
+    keyEl.textContent = key;
+    keysEl.appendChild(keyEl);
+  }
+
+  copyEl.appendChild(keysEl);
+
+  const noteEl = document.createElement('p');
+  noteEl.className = 'dccs-tutorial-rownote';
+  noteEl.textContent = row.note || '';
+  copyEl.appendChild(noteEl);
+  rowEl.appendChild(copyEl);
+
+  const stripEl = document.createElement('div');
+  stripEl.className = 'dccs-tutorial-strip';
+
+  for (const item of row.images || []) {
+    const img = document.createElement('img');
+    img.src = item.src;
+    // 教學圖只是示意，讀屏軟體念出檔名沒有意義。
+    img.alt = '';
+    if (item.framed) img.className = 'dccs-tutorial-frame';
+    stripEl.appendChild(img);
+  }
+
+  rowEl.appendChild(stripEl);
+  return rowEl;
+}
+
 export function createOverlays(container) {
   injectStyleOnce();
 
@@ -208,7 +548,8 @@ export function createOverlays(container) {
   const titleEl = buildOverlay(
     'dccs-overlay-title',
     '<h1>賽道攔截 · DCCS</h1>' +
-      '<p class="dccs-hint">按 <span class="dccs-kbd">空白鍵</span> 開始</p>' +
+      '<p class="dccs-hint">按 <span class="dccs-kbd">Enter</span> 或 ' +
+      '<span class="dccs-kbd">空白鍵</span> 開始</p>' +
       '<p class="dccs-hint dccs-small dccs-title-meta"></p>'
   );
   const levelEl = buildOverlay(
@@ -227,15 +568,36 @@ export function createOverlays(container) {
     'dccs-overlay-error',
     '<h1>發生錯誤</h1><p class="dccs-hint dccs-error-detail"></p>'
   );
+  // 教學只講「怎麼操作」，**刻意不講答題規則**——SPEC 1.4：規則不顯示給
+  // 玩家，要自己從畫面推。把規則說出來等於把要測的認知彈性直接送給受試者，
+  // 資料就失去意義了。
+  const tutorialEl = buildOverlay(
+    'dccs-overlay-tutorial',
+    '<header class="dccs-tutorial-header">' +
+      '<span class="dccs-tutorial-eyebrow">操作說明</span>' +
+      '<h1 class="dccs-tutorial-title"></h1>' +
+      '<p class="dccs-tutorial-lead"></p>' +
+      '</header>' +
+      '<div class="dccs-tutorial-rows"></div>' +
+      '<div class="dccs-tutorial-answer">' +
+      '<strong>怎麼作答</strong><p class="dccs-tutorial-answer-text"></p>' +
+      '</div>' +
+      '<p class="dccs-tutorial-reassurance"></p>' +
+      '<p class="dccs-tutorial-keyhint">' +
+      '按 <span class="dccs-kbd">Enter</span> 或 ' +
+      '<span class="dccs-kbd">空白鍵</span> 開始' +
+      '</p>'
+  );
 
   wrapper.appendChild(loadingEl);
   wrapper.appendChild(titleEl);
   wrapper.appendChild(levelEl);
   wrapper.appendChild(resultEl);
   wrapper.appendChild(errorEl);
+  wrapper.appendChild(tutorialEl);
   container.appendChild(wrapper);
 
-  const all = [loadingEl, titleEl, levelEl, resultEl, errorEl];
+  const all = [loadingEl, titleEl, levelEl, resultEl, errorEl, tutorialEl];
   const levelButton = levelEl.querySelector('.dccs-level-continue');
   let resolveLevelPrompt = null;
 
@@ -291,6 +653,70 @@ export function createOverlays(container) {
     resultEl.querySelector('.dccs-result-status').textContent = text || '';
   }
 
+  const tutorialTitleEl = tutorialEl.querySelector('.dccs-tutorial-title');
+  const tutorialLeadEl = tutorialEl.querySelector('.dccs-tutorial-lead');
+  const tutorialRowsEl = tutorialEl.querySelector('.dccs-tutorial-rows');
+  const tutorialAnswerEl = tutorialEl.querySelector('.dccs-tutorial-answer-text');
+  const tutorialReassuranceEl = tutorialEl.querySelector('.dccs-tutorial-reassurance');
+
+  let resolveTutorial = null;
+
+  function settleTutorial() {
+    window.removeEventListener('keydown', onTutorialKeyDown);
+    if (!resolveTutorial) return;
+    const resolve = resolveTutorial;
+    resolveTutorial = null;
+    resolve();
+  }
+
+  // 方向鍵是遊戲中的操作鍵，因此教學只收 Enter 與空白鍵。
+  function onTutorialKeyDown(event) {
+    if (
+      event.code !== 'Enter' &&
+      event.code !== 'NumpadEnter' &&
+      event.code !== 'Space'
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    settleTutorial();
+  }
+
+  /**
+   * 顯示單頁操作說明，回傳的 Promise 在受試者按「開始」時 resolve。
+   * @param {{title: string, lead?: string, answer?: string, reassurance?: string,
+   *          rows?: Array<{label: string, keys?: Array<string>, note?: string,
+   *                        images?: Array<{src: string, framed?: boolean}>}>}} content
+   * @returns {Promise<void>}
+   */
+  function showTutorial(content) {
+    if (!content) {
+      return Promise.resolve();
+    }
+
+    tutorialTitleEl.textContent = content.title || '';
+    tutorialLeadEl.textContent = content.lead || '';
+    tutorialAnswerEl.textContent = content.answer || '';
+    tutorialReassuranceEl.textContent = content.reassurance || '';
+
+    tutorialRowsEl.replaceChildren();
+    for (const row of content.rows || []) {
+      tutorialRowsEl.appendChild(buildTutorialRowElement(row));
+    }
+
+    showOnly(tutorialEl);
+    const panelEl = tutorialEl.querySelector('.dccs-panel');
+    panelEl.scrollTop = 0;
+    panelEl.tabIndex = -1;
+    panelEl.focus({ preventScroll: true });
+    window.addEventListener('keydown', onTutorialKeyDown);
+
+    return new Promise((resolve) => {
+      resolveTutorial = resolve;
+    });
+  }
+
   function showError(message) {
     errorEl.querySelector('.dccs-error-detail').textContent = message || '';
     showOnly(errorEl);
@@ -298,6 +724,7 @@ export function createOverlays(container) {
 
   function destroy() {
     settleLevelPrompt();
+    settleTutorial();
     levelButton.removeEventListener('click', settleLevelPrompt);
     wrapper.remove();
   }
@@ -306,6 +733,7 @@ export function createOverlays(container) {
     showLoading,
     showTitle,
     showLevelPrompt,
+    showTutorial,
     showResult,
     setResultStatus,
     showError,

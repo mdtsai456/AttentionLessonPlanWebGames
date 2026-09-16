@@ -14,6 +14,63 @@ import { createOverlays } from './ui/overlays.js';
 // 只有先掛的那個會觸發，避免兩邊搶同一批暫存。
 let pendingFlushStarted = false;
 
+/**
+ * 單頁操作說明的內容。**只講操作，不講答題規則**——SPEC 1.4 明定規則不
+ * 顯示給玩家，要自己從畫面推；講出來等於把要測的認知彈性直接送給受試者。
+ *
+ * 版面刻意做成上下兩排，對應遊戲畫面裡形狀閥在上、物件閥在下的位置，
+ * 讓「上排／下排」這兩個詞不必解釋。
+ *
+ * @param {object} manifest
+ * @param {string} assetBase manifest 相對路徑的基準網址
+ * @returns {object} 傳給 overlays.showTutorial 的內容
+ */
+export function buildTutorialContent(manifest, assetBase) {
+  const toSrc = (item) =>
+    new URL(item.src, assetBase).href;
+
+  const shapes =
+    Array.isArray(manifest.shapes)
+      ? manifest.shapes.slice(0, 3).map((item) => ({
+          src: toSrc(item),
+          framed: true,
+        }))
+      : [];
+
+  const firstCategory =
+    Array.isArray(manifest.categories) && manifest.categories.length > 0
+      ? manifest.categories[0]
+      : null;
+
+  const objects =
+    firstCategory && Array.isArray(firstCategory.images)
+      ? firstCategory.images.slice(0, 3).map((item) => ({
+          src: toSrc(item),
+        }))
+      : [];
+
+  return {
+    title: '先學會怎麼操作',
+    lead: '遊戲裡有上、下兩排選項，請用不同的按鍵轉動它們。',
+    rows: [
+      {
+        label: '控制上排',
+        keys: ['←', 'A'],
+        note: '每按一下，上排會轉動一格。',
+        images: shapes,
+      },
+      {
+        label: '控制下排',
+        keys: ['→', 'D'],
+        note: '每按一下，下排會轉動一格。',
+        images: objects,
+      },
+    ],
+    answer: '物件通過兩排選項時，停在正中間的圖案，就是你的答案。',
+    reassurance: '別緊張，答錯不扣分，遊戲也不會重來。',
+  };
+}
+
 export const DCCS_DEFAULT_BINDINGS = {
   rotateShape: ['ArrowLeft', 'KeyA'],
   rotateObject: ['ArrowRight', 'KeyD'],
@@ -126,6 +183,10 @@ export function mountDCCS(options) {
 
   const autoStart = !!opts.autoStart;
 
+  // 教學畫面。autoStart 時不顯示（雙人由外層殼統一帶）。
+  const showTutorial =
+    opts.showTutorial !== false;
+
   const showResultScreen =
     opts.showResultScreen !== false;
 
@@ -146,7 +207,42 @@ export function mountDCCS(options) {
       ? opts.onPhase
       : null;
 
+  // 場次進行中離開頁面，這一場的成績就沒了——沒有中途續玩機制，逐題紀錄
+  // 只存在記憶體裡。故在這些階段掛上離開確認。
+  //
+  // 兩個瀏覽器限制要知道：提示文字**不可自訂**（一律是瀏覽器的制式問句），
+  // 且使用者必須先與頁面互動過才會觸發——標題畫面要按空白鍵才開始，這個
+  // 條件天然成立。
+  const PHASES_IN_PROGRESS = new Set([
+    'level-prompt',
+    'playing',
+    'submitting',
+  ]);
+
+  function guardUnload(shouldGuard) {
+    if (shouldGuard === !!unloadHandler) {
+      return;
+    }
+
+    if (shouldGuard) {
+      unloadHandler = (event) => {
+        event.preventDefault();
+        // 舊版瀏覽器要 returnValue 有值才會顯示提示。
+        event.returnValue = '';
+      };
+
+      window.addEventListener('beforeunload', unloadHandler);
+      return;
+    }
+
+    window.removeEventListener('beforeunload', unloadHandler);
+    unloadHandler = null;
+  }
+
   function emitPhase(phase) {
+    // 放在 onPhase 之前：沒有傳 onPhase 的呼叫端一樣要有離開保護。
+    guardUnload(PHASES_IN_PROGRESS.has(phase));
+
     if (!onPhase) {
       return;
     }
@@ -279,6 +375,7 @@ export function mountDCCS(options) {
   let startedAtMs = null;
   let destroyed = false;
   let titleKeyHandler = null;
+  let unloadHandler = null;
   let resolveTitleWait = null;
   let settleDone;
   let rejectDone;
@@ -314,6 +411,7 @@ export function mountDCCS(options) {
     }
 
     resizeObserver.disconnect();
+    guardUnload(false);
 
     if (titleKeyHandler) {
       window.removeEventListener(
@@ -472,7 +570,22 @@ export function mountDCCS(options) {
         `${Date.now().toString(36)}-` +
         `${Math.floor(rng() * 1e9).toString(36)}`;
 
-      if (!autoStart) {
+      const tutorialStartsSession =
+        showTutorial && !autoStart;
+
+      if (tutorialStartsSession) {
+        emitPhase('tutorial');
+
+        await overlays.showTutorial(
+          buildTutorialContent(manifest, assetBase)
+        );
+
+        if (destroyed) {
+          return;
+        }
+      }
+
+      if (!autoStart && !tutorialStartsSession) {
         emitPhase('title');
 
         overlays.showTitle({
@@ -487,9 +600,16 @@ export function mountDCCS(options) {
           resolveTitleWait = resolve;
 
           titleKeyHandler = (event) => {
-            if (event.code !== 'Space') {
+            if (
+              event.code !== 'Space' &&
+              event.code !== 'Enter' &&
+              event.code !== 'NumpadEnter'
+            ) {
               return;
             }
+
+            // 空白鍵預設會捲動頁面；遊戲嵌在別人的頁面裡時會整頁跳一下。
+            event.preventDefault();
 
             window.removeEventListener(
               'keydown',
