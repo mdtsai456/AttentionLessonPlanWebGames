@@ -6,8 +6,13 @@ import { createInput } from './core/input.js';
 import { loadManifest, preloadImages } from './core/assets.js';
 import { Track } from './game/track.js';
 import { createStats } from './game/stats.js';
-import { buildPayload, submitResult } from './net/client.js';
+import { buildPayload, submitResult, flushPendingResults } from './net/client.js';
+import { resolveSubmitUrl } from './net/apiBase.js';
 import { createOverlays } from './ui/overlays.js';
+
+// 前一場送不出去的成績重送一次即可；同一頁掛兩個實例（雙人模式）時，
+// 只有先掛的那個會觸發，避免兩邊搶同一批暫存。
+let pendingFlushStarted = false;
 
 export const DCCS_DEFAULT_BINDINGS = {
   rotateShape: ['ArrowLeft', 'KeyA'],
@@ -128,7 +133,13 @@ export function mountDCCS(options) {
     opts.submit !== false;
 
   const submitUrl =
-    opts.submitUrl || '/api/results';
+    opts.submitUrl || resolveSubmitUrl();
+
+  if (!pendingFlushStarted) {
+    pendingFlushStarted = true;
+    // 背景重送，不擋這一場開始；失敗就留到下次開場。
+    flushPendingResults({ url: submitUrl }).catch(() => {});
+  }
 
   const onPhase =
     typeof opts.onPhase === 'function'

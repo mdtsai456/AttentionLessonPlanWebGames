@@ -4,7 +4,7 @@
 只用 Python 標準函式庫（http.server）。詳細規格見 SPEC.md 第 6、7 節。
 
 用法：
-    python3 backend/serve.py [--port 8000]
+    python3 backend/serve.py [--port 8080]
 """
 from __future__ import annotations
 
@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = BACKEND_DIR / "results"
 DEFAULT_INDEX = "frontend/dccs/index.html"
+# 8080 是中介平台後端（backend/main.py）CORS 預設放行的本機 port 之一。
+# 換成不在那份白名單裡的 port，跨網域送成績會被 preflight 擋下來。
+DEFAULT_PORT = 8080
 # 伺服器自己的原始碼（含 results/）不得透過瀏覽器讀取。
 FORBIDDEN_DIRS = (BACKEND_DIR.resolve(),)
 
@@ -246,7 +249,12 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="賽道攔截 DCCS 靜態伺服器")
-    parser.add_argument("--port", type=int, default=8000, help="監聽埠號（預設 8000）")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"監聽埠號（預設 {DEFAULT_PORT}）",
+    )
     args = parser.parse_args()
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)

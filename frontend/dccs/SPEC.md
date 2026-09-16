@@ -284,7 +284,7 @@ AttentionLessonPlanWebGames/
             ├── core/{loop,input,assets}.js
             ├── render/{projection,road,hud}.js
             ├── game/{valve,target,rules,trialGen,stats,track}.js
-            └── net/client.js
+            └── net/{client,apiBase}.js
 ```
 
 前端使用 **原生 ES modules**（`<script type="module">`），無框架、無打包工具、
@@ -722,7 +722,9 @@ Track 內不得寫死背景。
 
 ```js
 export function buildPayload({ lessonId, student, summary }) -> object
-export async function submitResult(payload, { url = '/api/results' } = {}) -> { ok, detail }
+export async function submitResult(payload, { url = resolveSubmitUrl() } = {}) -> { ok, detail }
+export function listPendingResults() -> Array<{ key, payload }>
+export async function flushPendingResults({ url = resolveSubmitUrl() } = {}) -> { attempted, sent, failed }
 ```
 
 - `buildPayload` 產出的物件結構必須與中介平台的 Unity payload 相同
@@ -738,11 +740,37 @@ export async function submitResult(payload, { url = '/api/results' } = {}) -> { 
 - 回傳值**只能**包含中介平台實際收到的 `{ lessonId, data }`；不得混入
   `sessionId`、`seed`、`rows`、`summary`、`warnings` 或 `notes`。本機 TXT
   直接保存這個回傳值，因此 TXT 的欄位和值必須與送出的 request body 相同。
-- `submitResult` 的**預設**目標是本機 `POST /api/results`（由 `backend/serve.py`
-  接收後寫成 txt）。**模組內不得寫死任何外部網址**；要送到別處只能由呼叫端
-  用第二個參數明示覆寫（`mountDCCS` 的 `submitUrl` 會傳進來）。
+- `submitResult` 的**預設**目標由 `js/net/apiBase.js` 的 `resolveSubmitUrl()`
+  決定（見 4.13b）。**本模組內不得寫死任何外部網址**；要送到別處由呼叫端用
+  第二個參數明示覆寫（`mountDCCS` 的 `submitUrl` 會傳進來）。
   送失敗時把整包 JSON 存進 `localStorage`（key 前綴 `dccs_pending_`）
   並回傳 `ok: false`。
+- `flushPendingResults` 重送所有暫存成績，**成功的才刪掉**，失敗就整批留到
+  下次；遇到第一個失敗即停止（多半是伺服器仍未就緒，continue 也只是白試）。
+  它**不得**走 `submitResult`——那支失敗時會再寫一筆新的暫存，重送一旦失敗
+  會讓暫存無限增生。`listPendingResults` 順便清掉 JSON 已損毀的殘留。
+- 暫存 key 為 `dccs_pending_<毫秒>_<亂數>`；亂數是必要的，雙人模式兩位玩家
+  會在同一毫秒送出，只用時間戳會互相覆蓋。
+
+### 4.13b `js/net/apiBase.js`
+
+```js
+export function resolveApiBase() -> string    // 不含結尾斜線
+export function resolveSubmitUrl() -> string
+```
+
+單人與雙人**共用同一套端點解析**，任何一邊都不得自己寫死網址。
+`resolveSubmitUrl()` 的優先序：
+
+1. `window.DCCS_SUBMIT_URL`——整支端點覆寫。用 `backend/serve.py` 做離線
+   落地（第 6、7 節）時設成 `'/api/results'`。
+2. `window.API_BASE_URL`——只換 API 前綴，端點仍是 `<base>/sessions`。
+   與中介平台前端 `frontend/js/api.js` 同名同義。
+3. 依 `window.location.hostname` 推導：`localhost` / `127.0.0.1` 指向同
+   hostname 的 `:5001/api`，其餘一律指向正式站。
+
+第 3 條是關鍵：**本機測試不得把成績送進正式庫**。
+
 ### 4.14 `js/main.js`（**獨立執行用的殼**）
 
 **真正的進入點是 `js/dccs.js`（4.15）**；`main.js` 只是「不靠 main 專案也能
@@ -783,7 +811,7 @@ export function mountDCCS(options) -> DCCSHandle
 | `autoStart` | `false` | `true` 則不顯示標題畫面；每關開始提示仍會顯示 |
 | `showResultScreen` | `true` | `false` 則結束後不顯示結算畫面（由 main 自己畫） |
 | `submit` | `true` | 是否自己送出成績（**預設照舊自己送**） |
-| `submitUrl` | `'/api/results'` | 傳給 `submitResult` |
+| `submitUrl` | `resolveSubmitUrl()` | 傳給 `submitResult`，見 4.13b |
 | `onPhase` | `null` | `(phase) => void`，phase 為 `'loading' \| 'title' \| 'level-prompt' \| 'playing' \| 'submitting' \| 'done' \| 'error'` |
 
 #### DCCSHandle
@@ -991,7 +1019,7 @@ request body 深度相等；不得加入標題、摘要、逐題紀錄或其他�
 
 **只用 Python 標準函式庫**（`http.server`），不得要求 pip 安裝任何套件。
 
-- 靜態伺服專案根目錄，預設 port 8000。
+- 靜態伺服專案根目錄，預設 port 8080。
 - `GET /` 以 302 導向 `/frontend/dccs/index.html`，**必須原封不動帶上 query string**
   （否則 `main.js` 讀不到受試者資料，會退回填表畫面）。
 - **不要改成把 `index.html` 直接掛在根路徑**：它用相對路徑載入 `./js/main.js`，
@@ -1113,7 +1141,7 @@ request body 深度相等；不得加入標題、摘要、逐題紀錄或其他�
 ### 其他
 
 - `python3 backend/serve.py` 啟動後，瀏覽
-  `http://127.0.0.1:8000/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`
+  `http://127.0.0.1:8080/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`
   可以進入遊戲並實際遊玩。
 - 逐題紀錄的每一個 `#` 都恰好有兩列（`shape` 與 `object` 各一），
   且 `object` 那列的規則等於該關設計表的 `objectRule`：

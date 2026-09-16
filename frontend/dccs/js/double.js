@@ -1,7 +1,5 @@
 import { mountDCCS } from './dccs.js';
-
-const RESULT_API =
-  'https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions';
+import { submitResult } from './net/client.js';
 
 const form =
   document.getElementById('setup-form');
@@ -114,38 +112,30 @@ function makeDoublePayload(result, pairId) {
 
 /*
   送出其中一位玩家的成績。
+
+  端點由 net/apiBase.js 統一解析（本機開發指向本機後端，正式站指向 Zeabur），
+  不再把正式站網址寫死在這裡——以前那樣寫，本機測雙人會把成績灌進正式庫。
 */
 async function submitPlayerResult(payload) {
-  const response =
-    await fetch(RESULT_API, {
-      method: 'POST',
+  const { ok, detail } =
+    await submitResult(payload);
 
-      headers: {
-        'Content-Type': 'application/json',
-      },
-
-      body: JSON.stringify(payload),
-    });
-
-  const responseText =
-    await response.text();
-
-  if (!response.ok) {
-    throw new Error(
-      `HTTP ${response.status}` +
-      (
-        responseText
-          ? `：${responseText}`
-          : ''
-      )
-    );
+  if (!ok) {
+    // submitResult 失敗時已把 payload 暫存在 localStorage，下次開場會自動
+    // 重送；這裡照樣 throw，讓結算畫面照原本的方式標示這一位送出失敗。
+    throw new Error(detail);
   }
 
-  if (!responseText) {
+  if (!detail) {
     return {};
   }
 
-  return JSON.parse(responseText);
+  try {
+    return JSON.parse(detail);
+  } catch (_err) {
+    // 後端回的不是 JSON 也無妨，送出成功才是重點。
+    return {};
+  }
 }
 
 /*
@@ -171,7 +161,7 @@ function submissionMessage(
   return `
     <p class="save-error">
       ${playerName}：成績送出失敗
-      （${reason}）
+      （${reason}）——已暫存於本機，下次開啟遊戲會自動重送。
     </p>
   `;
 }
