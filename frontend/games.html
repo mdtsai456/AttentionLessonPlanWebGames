@@ -77,14 +77,28 @@
         window.location.href = "index.html";
       });
 
-      // 點擊開始挑戰：依據單雙人帶入對應頁面編號
+      // 已經接上的網頁版遊戲：值是 [單人頁, 雙人頁]。
+      // 遊戲與本頁同源，受試者資料由遊戲自己讀 sessionStorage，不必經由
+      // URL 傳遞（見 dccs/js/lobby.js）。
+      const GAME_PAGES = {
+        DCCS: ["dccs/index.html", "dccs/double.html"],
+      };
+
+      // 點擊開始挑戰
       document.querySelectorAll(".btn-play").forEach(btn => {
         btn.addEventListener("click", (e) => {
           const gameType = e.target.closest(".game-item").getAttribute("data-game");
+          const pages = GAME_PAGES[gameType];
+
+          if (pages) {
+            window.location.href = isDouble ? pages[1] : pages[0];
+            return;
+          }
+
+          // 還沒接上的遊戲維持原本的佔位提示。
           let pageNum = 0;
 
           if (gameType === "DAT")  pageNum = isDouble ? 5 : 2;
-          if (gameType === "DCCS") pageNum = isDouble ? 6 : 3;
           if (gameType === "EFT")  pageNum = isDouble ? 7 : 4;
 
           alert(`【啟動 Unity 遊戲】\n項目：${gameType} (${isDouble ? "雙人" : "單人"})\n對應頁面：頁面 ${pageNum}\n學生代號：${s1Id} ${isDouble ? "與 " + s2Id : ""}`);

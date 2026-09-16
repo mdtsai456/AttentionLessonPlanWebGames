@@ -1,19 +1,16 @@
-// API 前綴：瀏覽器端 JS 沒有真正的環境變數，這裡用等價的兩層機制：
-// 1. 部署時可在載入本檔案「之前」設定 `window.API_BASE_URL`（例如在 index.html
-//    / dms.html / games.html 加一段 `<script>window.API_BASE_URL = "https://...";</script>`），
-//    不用改這支檔案就能切換環境。
-// 2. 沒設定時，依目前頁面的 hostname 自動判斷：本機開發（localhost/127.0.0.1）
-//    用同 hostname 換成後端的 5001 port；其他情況一律指向正式部署的 Zeabur。
-const DEV_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
-const PROD_API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app/api";
-
+// API 前綴：本前端由中介平台後端一併提供（FastAPI 把 frontend/ 掛在 /app，
+// 見 backend/main.py），所以 API 一律與目前頁面同源——不需要猜 port，也不需要
+// 硬寫任何網域。本機、正式站、換 port、換網域都不用改這支檔案，CORS 也免設。
+//
+// 先前這裡把本機 port 寫死成 5001，結果用 `fastapi dev`（預設 8000）起服務時，
+// 登入請求會打到空的 5001，畫面只顯示「登入失敗」，看起來像帳密錯誤。
+//
+// 前端若哪天改成獨立部署、與後端不同網域，在載入本檔案「之前」設定
+// `window.API_BASE_URL` 即可（例如在 index.html 加一段
+// `<script>window.API_BASE_URL = "https://...";</script>`），不用改這裡。
 function resolveBaseUrl() {
-  if (window.API_BASE_URL) return window.API_BASE_URL;
-  const { hostname, protocol } = window.location;
-  if (DEV_HOSTNAMES.has(hostname)) {
-    return `${protocol}//${hostname}:5001/api`;
-  }
-  return PROD_API_BASE_URL;
+  if (window.API_BASE_URL) return String(window.API_BASE_URL).replace(/\/+$/, "");
+  return `${window.location.origin}/api`;
 }
 
 const BASE_URL = resolveBaseUrl();

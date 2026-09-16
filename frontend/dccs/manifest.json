@@ -1,0 +1,183 @@
+{
+  "generatedAt": "2026-09-16T05:51:24Z",
+  "backgrounds": {
+    "single": "assets/Single.png",
+    "double": "assets/Double.png"
+  },
+  "shapes": [
+    {
+      "id": "shape/未命名的作品 10",
+      "src": "assets/shape/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%2010.png"
+    },
+    {
+      "id": "shape/未命名的作品 11",
+      "src": "assets/shape/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%2011.png"
+    },
+    {
+      "id": "shape/未命名的作品 12",
+      "src": "assets/shape/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%2012.png"
+    },
+    {
+      "id": "shape/未命名的作品 13",
+      "src": "assets/shape/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%2013.png"
+    },
+    {
+      "id": "shape/未命名的作品 9",
+      "src": "assets/shape/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%209.png"
+    }
+  ],
+  "categories": [
+    {
+      "id": "2",
+      "imageCount": 2,
+      "images": [
+        {
+          "id": "2/未命名的作品 1",
+          "src": "assets/2/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%201.png",
+          "categoryId": "2"
+        },
+        {
+          "id": "2/未命名的作品",
+          "src": "assets/2/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81.png",
+          "categoryId": "2"
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "imageCount": 3,
+      "images": [
+        {
+          "id": "3/未命名的作品 6",
+          "src": "assets/3/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%206.png",
+          "categoryId": "3"
+        },
+        {
+          "id": "3/未命名的作品 7",
+          "src": "assets/3/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%207.png",
+          "categoryId": "3"
+        },
+        {
+          "id": "3/未命名的作品 8",
+          "src": "assets/3/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%208.png",
+          "categoryId": "3"
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "imageCount": 4,
+      "images": [
+        {
+          "id": "4/未命名的作品 2",
+          "src": "assets/4/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%202.png",
+          "categoryId": "4"
+        },
+        {
+          "id": "4/未命名的作品 3",
+          "src": "assets/4/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%203.png",
+          "categoryId": "4"
+        },
+        {
+          "id": "4/未命名的作品 4",
+          "src": "assets/4/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%204.png",
+          "categoryId": "4"
+        },
+        {
+          "id": "4/未命名的作品 5",
+          "src": "assets/4/%E6%9C%AA%E5%91%BD%E5%90%8D%E7%9A%84%E4%BD%9C%E5%93%81%205.png",
+          "categoryId": "4"
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "imageCount": 5,
+      "images": [
+        {
+          "id": "5/ChatGPT Image 2026年9月8日 下午03_58_58 (1)",
+          "src": "assets/5/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%888%E6%97%A5%20%E4%B8%8B%E5%8D%8803_58_58%20%281%29.png",
+          "categoryId": "5"
+        },
+        {
+          "id": "5/ChatGPT Image 2026年9月8日 下午03_58_58 (2)",
+          "src": "assets/5/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%888%E6%97%A5%20%E4%B8%8B%E5%8D%8803_58_58%20%282%29.png",
+          "categoryId": "5"
+        },
+        {
+          "id": "5/ChatGPT Image 2026年9月8日 下午03_58_58 (3)",
+          "src": "assets/5/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%888%E6%97%A5%20%E4%B8%8B%E5%8D%8803_58_58%20%283%29.png",
+          "categoryId": "5"
+        },
+        {
+          "id": "5/ChatGPT Image 2026年9月8日 下午03_58_58 (4)",
+          "src": "assets/5/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%888%E6%97%A5%20%E4%B8%8B%E5%8D%8803_58_58%20%284%29.png",
+          "categoryId": "5"
+        },
+        {
+          "id": "5/ChatGPT Image 2026年9月8日 下午03_58_58 (5)",
+          "src": "assets/5/ChatGPT%20Image%202026%E5%B9%B49%E6%9C%888%E6%97%A5%20%E4%B8%8B%E5%8D%8803_58_58%20%285%29.png",
+          "categoryId": "5"
+        }
+      ]
+    }
+  ],
+  "levels": [
+    {
+      "index": 0,
+      "levelNo": 1,
+      "shapeCount": 5,
+      "objectCount": 2,
+      "objectRule": "model",
+      "sourceCategory": "2",
+      "playable": true,
+      "reason": null
+    },
+    {
+      "index": 1,
+      "levelNo": 2,
+      "shapeCount": 5,
+      "objectCount": 3,
+      "objectRule": "model",
+      "sourceCategory": "3",
+      "playable": true,
+      "reason": null
+    },
+    {
+      "index": 2,
+      "levelNo": 3,
+      "shapeCount": 2,
+      "objectCount": 4,
+      "objectRule": "category",
+      "sourceCategories": [
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "playable": true,
+      "reason": null
+    },
+    {
+      "index": 3,
+      "levelNo": 4,
+      "shapeCount": 2,
+      "objectCount": 4,
+      "objectRule": "model",
+      "sourceCategory": "4",
+      "playable": true,
+      "reason": null
+    },
+    {
+      "index": 4,
+      "levelNo": 5,
+      "shapeCount": 2,
+      "objectCount": 5,
+      "objectRule": "model",
+      "sourceCategory": "5",
+      "playable": true,
+      "reason": null
+    }
+  ],
+  "warnings": []
+}

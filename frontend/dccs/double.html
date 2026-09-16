@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>賽道攔截 DCCS－雙人模式</title>
+
+  <link
+    rel="stylesheet"
+    href="./css/double.css"
+  >
+</head>
+
+<body>
+  <div id="app">
+    <form id="setup-form" hidden>
+      <h1>賽道攔截 DCCS－雙人模式</h1>
+
+      <div class="student-fields">
+        <section>
+          <h2>玩家 1</h2>
+
+          <label>
+            年級 grade
+
+            <input
+              name="grade1"
+              value="G1"
+              required
+            >
+          </label>
+
+          <label>
+            個案編號 caseId
+
+            <input
+              name="caseId1"
+              value="S01"
+              required
+            >
+          </label>
+        </section>
+
+        <section>
+          <h2>玩家 2</h2>
+
+          <label>
+            年級 grade
+
+            <input
+              name="grade2"
+              value="G1"
+              required
+            >
+          </label>
+
+          <label>
+            個案編號 caseId
+
+            <input
+              name="caseId2"
+              value="S02"
+              required
+            >
+          </label>
+        </section>
+      </div>
+
+      <label>
+        場域 school
+
+        <select
+          name="school"
+          required
+        >
+          <option value="KMU">KMU</option>
+          <option value="NTHU-01">NTHU-01</option>
+          <option value="NTHU-02">NTHU-02</option>
+          <option value="NTHU-03">NTHU-03</option>
+          <option value="NTHU-04">NTHU-04</option>
+          <option value="NTHU-05">NTHU-05</option>
+          <option value="NTHU-06">NTHU-06</option>
+          <option value="NTHU-07">NTHU-07</option>
+        </select>
+      </label>
+
+      <label>
+        第幾天 currentDay
+
+        <input
+          name="currentDay"
+          type="number"
+          value="1"
+          min="1"
+          step="1"
+          required
+        >
+      </label>
+
+      <p class="control-hint">
+        玩家 1：A、D　｜　玩家 2：←、→
+      </p>
+
+      <button type="submit">
+        開始雙人遊戲
+      </button>
+    </form>
+
+    <main
+      id="double-game"
+      hidden
+    >
+      <section class="player-panel player-one">
+        <h2>玩家 1：A／D</h2>
+
+        <div
+          id="player1-game"
+          class="game-root"
+        ></div>
+      </section>
+
+      <section class="player-panel player-two">
+        <h2>玩家 2：←／→</h2>
+
+        <div
+          id="player2-game"
+          class="game-root"
+        ></div>
+      </section>
+
+      <!-- 左右遊戲共用一份提示，避免兩側重複顯示。 -->
+      <div
+        id="shared-overlay"
+        class="shared-overlay"
+      >
+        <div class="shared-card dccs-panel">
+          <section
+            id="shared-loading"
+            class="shared-screen"
+          >
+            <h1>載入中…</h1>
+
+            <p>
+              正在準備兩位玩家的遊戲
+            </p>
+          </section>
+
+          <section
+            id="shared-tutorial"
+            class="shared-screen"
+            hidden
+          >
+            <div id="shared-tutorial-body"></div>
+
+            <p class="dccs-tutorial-keyhint">
+              按
+              <span class="dccs-kbd">Enter</span>
+              或
+              <span class="dccs-kbd">空白鍵</span>
+              開始
+            </p>
+          </section>
+
+          <section
+            id="shared-title"
+            class="shared-screen"
+            hidden
+          >
+            <h1>賽道攔截 · DCCS</h1>
+
+            <p class="shared-hint">
+              按
+              <span class="shared-key">Enter</span>
+              或
+              <span class="shared-key">空白鍵</span>
+              開始
+            </p>
+
+            <p id="shared-player-info"></p>
+          </section>
+
+          <section
+            id="shared-level"
+            class="shared-screen"
+            hidden
+          >
+            <div
+              id="shared-level-badge"
+              class="dccs-level-badge"
+            >
+              第 1 關
+            </div>
+
+            <p
+              id="shared-level-message"
+              class="dccs-level-message"
+            >
+              準備開始第 1 關！
+            </p>
+
+            <button
+              type="button"
+              id="shared-continue"
+              class="dccs-level-continue"
+            >
+              繼續
+            </button>
+
+          </section>
+
+          <section
+            id="shared-error"
+            class="shared-screen"
+            hidden
+          >
+            <h1>遊戲發生錯誤</h1>
+
+            <p id="shared-error-message">
+              無法載入雙人遊戲。
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div
+      id="final-result"
+      hidden
+    ></div>
+  </div>
+
+  <script
+    type="module"
+    src="./js/double.js"
+  ></script>
+</body>
+</html>
