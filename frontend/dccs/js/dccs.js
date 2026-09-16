@@ -99,7 +99,7 @@ export function mountDCCS(options) {
 
   const assetBase =
     opts.assetBase ||
-    new URL('../../', import.meta.url).href;
+    new URL('../', import.meta.url).href;
 
   // 單人模式預設使用 Single.png。
   // 雙人模式可傳入 null，不讓個別 Canvas 再畫背景。

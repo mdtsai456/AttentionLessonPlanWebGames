@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""依 game/levels.json 與唯讀 material/ 產生 game/manifest.json。
+"""依 frontend/dccs/levels.json 與唯讀 frontend/dccs/assets/ 產生 frontend/dccs/manifest.json。
 
 只使用標準函式庫。設定錯誤會終止；素材不足則將關卡標為不可玩。
 
@@ -14,8 +14,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
-MATERIAL_DIR = ROOT / "material"
-GAME_DIR = ROOT / "game"
+GAME_DIR = ROOT / "frontend" / "dccs"
+# 素材與遊戲同在 frontend/dccs/ 底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
+# 前綴、相對於 assetBase（= frontend/dccs/）解析。
+ASSET_DIR_NAME = "assets"
+MATERIAL_DIR = GAME_DIR / ASSET_DIR_NAME
 LEVELS_CONFIG_PATH = GAME_DIR / "levels.json"
 MANIFEST_PATH = GAME_DIR / "manifest.json"
 
@@ -45,7 +48,7 @@ def list_images(dir_path: Path) -> list[Path]:
 
 
 def discover_category_dirs() -> list[Path]:
-    """列出 material/ 下除了 shape/ 與隱藏項目以外的語意類別。"""
+    """列出 assets/ 下除了 shape/ 與隱藏項目以外的語意類別。"""
     dirs = []
     for p in MATERIAL_DIR.iterdir():
         if not p.is_dir():
@@ -63,7 +66,7 @@ def build_shapes() -> list[dict]:
     shape_dir = MATERIAL_DIR / SHAPE_DIR_NAME
     shapes = []
     for img in list_images(shape_dir):
-        rel = ["material", SHAPE_DIR_NAME, img.name]
+        rel = [ASSET_DIR_NAME, SHAPE_DIR_NAME, img.name]
         shapes.append(
             {
                 "id": f"{SHAPE_DIR_NAME}/{img.stem}",
@@ -78,7 +81,7 @@ def build_categories(category_dirs: list[Path]) -> list[dict]:
     for d in category_dirs:
         images = []
         for img in list_images(d):
-            rel = ["material", d.name, img.name]
+            rel = [ASSET_DIR_NAME, d.name, img.name]
             images.append(
                 {
                     "id": f"{d.name}/{img.stem}",
@@ -98,7 +101,7 @@ def build_categories(category_dirs: list[Path]) -> list[dict]:
 
 
 def load_levels_config() -> list[dict] | None:
-    """讀 game/levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
+    """讀 frontend/dccs/levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
 
     SPEC 5.1：這裡驗證的是「設定本身合不合法」（缺欄位、型別錯、長度對不
     上），跟「素材有沒有補齊」是兩回事——後者是 compute_feasibility() 的
@@ -158,7 +161,7 @@ def load_levels_config() -> list[dict] | None:
             if not isinstance(source_category, str) or not source_category:
                 print(
                     f"錯誤：levels.json 第 {level_no} 關（model）缺少合法的 sourceCategory"
-                    f"：{source_category!r}（必須是非空字串，即 material/ 底下的資料夾名稱）",
+                    f"：{source_category!r}（必須是非空字串，即 assets/ 底下的資料夾名稱）",
                     file=sys.stderr,
                 )
                 return None
@@ -298,7 +301,7 @@ def print_feasibility_table(table_rows: list[dict]) -> None:
 
 def main() -> int:
     if not MATERIAL_DIR.is_dir():
-        print(f"錯誤：找不到 material/ 目錄 ({MATERIAL_DIR})", file=sys.stderr)
+        print(f"錯誤：找不到素材目錄 ({MATERIAL_DIR})", file=sys.stderr)
         return 1
 
     levels_config = load_levels_config()
@@ -307,7 +310,7 @@ def main() -> int:
 
     category_dirs = discover_category_dirs()
     if not category_dirs:
-        print("警告：material/ 底下沒有任何語意類別資料夾（shape/ 以外的子資料夾）", file=sys.stderr)
+        print("警告：assets/ 底下沒有任何語意類別資料夾（shape/ 以外的子資料夾）", file=sys.stderr)
 
     shapes = build_shapes()
     categories = build_categories(category_dirs)
@@ -316,8 +319,8 @@ def main() -> int:
     manifest = {
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "backgrounds": {
-            "single": url_quote_path(["material", "Single.png"]),
-            "double": url_quote_path(["material", "Double.png"]),
+            "single": url_quote_path([ASSET_DIR_NAME, "Single.png"]),
+            "double": url_quote_path([ASSET_DIR_NAME, "Double.png"]),
         },
         "shapes": shapes,
         "categories": categories,

@@ -4,7 +4,7 @@
 只用 Python 標準函式庫（http.server）。詳細規格見 SPEC.md 第 6、7 節。
 
 用法：
-    python3 tools/serve.py [--port 8000]
+    python3 backend/serve.py [--port 8000]
 """
 from __future__ import annotations
 
@@ -17,10 +17,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+# 靜態根是 repo 根目錄；前端在 frontend/ 底下，後端原始碼在 backend/。
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS_DIR = ROOT / "results"
-FORBIDDEN_PREFIX = "AttentionLessonPlanTransferDataPlatform-main"
-FORBIDDEN_DIR = (ROOT / FORBIDDEN_PREFIX).resolve()
+BACKEND_DIR = Path(__file__).resolve().parent
+RESULTS_DIR = BACKEND_DIR / "results"
+DEFAULT_INDEX = "frontend/dccs/index.html"
+# 伺服器自己的原始碼（含 results/）不得透過瀏覽器讀取。
+FORBIDDEN_DIRS = (BACKEND_DIR.resolve(),)
 
 
 def sanitize_filename_component(value: str) -> str:
@@ -46,12 +49,16 @@ def is_path_traversal(raw_path: str) -> bool:
 
 
 def is_forbidden_resolved(candidate: Path) -> bool:
-    """檢查解析後的實際路徑是否落在唯讀後端參考目錄。"""
-    try:
-        candidate.relative_to(FORBIDDEN_DIR)
-        return True
-    except ValueError:
-        return candidate == FORBIDDEN_DIR
+    """檢查解析後的實際路徑是否落在不得對外提供的後端目錄。"""
+    for forbidden in FORBIDDEN_DIRS:
+        if candidate == forbidden:
+            return True
+        try:
+            candidate.relative_to(forbidden)
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 def resolve_safe_path(raw_path: str) -> Path | None:
@@ -59,7 +66,7 @@ def resolve_safe_path(raw_path: str) -> Path | None:
     decoded = unquote(raw_path.split("?", 1)[0])
     decoded = decoded.lstrip("/")
     if decoded == "":
-        decoded = "game/index.html"
+        decoded = DEFAULT_INDEX
     candidate = (ROOT / decoded).resolve()
     try:
         candidate.relative_to(ROOT.resolve())
@@ -141,7 +148,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if raw_path == "/":
             # 保留 query，讓 main.js 能取得受試者資料。
-            location = "/game/index.html"
+            location = "/" + DEFAULT_INDEX
             if parsed.query:
                 location += "?" + parsed.query
             self.send_response(302)
@@ -233,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(500, {"error": f"failed to write result: {exc}"})
             return
 
-        rel_path = f"results/{filename}"
+        rel_path = str(file_path.relative_to(ROOT))
         self._send_json(201, {"file": rel_path})
 
 
