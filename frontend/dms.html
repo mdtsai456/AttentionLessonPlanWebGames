@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attention Lesson Plan - DMS 數據管理系統</title>
+  <link rel="stylesheet" href="css/dms.css">
+</head>
+<body>
+  <div class="dms-wrapper">
+    <!-- 頂部身分選單與控制列 -->
+    <header class="top-navbar">
+      <div class="brand">
+        <h2>Attention Lesson Plan</h2>
+        <span class="badge">DMS Dashboard</span>
+      </div>
+
+      <div class="nav-controls">
+        <!-- 登入身份（老師姓名／場域）純顯示，來自登入時的 token，不用再選一次 -->
+        <div class="teacher-identity">
+          <strong id="view-teacher-name">--</strong>
+          <span id="view-teacher-school" class="badge-muted">--</span>
+        </div>
+
+        <div class="select-group">
+          <select id="select-student" disabled>
+            <option value="">-- 載入學生中... --</option>
+          </select>
+        </div>
+
+        <button id="btn-logout" class="btn-text">登出</button>
+      </div>
+    </header>
+
+    <!-- 主展示區塊 -->
+    <main class="content-area">
+      <!-- 初始未選擇提示 -->
+      <div id="empty-state" class="empty-card">
+        <h3>請於上方選取「學生」以載入專注力評測資料</h3>
+        <p>系統將即時查詢 MariaDB 資料庫並呈現歷史場次與各遊戲分析。</p>
+      </div>
+
+      <!-- 報表主看板 (選取學生後顯示) -->
+      <div id="report-view" style="display: none;">
+        <!-- 個案基本資訊卡 -->
+        <section class="meta-card">
+          <div>
+            <h2 id="view-student-key">--</h2>
+            <p id="view-school-name" style="color: #64748b; margin-top: 4px;">--</p>
+          </div>
+          <div class="meta-stats">
+            <div>累計施測場次：<strong id="view-total-sessions" style="color: #1e3a8a; font-size: 1.25rem;">0</strong> 次</div>
+            <div>最後評測時間：<span id="view-last-played">--</span></div>
+          </div>
+        </section>
+
+        <!-- 各遊戲成效彙總卡 (依 gameType + mode 分組) -->
+        <section class="section-card">
+          <h3 class="section-title">遊戲成效總覽 (區分 Single / Double)</h3>
+          <div id="summary-grid" class="cards-grid">
+            <!-- 動態插入各遊戲彙總卡片 -->
+          </div>
+        </section>
+
+        <!-- 歷史場次明細表 (records[]) -->
+        <section class="section-card">
+          <h3 class="section-title">施測歷程明細</h3>
+          <div class="table-container">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>施測日 (Day)</th>
+                  <th>遊戲種類</th>
+                  <th>模式</th>
+                  <th>正確率</th>
+                  <th>答對 / 答錯</th>
+                  <th>耗時 (秒)</th>
+                  <th>作答題數 (Stage)</th>
+                  <th>開始時間</th>
+                </tr>
+              </thead>
+              <tbody id="records-tbody">
+                <!-- 動態注入每一場紀錄 -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/dms.js"></script>
+</body>
+</html>

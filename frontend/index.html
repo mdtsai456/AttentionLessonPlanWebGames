@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AttentionLessonPlan - 登入</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="main-container">
+    <div class="card">
+      <h1 class="title">AttentionLessonPlan</h1>
+
+      <!-- 身份選擇 (學生 / 老師) -->
+      <p class="section-label">請選擇身份</p>
+      <div class="btn-group">
+        <button id="btn-role-student" class="btn btn-pill active-green">學生</button>
+        <button id="btn-role-teacher" class="btn btn-pill btn-inactive-blue">老師</button>
+      </div>
+
+      <!-- 模式選擇 (單人 / 雙人) -->
+      <div id="mode-section">
+        <p class="section-label">請選擇模式</p>
+        <div class="btn-group">
+          <button id="btn-mode-single" class="btn btn-pill active-green">單人</button>
+          <button id="btn-mode-double" class="btn btn-pill btn-inactive">雙人</button>
+        </div>
+      </div>
+
+      <!-- 表單輸入區：帳號＋密碼，跟 mockup（圖2～圖4）對齊——沒有選場域這一步，
+           帳號是全域唯一的登入帳號（跟老師姓名／studentKey 是分開的兩回事，
+           見 docs/adr/0004-teacher-student-password-login.md）。 -->
+      <form id="login-form">
+        <!-- 學生輸入區 -->
+        <div id="student-inputs">
+          <div class="form-row">
+            <div class="input-col" id="col-student-1">
+              <label id="lbl-student-1" class="input-label">學生</label>
+              <input type="text" id="student1-account" class="text-input" placeholder="帳號" required>
+              <input type="password" id="student1-password" class="text-input" placeholder="密碼" required>
+            </div>
+            <div class="input-col" id="col-student-2" style="display: none;">
+              <label class="input-label">學生 2</label>
+              <input type="text" id="student2-account" class="text-input" placeholder="帳號">
+              <input type="password" id="student2-password" class="text-input" placeholder="密碼">
+            </div>
+          </div>
+        </div>
+
+        <!-- 老師輸入區 -->
+        <div id="teacher-inputs" style="display: none;">
+          <label class="input-label">老師</label>
+          <input type="text" id="teacher-account" class="text-input" placeholder="帳號">
+          <input type="password" id="teacher-password" class="text-input" placeholder="密碼">
+        </div>
+
+        <!-- 登入錯誤訊息：改用畫面文字，不用 alert()（隱藏欄位配合原生驗證很容易讓人以為「完全沒反應」） -->
+        <p id="login-error" class="error-text" style="display: none;"></p>
+
+        <!-- ENTER 送出按鈕 -->
+        <button type="submit" id="btn-enter" class="btn btn-enter">ENTER</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
