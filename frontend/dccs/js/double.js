@@ -1,5 +1,6 @@
 import { mountDCCS } from './dccs.js';
 import { submitResult } from './net/client.js';
+import { readLobbySession, resolveCurrentDay } from './lobby.js';
 
 const form =
   document.getElementById('setup-form');
@@ -166,66 +167,12 @@ function submissionMessage(
   `;
 }
 
-form.addEventListener(
-  'submit',
-
-  async (event) => {
-    event.preventDefault();
-
-    const formData =
-      new FormData(form);
-
-    const school =
-      formData
-        .get('school')
-        .trim();
-
-    const currentDay =
-      formData
-        .get('currentDay')
-        .trim();
-
-    const player1 = {
-      grade:
-        formData
-          .get('grade1')
-          .trim(),
-
-      caseId:
-        formData
-          .get('caseId1')
-          .trim(),
-
-      school,
-      currentDay,
-    };
-
-    const player2 = {
-      grade:
-        formData
-          .get('grade2')
-          .trim(),
-
-      caseId:
-        formData
-          .get('caseId2')
-          .trim(),
-
-      school,
-      currentDay,
-    };
-
-    if (
-      player1.caseId ===
-      player2.caseId
-    ) {
-      window.alert(
-        '玩家 1 和玩家 2 的個案編號不能相同。'
-      );
-
-      return;
-    }
-
+/*
+  開始一場雙人遊戲。受試者資料有兩個來源——大廳（frontend/games.html）的
+  sessionStorage，或本頁的手動表單——兩邊都組出同樣形狀的 player 物件
+  （{ grade, caseId, school, currentDay }）之後走同一條路。
+*/
+async function startSession(player1, player2) {
     const pairId =
       createPairId();
 
@@ -797,5 +744,97 @@ form.addEventListener(
       finalResult.textContent =
         `遊戲發生錯誤：${error.message}`;
     }
+}
+
+/*
+  手動表單：獨立執行（不經大廳）時用。
+*/
+form.addEventListener(
+  'submit',
+
+  async (event) => {
+    event.preventDefault();
+
+    const formData =
+      new FormData(form);
+
+    const school =
+      formData
+        .get('school')
+        .trim();
+
+    const currentDay =
+      formData
+        .get('currentDay')
+        .trim();
+
+    const player1 = {
+      grade: formData.get('grade1').trim(),
+      caseId: formData.get('caseId1').trim(),
+      school,
+      currentDay,
+    };
+
+    const player2 = {
+      grade: formData.get('grade2').trim(),
+      caseId: formData.get('caseId2').trim(),
+      school,
+      currentDay,
+    };
+
+    if (
+      player1.caseId ===
+      player2.caseId
+    ) {
+      window.alert(
+        '玩家 1 和玩家 2 的個案編號不能相同。'
+      );
+
+      return;
+    }
+
+    await startSession(player1, player2);
   }
 );
+
+/*
+  大廳進場：兩位學生都已在大廳登入，受試者資料讀 sessionStorage 就有，
+  只有 currentDay 要跟中介平台查。任一位查不到、或兩位算出來不一致，就整場
+  退回手動表單——雙人兩邊的 currentDay 必須相同，猜其中一個沒有意義。
+*/
+async function bootFromLobby() {
+  const session = readLobbySession();
+  if (!session || session.mode !== 'double') return false;
+
+  const [lobby1, lobby2] = session.players;
+
+  let currentDay;
+  try {
+    const [day1, day2] = await Promise.all([
+      resolveCurrentDay(lobby1),
+      resolveCurrentDay(lobby2),
+    ]);
+
+    if (day1 !== day2) {
+      throw new Error(
+        `兩位玩家推導出的第幾天不一致（${day1} / ${day2}）`
+      );
+    }
+
+    currentDay = day1;
+  } catch (err) {
+    console.warn('無法自動判斷 currentDay，改由人工填寫：', err);
+    return false;
+  }
+
+  await startSession(
+    { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay },
+    { grade: lobby2.grade, caseId: lobby2.caseId, school: lobby2.school, currentDay }
+  );
+
+  return true;
+}
+
+bootFromLobby().then((started) => {
+  if (!started) form.hidden = false;
+});

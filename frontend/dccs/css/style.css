@@ -69,6 +69,11 @@ html, body {
   line-height: 1.5;
 }
 
+/* 從大廳進來、但 currentDay 自動判斷失敗時的提示（見 js/main.js）。 */
+.hint.notice {
+  color: #ffd479;
+}
+
 .hint code {
   background: #1f2530;
   padding: 0.1em 0.35em;

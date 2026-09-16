@@ -281,6 +281,7 @@ AttentionLessonPlanWebGames/
             ├── main.js                              ← 獨立執行用的殼（見 4.14）
             ├── double.js                            ← 雙人模式殼
             ├── ui/overlays.js                       ← 遊戲自帶的畫面層（見 4.16）
+            ├── lobby.js                              ← 與中介平台大廳的銜接（見 4.13c）
             ├── core/{loop,input,assets}.js
             ├── render/{projection,road,hud}.js
             ├── game/{valve,target,rules,trialGen,stats,track}.js
@@ -770,6 +771,34 @@ export function resolveSubmitUrl() -> string
    hostname 的 `:5001/api`，其餘一律指向正式站。
 
 第 3 條是關鍵：**本機測試不得把成績送進正式庫**。
+
+### 4.13c `js/lobby.js`
+
+```js
+export function readLobbyPlayer(slot) -> object | null
+export function readLobbySession() -> { mode, players } | null
+export async function resolveCurrentDay(player) -> number
+export function returnToLobby() -> void
+```
+
+與中介平台大廳（`frontend/games.html`）的銜接。大廳與本遊戲**同源**，學生
+登入後由 `frontend/js/app.js` 寫進 `sessionStorage` 的資料這裡直接讀得到，
+因此大廳不必透過 URL 或 postMessage 傳遞受試者資料，只需把使用者導過來。
+
+- 讀的鍵：`student{1,2}_key`（`G1_S03` 形式）、`student{1,2}_school`、
+  `student{1,2}_token` / `token`、`game_mode`。
+  `studentKey` **只切第一個底線**，因為 caseId 本身可能含底線。
+- `game_mode` 為 `double` 且第二位玩家存在，才回 `mode: 'double'`；否則
+  一律 `'single'`。兩位玩家**可以屬於不同 school**（school 是學生身分的
+  一部分，見 `backend/CONTEXT.md`），故各自帶各自的。
+- `resolveCurrentDay` 打 `GET /api/students/{key}/sessions?school=...`
+  推導施測日：今天已有場次→沿用其 `currentDay`（同一施測日的 5 款遊戲
+  共用一個值）；否則歷史最大值 +1；無紀錄→1。後端存的是 UTC naive，
+  而施測日是**本地日曆**的一天，故比對前先轉回本地時區。
+- **推導失敗一律 `throw`，不得默默猜值**——`currentDay` 猜錯會污染研究
+  資料，寧可退回讓現場人員手動填。雙人時兩位算出來不一致也視為失敗。
+
+這是權宜做法；正解是後端擁有此值，見 `docs/dccs-lobby-handoff.md`。
 
 ### 4.14 `js/main.js`（**獨立執行用的殼**）
 

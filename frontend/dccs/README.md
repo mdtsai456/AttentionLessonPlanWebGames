@@ -48,6 +48,18 @@ python3 backend/serve.py --port 9000 # 自訂 port
 http://127.0.0.1:8080/?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42
 ```
 
+## 2b. 從遊戲大廳進場
+
+學生在 `frontend/index.html` 登入、於 `frontend/games.html` 點「開始挑戰」
+之後，會被導到 `dccs/index.html`（雙人為 `dccs/double.html`）。
+
+受試者資料**不經 URL 傳遞**——大廳與遊戲同源，遊戲自己讀 `sessionStorage`
+（見 `js/lobby.js`）。`currentDay` 由遊戲向中介平台查既有場次推導；推導
+失敗會退回手動表單並把已知欄位填好，不會猜值。玩完自動導回大廳。
+
+要接上新遊戲，在 `frontend/games.html` 的 `GAME_PAGES` 加一行即可。
+詳見 `docs/dccs-lobby-handoff.md`。
+
 ## 3. 其他頁面怎麼呼叫
 
 真正的整合入口是 `frontend/dccs/js/dccs.js` 匯出的 `mountDCCS()`，
