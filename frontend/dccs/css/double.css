@@ -12,8 +12,15 @@ body {
   color: white;
 
   font-family:
-    "Microsoft JhengHei",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     "Noto Sans TC",
+    "PingFang TC",
+    "Microsoft JhengHei",
+    Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
 }
 
@@ -36,9 +43,7 @@ select {
   justify-content: center;
 }
 
-/* ================================
-   遊戲資料填寫表單
-   ================================ */
+/* 遊戲資料填寫表單 */
 
 #setup-form {
   width: min(720px, 92%);
@@ -109,9 +114,7 @@ select {
   background: #6890ff;
 }
 
-/* ================================
-   雙人遊戲主畫面
-   ================================ */
+/* 雙人遊戲主畫面 */
 
 #double-game {
   position: relative;
@@ -133,10 +136,6 @@ select {
   display: none;
 }
 
-/*
-  玩家 1、玩家 2 各占畫面的一半。
-  每一邊分別使用一張 Single.png。
-*/
 .player-panel {
   position: relative;
 
@@ -153,9 +152,6 @@ select {
   background-size: 100% 100%;
 }
 
-/*
-  左右中間的分隔線。
-*/
 .player-one {
   border-right: 2px solid
     rgba(255, 255, 255, 0.35);
@@ -177,17 +173,12 @@ select {
   background: transparent !important;
 }
 
-/*
-  隱藏左右遊戲原本各自建立的提示畫面。
-  共用提示改由 double.html 的 shared-overlay 顯示。
-*/
+/* 雙人模式只顯示外層共用提示。 */
 .game-root > .dccs-overlays {
   display: none !important;
 }
 
-/* ================================
-   雙人共用提示畫面
-   ================================ */
+/* 雙人共用提示畫面 */
 
 .shared-overlay {
   position: absolute;
@@ -199,10 +190,10 @@ select {
   align-items: center;
   justify-content: center;
 
-  padding: 30px;
+  padding: 0;
 
   background:
-    rgba(0, 0, 0, 0.58);
+    rgba(0, 0, 0, 0.72);
 }
 
 .shared-overlay[hidden] {
@@ -219,77 +210,40 @@ select {
 
   padding: 2rem 2.5rem;
 
-  color: white;
-  background: #12171f;
+  color: #eee;
+  background: #14181f;
 
-  border: 1px solid #394353;
+  border: 1px solid #2c333f;
   border-radius: 12px;
 
-  box-shadow:
-    0 20px 60px
-    rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 
-  text-align: center;
 }
 
 .shared-screen {
   width: 100%;
 }
 
+.shared-screen:not(#shared-tutorial) {
+  text-align: center;
+}
+
 .shared-screen[hidden] {
   display: none;
 }
 
-/* 操作說明獨立鋪滿視窗，不受雙人遊戲 16:9 畫布限制；內容版型與單人版一致。
-   .dccs-* 的共用樣式由 overlays.js 注入（見 ensureOverlayStyles）。 */
+/* 操作說明獨立鋪滿視窗，不受雙人遊戲 16:9 畫布限制。
+   其餘版型直接使用 overlays.js 的 .dccs-overlay-tutorial / .dccs-panel。 */
 .shared-overlay.tutorial-mode {
   position: fixed;
-  padding: clamp(10px, 2.4vw, 28px);
-  background:
-    radial-gradient(circle at 15% 10%, rgba(50, 184, 229, 0.28), transparent 32%),
-    radial-gradient(circle at 88% 90%, rgba(255, 190, 53, 0.24), transparent 30%),
-    #0b1324;
 }
 
-.shared-overlay.tutorial-mode .shared-card {
-  display: block;
-  width: min(94vw, 900px);
-  min-height: 0;
-  max-height: 94%;
-  overflow-y: auto;
-  padding: clamp(1.15rem, 3vh, 2.25rem) clamp(1rem, 3.6vw, 3rem);
-  color: #152238;
-  background: #f8fbff;
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  border-radius: clamp(20px, 3vw, 32px);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
-  text-align: left;
-}
-
-#shared-tutorial .dccs-tutorial-title {
-  margin: 0;
-  font-size: clamp(1.55rem, 3.2vw, 2.35rem);
-  text-align: center;
-}
-
-#shared-tutorial .dccs-tutorial-keyhint {
-  color: #5b6980;
-  font-size: clamp(0.9rem, 1.7vw, 1.05rem);
-  text-align: center;
-}
-
-#shared-tutorial .dccs-kbd {
-  color: #344057;
-  background: #fff;
-  border-color: #b9c4d4;
-}
-
-.shared-screen:not(#shared-tutorial) h1 {
+.shared-screen:not(#shared-tutorial):not(#shared-level) h1 {
   margin: 0 0 0.75rem;
   font-size: 1.4rem;
 }
 
-.shared-screen:not(#shared-tutorial) p {
+.shared-screen:not(#shared-tutorial):not(#shared-level) p {
   font-size: 0.95rem;
   line-height: 1.5;
 }
@@ -319,140 +273,35 @@ select {
   font-size: 0.8rem;
 }
 
-/* ================================
-   黃色共用關卡提示畫面
-   ================================ */
-
-/*
-  顯示第 1 關、第 2 關等提示時，
-  整個畫面切換成黃色背景。
-*/
+/* 共用關卡提示畫面 */
 .shared-overlay.level-mode {
   position: fixed;
-  padding: 0;
-
-  background:
-    linear-gradient(
-      135deg,
-      #ffb51b 0%,
-      #ffd53f 50%,
-      #ffb51b 100%
-    );
 }
 
-/*
-  黃色畫面中央只顯示一張白色卡片。
-*/
-.shared-overlay.level-mode .shared-card {
-  position: relative;
+#shared-level:not([hidden]) {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: min(86%, 980px);
-  height: min(70%, 560px);
-  min-height: 0;
-  max-width: none;
-  padding: clamp(72px, 11vh, 120px) clamp(24px, 6vw, 80px) clamp(28px, 5vh, 54px);
-
-  color: #292e36;
-  background: #ffffff;
-
-  border: 0;
-  border-radius: clamp(30px, 5vw, 72px);
-
-  box-shadow:
-    0 22px 50px
-    rgba(163, 104, 0, 0.25);
+  width: 100%;
+  height: 100%;
 }
 
-#shared-level-badge {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translate(-50%, -38%);
-  min-width: clamp(190px, 34%, 360px);
-  margin: 0;
-  padding: clamp(15px, 2.5vh, 26px) clamp(28px, 4vw, 54px);
-
-  color: white;
-  background: #2faed6;
-
-  border-radius: clamp(25px, 3vw, 42px);
-  font-size: clamp(1.5rem, 3.2vw, 2.75rem);
-
-  font-weight: bold;
-
-  box-shadow:
-    0 9px 0
-    rgba(31, 139, 173, 0.35);
+/* 單人版顯示關卡提示時會把焦點放在按鈕上；雙人版為避免空白鍵誤觸不能真的
+   focus，但保留相同的視覺焦點圈。 */
+.shared-overlay.level-mode .dccs-level-continue {
+  outline: 4px solid rgba(56, 169, 0, 0.25);
+  outline-offset: 4px;
 }
 
-#shared-level-message {
-  margin: auto 0;
-
-  color: #292e36;
-
-  font-size: clamp(1.55rem, 3.4vw, 3rem);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  line-height: 1.35;
-}
-
-#shared-continue {
-  width: clamp(190px, 31%, 330px);
-  min-width: 0;
-  margin: 0;
-  padding: clamp(13px, 2.1vh, 21px) 28px;
-
-  color: white;
-  background: #35b900;
-
-  border: 0;
-  border-radius: 999px;
-
-  font-size: clamp(1.25rem, 2.5vw, 2rem);
-
-  font-weight: bold;
-  cursor: pointer;
-
-  box-shadow:
-    0 8px 0
-    rgba(31, 119, 0, 0.3);
-}
-
-#shared-continue:hover {
-  background: #42d400;
-}
-
-#shared-continue:active {
-  transform: translateY(4px);
-
-  box-shadow:
-    0 4px 0
-    rgba(31, 119, 0, 0.3);
-}
-
-.shared-overlay.level-mode .shared-hint {
-  margin-bottom: 0;
-
-  color: #59616d;
-
-  font-size: clamp(
-    15px,
-    1.5vw,
-    20px
-  );
-}
-
-/* ================================
-   最後成績畫面
-   ================================ */
+/* 最後成績畫面 */
 
 #final-result {
-  width: min(600px, 92%);
-  margin: 40px auto;
-  padding: 30px;
+  width: min(960px, 94vw);
+  max-height: calc(100vh - 32px);
+  margin: 16px auto;
+  padding: clamp(20px, 3vw, 32px);
+  overflow-y: auto;
 
   background: #20252d;
   border: 1px solid #394353;
@@ -465,14 +314,79 @@ select {
   display: none;
 }
 
-#final-result section {
-  margin: 20px 0;
-  padding: 16px;
+.result-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+}
+
+.result-pair-id {
+  margin: 0.45rem 0 1.1rem;
+  color: #91a4c2;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.result-players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+
+#final-result .result-player-card {
+  margin: 0;
+  padding: clamp(16px, 2.4vw, 24px);
 
   background:
     rgba(255, 255, 255, 0.05);
 
   border-radius: 12px;
+  text-align: left;
+}
+
+.result-player-card h2 {
+  margin: 0 0 0.85rem;
+  color: #fff;
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  text-align: center;
+}
+
+.result-player-card p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.45rem 0;
+  color: #c7d0df;
+}
+
+.result-player-card strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-player-card .save-success,
+.result-player-card .save-error {
+  display: block;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.result-player-card .save-success {
+  color: #8ee6a4;
+}
+
+.result-player-card .save-error {
+  color: #ffb1b1;
+}
+
+.result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 1.25rem;
 }
 
 #final-result button {
@@ -487,139 +401,44 @@ select {
   cursor: pointer;
 }
 
-/* ================================
-   小螢幕調整
-   ================================ */
+#back-to-lobby {
+  background: #2c333f;
+}
+
+/* 小螢幕調整 */
 
 @media (max-width: 900px) {
   .student-fields {
     grid-template-columns: 1fr;
   }
+}
 
-  .shared-card {
-    min-height: 240px;
-    padding: 24px;
-  }
-
-  .shared-overlay.tutorial-mode .shared-card {
+@media (max-width: 560px) {
+  #final-result {
     width: 96vw;
-    min-height: 0;
-    max-height: 96%;
-    padding: 1rem 0.85rem;
-    border-radius: 20px;
+    padding: 14px;
   }
 
-}
-
-/* 教學頁依可用高度收斂間距與圖片；即使是較矮的螢幕，也能一次看到完整內容。
-   只影響雙人共用教學，不改動載入、關卡與結算畫面。 */
-@media (max-height: 760px) {
-  .shared-overlay.tutorial-mode {
-    padding: 8px;
+  .result-players {
+    gap: 8px;
   }
 
-  .shared-overlay.tutorial-mode .shared-card {
-    width: min(96vw, 860px);
-    max-height: calc(100dvh - 16px);
-    overflow: hidden;
-    padding: clamp(0.6rem, 1.6vh, 0.85rem) clamp(0.7rem, 2.4vw, 1.35rem);
+  #final-result .result-player-card {
+    padding: 12px 10px;
   }
 
-  #shared-tutorial .dccs-tutorial-header {
-    margin-bottom: clamp(0.35rem, 1vh, 0.55rem);
+  .result-player-card p {
+    display: block;
+    margin: 0.55rem 0;
+    text-align: center;
   }
 
-  #shared-tutorial .dccs-tutorial-eyebrow {
-    margin-bottom: 0.18rem;
-    padding: 0.18rem 0.55rem;
-    font-size: 0.72rem;
+  .result-player-card strong {
+    display: block;
+    margin-top: 0.12rem;
   }
 
-  #shared-tutorial .dccs-tutorial-title {
-    font-size: clamp(1.25rem, 3.5vh, 1.75rem);
-  }
-
-  #shared-tutorial .dccs-tutorial-lead {
-    margin-top: 0.2rem;
-    font-size: clamp(0.76rem, 2vh, 0.92rem);
-    line-height: 1.35;
-  }
-
-  #shared-tutorial .dccs-tutorial-rows {
-    gap: clamp(0.3rem, 0.9vh, 0.5rem);
-  }
-
-  #shared-tutorial .dccs-tutorial-row {
-    grid-template-columns: minmax(120px, 0.7fr) 1.4fr;
-    gap: clamp(0.45rem, 1.5vw, 0.8rem);
-    padding: clamp(0.38rem, 1vh, 0.58rem);
-    border-radius: 14px;
-  }
-
-  #shared-tutorial .dccs-tutorial-rowtitle {
-    margin-bottom: 0.22rem;
-    font-size: clamp(0.84rem, 2.2vh, 1rem);
-  }
-
-  #shared-tutorial .dccs-tutorial-key {
-    min-width: 1.9rem;
-    height: 1.9rem;
-    padding-inline: 0.4rem;
-    border-radius: 8px;
-    font-size: 0.86rem;
-  }
-
-  #shared-tutorial .dccs-tutorial-rownote {
-    margin-top: 0.2rem;
-    font-size: clamp(0.7rem, 1.8vh, 0.82rem);
-    line-height: 1.25;
-  }
-
-  #shared-tutorial .dccs-tutorial-strip {
-    gap: clamp(0.25rem, 0.8vw, 0.45rem);
-  }
-
-  #shared-tutorial .dccs-tutorial-strip img {
-    width: clamp(40px, 7.5vh, 58px);
-    height: clamp(40px, 7.5vh, 58px);
-    padding: 4px;
-    border-radius: 10px;
-  }
-
-  #shared-tutorial .dccs-tutorial-strip .dccs-tutorial-frame {
-    border-width: 3px;
-    border-radius: 12px;
-    padding: 3px;
-  }
-
-  #shared-tutorial .dccs-tutorial-answer {
-    grid-template-columns: auto 1fr;
-    gap: 0.45rem;
-    margin-top: clamp(0.35rem, 1vh, 0.55rem);
-    padding: 0.4rem 0.6rem;
-    border-radius: 10px;
-    font-size: clamp(0.72rem, 1.9vh, 0.88rem);
-    line-height: 1.3;
-  }
-
-  #shared-tutorial .dccs-tutorial-reassurance {
-    margin-top: 0.25rem;
-    font-size: clamp(0.7rem, 1.8vh, 0.82rem);
-  }
-
-  #shared-tutorial .dccs-tutorial-keyhint {
-    margin-top: clamp(0.3rem, 0.9vh, 0.5rem);
-    font-size: clamp(0.72rem, 1.9vh, 0.88rem);
-  }
-}
-
-@media (max-width: 560px) and (max-height: 760px) {
-  #shared-tutorial .dccs-tutorial-row {
-    grid-template-columns: minmax(105px, 0.8fr) 1.25fr;
-  }
-
-  #shared-tutorial .dccs-tutorial-strip img {
-    width: clamp(38px, 12vw, 48px);
-    height: clamp(38px, 12vw, 48px);
+  .result-actions {
+    flex-wrap: wrap;
   }
 }

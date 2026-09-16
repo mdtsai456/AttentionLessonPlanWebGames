@@ -262,6 +262,119 @@ const CSS = `
   }
 }
 
+/* 較矮的畫面改用共用緊湊版；單人與雙人都走同一組數值，保持外觀一致，
+   同時讓完整操作說明不必捲動。 */
+@media (max-height: 760px) {
+  .dccs-overlay-tutorial {
+    padding: 8px;
+  }
+
+  .dccs-overlay-tutorial .dccs-panel {
+    width: min(96vw, 860px);
+    max-height: calc(100dvh - 16px);
+    overflow: hidden;
+    padding: clamp(0.6rem, 1.6vh, 0.85rem) clamp(0.7rem, 2.4vw, 1.35rem);
+  }
+
+  .dccs-tutorial-header {
+    margin-bottom: clamp(0.35rem, 1vh, 0.55rem);
+  }
+
+  .dccs-tutorial-eyebrow {
+    margin-bottom: 0.18rem;
+    padding: 0.18rem 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .dccs-panel .dccs-tutorial-title {
+    font-size: clamp(1.25rem, 3.5vh, 1.75rem);
+  }
+
+  .dccs-tutorial-lead {
+    margin-top: 0.2rem;
+    font-size: clamp(0.76rem, 2vh, 0.92rem);
+    line-height: 1.35;
+  }
+
+  .dccs-tutorial-rows {
+    gap: clamp(0.3rem, 0.9vh, 0.5rem);
+  }
+
+  .dccs-tutorial-row {
+    grid-template-columns: minmax(120px, 0.7fr) 1.4fr;
+    gap: clamp(0.45rem, 1.5vw, 0.8rem);
+    padding: clamp(0.38rem, 1vh, 0.58rem);
+    border-radius: 14px;
+  }
+
+  .dccs-tutorial-rowtitle {
+    margin-bottom: 0.22rem;
+    font-size: clamp(0.84rem, 2.2vh, 1rem);
+  }
+
+  .dccs-tutorial-key {
+    min-width: 1.9rem;
+    height: 1.9rem;
+    padding-inline: 0.4rem;
+    border-radius: 8px;
+    font-size: 0.86rem;
+  }
+
+  .dccs-tutorial-rownote {
+    margin-top: 0.2rem;
+    font-size: clamp(0.7rem, 1.8vh, 0.82rem);
+    line-height: 1.25;
+  }
+
+  .dccs-tutorial-strip {
+    gap: clamp(0.25rem, 0.8vw, 0.45rem);
+  }
+
+  .dccs-tutorial-strip img {
+    width: clamp(40px, 7.5vh, 58px);
+    height: clamp(40px, 7.5vh, 58px);
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .dccs-tutorial-strip .dccs-tutorial-frame {
+    border-width: 3px;
+    border-radius: 12px;
+    padding: 3px;
+  }
+
+  .dccs-tutorial-answer {
+    grid-template-columns: auto 1fr;
+    gap: 0.45rem;
+    margin-top: clamp(0.35rem, 1vh, 0.55rem);
+    padding: 0.4rem 0.6rem;
+    border-radius: 10px;
+    font-size: clamp(0.72rem, 1.9vh, 0.88rem);
+    line-height: 1.3;
+  }
+
+  .dccs-tutorial-reassurance {
+    margin-top: 0.25rem;
+    font-size: clamp(0.7rem, 1.8vh, 0.82rem);
+  }
+
+  .dccs-tutorial-keyhint {
+    margin-top: clamp(0.3rem, 0.9vh, 0.5rem);
+    font-size: clamp(0.72rem, 1.9vh, 0.88rem);
+  }
+}
+
+@media (max-width: 560px) and (max-height: 760px) {
+  .dccs-tutorial-row {
+    grid-template-columns: minmax(105px, 0.8fr) 1.25fr;
+  }
+
+  .dccs-tutorial-strip img {
+    width: clamp(38px, 12vw, 48px);
+    height: clamp(38px, 12vw, 48px);
+  }
+}
+
 .dccs-kbd {
   display: inline-block;
   padding: 0.1em 0.5em;
@@ -400,20 +513,6 @@ function renderSummaryFields(dl, summary) {
   }
 }
 
-/**
- * @param {HTMLElement} container
- * @returns {{
- *   showLoading(detail: string): void,
- *   showTitle(meta: object): void,
- *   showLevelPrompt(levelNo: number): Promise<void>,
- *   showTutorial(pages: Array<object>): Promise<void>,
- *   showResult(summary: object, statusText: string): void,
- *   setResultStatus(text: string): void,
- *   showError(message: string): void,
- *   hideAll(): void,
- *   destroy(): void,
- * }}
- */
 /** 供雙人版等外部畫面使用：確保 .dccs-* 樣式已注入。 */
 export function ensureOverlayStyles() {
   injectStyleOnce();
@@ -476,7 +575,6 @@ export function renderTutorialInto(element, content) {
   element.appendChild(reassuranceEl);
 }
 
-/** 一排：操作按鍵與選項圖。單人與雙人共用。 */
 function buildTutorialRowElement(row) {
   const rowEl = document.createElement('div');
   rowEl.className = 'dccs-tutorial-row';
@@ -568,9 +666,7 @@ export function createOverlays(container) {
     'dccs-overlay-error',
     '<h1>發生錯誤</h1><p class="dccs-hint dccs-error-detail"></p>'
   );
-  // 教學只講「怎麼操作」，**刻意不講答題規則**——SPEC 1.4：規則不顯示給
-  // 玩家，要自己從畫面推。把規則說出來等於把要測的認知彈性直接送給受試者，
-  // 資料就失去意義了。
+  // SPEC 1.4：教學只說明操作，不揭露受試者要自行推導的答題規則。
   const tutorialEl = buildOverlay(
     'dccs-overlay-tutorial',
     '<header class="dccs-tutorial-header">' +
@@ -669,7 +765,6 @@ export function createOverlays(container) {
     resolve();
   }
 
-  // 方向鍵是遊戲中的操作鍵，因此教學只收 Enter 與空白鍵。
   function onTutorialKeyDown(event) {
     if (
       event.code !== 'Enter' &&

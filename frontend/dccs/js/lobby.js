@@ -1,18 +1,5 @@
-// 與中介平台大廳（frontend/games.html）的銜接。
-//
-// 大廳與本遊戲同源，學生登入後由 frontend/js/app.js 寫進 sessionStorage 的
-// 東西，這裡直接讀得到——所以大廳不必把資料透過 URL 或 postMessage 傳給
-// 我們，它只需要把使用者導過來。鍵名以 app.js 實際寫入的為準。
-//
-// currentDay 是唯一要另外算的：中介平台沒有任何端點會回答「這個學生今天是
-// 第幾個施測日」，但 GET /api/students/{key}/sessions 有回每一場的
-// currentDay 與 startTime，學生用自己的 token 就讀得到自己的紀錄
-// （見 backend/routers/identity.py 的 require_own_student_or_same_school_teacher）。
-// 因此這裡照 backend/CONTEXT.md 的定義推導：同一個施測日的 5 款遊戲共用同一
-// 個 currentDay，換一天才 +1。
-//
-// 這是權宜做法。正解是後端擁有這個值（五款遊戲都要一致，各自在前端算容易
-// 不同步）——見 docs/dccs-lobby-handoff.md 給中介平台的提案。
+// 大廳資料來自同源 sessionStorage。currentDay 暫由歷史場次推導；長期應由
+// 後端統一提供，避免各遊戲各自計算而不同步（見 docs/dccs-lobby-handoff.md）。
 
 import { resolveApiBase } from './net/apiBase.js';
 
@@ -59,8 +46,7 @@ export function readLobbyPlayer(slot) {
     ...parts,
     school,
     studentKey,
-    // 單人時 app.js 會把 token 同時寫到共用的 "token"；雙人的第二位只有
-    // student2_token。取不到 token 不影響開始遊戲，只影響 currentDay 推導。
+    // 單人另有共用 token；雙人第二位只有 student2_token。
     token: readKey(`student${slot}_token`) || readKey('token'),
   };
 }
@@ -145,7 +131,6 @@ export async function resolveCurrentDay(player) {
   return maxSeen + 1;
 }
 
-/** 玩完回大廳。大廳與遊戲同源，相對路徑即可。 */
 export function returnToLobby() {
   window.location.href = '../games.html';
 }

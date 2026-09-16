@@ -2,7 +2,8 @@ import { mountDCCS, buildTutorialContent } from './dccs.js';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js';
-import { readLobbySession, resolveCurrentDay } from './lobby.js';
+import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
+import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
 const form =
   document.getElementById('setup-form');
@@ -49,9 +50,6 @@ const sharedContinue =
 const sharedErrorMessage =
   document.getElementById('shared-error-message');
 
-/*
-  建立本局雙人共用的 pairId。
-*/
 function createPairId() {
   if (
     window.crypto &&
@@ -66,9 +64,6 @@ function createPairId() {
   ).slice(0, 36);
 }
 
-/*
-  顯示指定的共用畫面。
-*/
 function showSharedScreen(target) {
   const screens = [
     sharedLoading,
@@ -83,11 +78,13 @@ function showSharedScreen(target) {
       screen !== target;
   }
 
-  /*
-    只有關卡提示使用黃色背景。
-  */
   sharedOverlay.classList.toggle(
     'level-mode',
+    target === sharedLevel
+  );
+
+  sharedOverlay.classList.toggle(
+    'dccs-overlay-level',
     target === sharedLevel
   );
 
@@ -96,24 +93,25 @@ function showSharedScreen(target) {
     target === sharedTutorial
   );
 
+  sharedOverlay.classList.toggle(
+    'dccs-overlay-tutorial',
+    target === sharedTutorial
+  );
+
   sharedOverlay.hidden = false;
 }
 
-/*
-  隱藏共用畫面。
-*/
 function hideSharedOverlay() {
   sharedOverlay.hidden = true;
 
   sharedOverlay.classList.remove(
     'level-mode',
-    'tutorial-mode'
+    'dccs-overlay-level',
+    'tutorial-mode',
+    'dccs-overlay-tutorial'
   );
 }
 
-/*
-  將單人成績轉換為雙人格式。
-*/
 function makeDoublePayload(result, pairId) {
   const payload =
     JSON.parse(
@@ -126,19 +124,12 @@ function makeDoublePayload(result, pairId) {
   return payload;
 }
 
-/*
-  送出其中一位玩家的成績。
-
-  端點由 net/apiBase.js 統一解析（本機開發指向本機後端，正式站指向 Zeabur），
-  不再把正式站網址寫死在這裡——以前那樣寫，本機測雙人會把成績灌進正式庫。
-*/
 async function submitPlayerResult(payload) {
   const { ok, detail } =
     await submitResult(payload);
 
   if (!ok) {
-    // submitResult 失敗時已把 payload 暫存在 localStorage，下次開場會自動
-    // 重送；這裡照樣 throw，讓結算畫面照原本的方式標示這一位送出失敗。
+    // submitResult 已負責暫存；拋錯讓結算畫面標示送出失敗。
     throw new Error(detail);
   }
 
@@ -149,14 +140,19 @@ async function submitPlayerResult(payload) {
   try {
     return JSON.parse(detail);
   } catch (_err) {
-    // 後端回的不是 JSON 也無妨，送出成功才是重點。
     return {};
   }
 }
 
-/*
-  顯示成績送出結果。
-*/
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function submissionMessage(
   result,
   playerName
@@ -174,23 +170,25 @@ function submissionMessage(
       ? result.reason.message
       : String(result.reason);
 
+  // 伺服器有時會回傳完整 HTML 錯誤頁；結算卡只顯示第一行摘要，避免把外部
+  // HTML 插進頁面、撐壞左右卡片，也避免不可信內容被當成標記解析。
+  const reasonSummary =
+    escapeHtml(
+      (reason.split(/\r?\n/, 1)[0] || '未知錯誤')
+        .slice(0, 180)
+    );
+
   return `
     <p class="save-error">
       ${playerName}：成績送出失敗
-      （${reason}）——已暫存於本機，下次開啟遊戲會自動重送。
+      （${reasonSummary}）——已暫存於本機，下次開啟遊戲會自動重送。
     </p>
   `;
 }
 
-/*
-  顯示共用的操作說明，等兩位玩家看完。
+let cameFromLobby = false;
 
-  雙人版**不能**讓左右兩個 mountDCCS 各自顯示教學——那會同時跑出兩個教學層，
-  各自等自己那一半被操作，而且都被這片共用畫面蓋住，遊戲永遠開不了。
-  因此兩側一律 showTutorial: false，改由這裡統一顯示一份。
-
-  內容與單人版完全相同（共用 buildTutorialContent），版面沿用 .dccs-* 樣式。
-*/
+// 只顯示一份共用教學；兩個 mountDCCS 實例都停用自己的教學層。
 async function showSharedTutorial() {
   ensureOverlayStyles();
 
@@ -209,7 +207,6 @@ async function showSharedTutorial() {
       buildTutorialContent(manifest, assetBase)
     );
   } catch (error) {
-    // 說明畫不出來不該擋住遊戲——記一筆就跳過。
     console.warn('操作說明載入失敗，略過：', error);
     return;
   }
@@ -227,7 +224,6 @@ async function showSharedTutorial() {
       resolve();
     }
 
-    // 操作說明以 Enter 或空白鍵結束；方向鍵留給遊戲操作。
     function onKeyDown(event) {
       if (
         event.code !== 'Enter' &&
@@ -247,12 +243,19 @@ async function showSharedTutorial() {
   showSharedScreen(sharedLoading);
 }
 
-/*
-  開始一場雙人遊戲。受試者資料有兩個來源——大廳（frontend/games.html）的
-  sessionStorage，或本頁的手動表單——兩邊都組出同樣形狀的 player 物件
-  （{ grade, caseId, school, currentDay }）之後走同一條路。
-*/
 async function startSession(player1, player2) {
+    const sessionSecondsOverride =
+      readSessionSecondsOverride();
+
+    if (sessionSecondsOverride !== null) {
+      markDebugSession(sessionSecondsOverride);
+    }
+
+    const sessionSecondsOption =
+      sessionSecondsOverride !== null
+        ? { sessionSeconds: sessionSecondsOverride }
+        : {};
+
     const pairId =
       createPairId();
 
@@ -262,39 +265,24 @@ async function startSession(player1, player2) {
 
     showSharedScreen(sharedLoading);
 
-    // 先看說明，再載入遊戲——兩側的 mountDCCS 都不顯示自己的教學。
     await showSharedTutorial();
 
     sharedPlayerInfo.textContent =
       `玩家 1：${player1.caseId}　｜　` +
       `玩家 2：${player2.caseId}`;
 
-    /*
-      儲存兩位玩家目前所在階段。
-    */
     const playerPhases = {
       1: 'loading',
       2: 'loading',
     };
 
-    // 共用教學已經取得開始意圖；兩側掛載後直接進入第 1 關提示，
-    // 不再額外顯示一次標題開始畫面。
+    // 教學已取得開始意圖，兩側載入後直接進入第 1 關提示。
     let bothPlayersReady = true;
     let continueLocked = false;
 
-    /*
-      記錄空白鍵是否還按著。
-    */
     let spaceDown = false;
-
-    /*
-      黃色畫面是否已經可以接受新的空白鍵。
-    */
     let canContinueWithSpace = false;
 
-    /*
-      取得左右遊戲原本的繼續按鈕。
-    */
     function getInternalContinueButtons() {
       return Array.from(
         doubleGame.querySelectorAll(
@@ -303,9 +291,6 @@ async function startSession(player1, player2) {
       );
     }
 
-    /*
-      讀取目前關卡編號。
-    */
     function getCurrentLevelNumber() {
       const badges =
         Array.from(
@@ -326,9 +311,6 @@ async function startSession(player1, player2) {
       return 1;
     }
 
-    /*
-      顯示黃色關卡提示畫面。
-    */
     function showCurrentLevel() {
       const levelNumber =
         getCurrentLevelNumber();
@@ -339,12 +321,7 @@ async function startSession(player1, player2) {
       sharedLevelMessage.textContent =
         `準備開始第 ${levelNumber} 關！`;
 
-      /*
-        如果進入黃色畫面時，第一次空白鍵還沒放開，
-        就不允許它直接開始遊戲。
-
-        必須先放開，再重新按一次。
-      */
+      // 進入提示時若空白鍵仍按著，必須放開再按，避免直接跳過。
       canContinueWithSpace =
         !spaceDown;
 
@@ -352,13 +329,7 @@ async function startSession(player1, player2) {
         sharedLevel
       );
 
-      /*
-        這裡不要使用 sharedContinue.focus()。
-
-        否則第一次空白鍵放開時，
-        瀏覽器可能會直接觸發按鈕 click，
-        造成黃色畫面被跳過。
-      */
+      // 不 focus 按鈕，否則空白鍵放開可能觸發 click 而跳過提示。
       if (
         document.activeElement &&
         typeof document.activeElement.blur ===
@@ -368,9 +339,6 @@ async function startSession(player1, player2) {
       }
     }
 
-    /*
-      同時通過左右兩邊的關卡提示。
-    */
     function continueBothPlayers() {
       if (continueLocked) {
         return;
@@ -398,9 +366,6 @@ async function startSession(player1, player2) {
       );
     }
 
-    /*
-      處理左右玩家的階段變化。
-    */
     function handlePlayerPhase(
       playerNumber,
       phase
@@ -408,10 +373,6 @@ async function startSession(player1, player2) {
       playerPhases[playerNumber] =
         phase;
 
-      /*
-        左右都載入到標題畫面後，
-        才顯示共用的開始畫面。
-      */
       if (
         playerPhases[1] === 'title' &&
         playerPhases[2] === 'title'
@@ -426,10 +387,6 @@ async function startSession(player1, player2) {
         return;
       }
 
-      /*
-        左右都進入關卡提示後，
-        顯示一個共用黃色畫面。
-      */
       if (
         playerPhases[1] === 'level-prompt' &&
         playerPhases[2] === 'level-prompt'
@@ -442,10 +399,6 @@ async function startSession(player1, player2) {
         return;
       }
 
-      /*
-        左右都正式開始後，
-        隱藏黃色提示畫面。
-      */
       if (
         playerPhases[1] === 'playing' &&
         playerPhases[2] === 'playing'
@@ -464,10 +417,6 @@ async function startSession(player1, player2) {
       }
     }
 
-    /*
-      左右都準備完成以前，
-      不允許空白鍵啟動其中一邊。
-    */
     function blockEarlySpace(event) {
       if (
         event.code !== 'Space' ||
@@ -486,17 +435,11 @@ async function startSession(player1, player2) {
       true
     );
 
-    /*
-      空白鍵按下。
-    */
     function handleSharedSpaceDown(event) {
       if (event.code !== 'Space') {
         return;
       }
 
-      /*
-        自動重複觸發不處理。
-      */
       if (event.repeat) {
         event.preventDefault();
         return;
@@ -510,22 +453,11 @@ async function startSession(player1, player2) {
 
       event.preventDefault();
 
-      /*
-        開始畫面：
-        這裡不呼叫 continueBothPlayers()。
-
-        空白鍵事件會繼續傳給左右兩個遊戲，
-        讓它們一起進入黃色關卡畫面。
-      */
+      // 標題畫面由兩個遊戲實例自行接收同一個空白鍵。
       if (!sharedTitle.hidden) {
         return;
       }
 
-      /*
-        黃色關卡畫面：
-        必須是放開前一次空白鍵後，
-        再按下的新空白鍵，才開始遊戲。
-      */
       if (
         !sharedLevel.hidden &&
         canContinueWithSpace
@@ -539,13 +471,6 @@ async function startSession(player1, player2) {
       handleSharedSpaceDown
     );
 
-    /*
-      空白鍵放開。
-
-      第一次按空白鍵進入黃色畫面後，
-      必須等到這個 keyup 發生，
-      才允許下一次空白鍵開始遊戲。
-    */
     function handleSharedSpaceUp(event) {
       if (event.code !== 'Space') {
         return;
@@ -563,10 +488,6 @@ async function startSession(player1, player2) {
       handleSharedSpaceUp
     );
 
-    /*
-      點擊黃色畫面的綠色繼續按鈕，
-      也可以讓左右兩邊一起開始。
-    */
     function handleSharedContinue(event) {
       event.preventDefault();
 
@@ -578,9 +499,6 @@ async function startSession(player1, player2) {
       handleSharedContinue
     );
 
-    /*
-      移除事件監聽器。
-    */
     function removeSharedEvents() {
       window.removeEventListener(
         'keydown',
@@ -604,15 +522,9 @@ async function startSession(player1, player2) {
       );
     }
 
-    /*
-      左右兩邊使用相同的題目順序。
-    */
     const sharedSeed =
       Date.now();
 
-    /*
-      建立玩家 1。
-    */
     const player1Handle =
       mountDCCS({
         container:
@@ -630,9 +542,6 @@ async function startSession(player1, player2) {
           );
         },
 
-        /*
-          左右底圖由 CSS 各自顯示 Single.png。
-        */
         backgroundKey: null,
         transparentBackground: true,
         viewportAspect: null,
@@ -646,11 +555,9 @@ async function startSession(player1, player2) {
         showResultScreen: false,
         showTutorial: false,
         autoStart: true,
+        ...sessionSecondsOption,
       });
 
-    /*
-      建立玩家 2。
-    */
     const player2Handle =
       mountDCCS({
         container:
@@ -681,6 +588,7 @@ async function startSession(player1, player2) {
         showResultScreen: false,
         showTutorial: false,
         autoStart: true,
+        ...sessionSecondsOption,
       });
 
     try {
@@ -739,77 +647,87 @@ async function startSession(player1, player2) {
       finalResult.hidden = false;
 
       finalResult.innerHTML = `
-        <h1>雙人遊戲完成</h1>
+        <h1 class="result-title">雙人遊戲完成</h1>
 
-        <p>
+        <p class="result-pair-id">
           本局 pairId：
           ${pairId}
         </p>
 
-        <section>
-          <h2>玩家 1</h2>
+        <div class="result-players">
+          <section class="result-player-card">
+            <h2>玩家 1</h2>
 
-          <p>
-            個案編號：
-            ${player1.caseId}
-          </p>
+            <p>
+              個案編號：
+              <strong>${escapeHtml(player1.caseId)}</strong>
+            </p>
 
-          <p>
-            答對：
-            ${result1.summary.correct_count}
-          </p>
+            <p>
+              答對：
+              <strong>${result1.summary.correct_count}</strong>
+            </p>
 
-          <p>
-            答錯：
-            ${result1.summary.wrong_count}
-          </p>
+            <p>
+              答錯：
+              <strong>${result1.summary.wrong_count}</strong>
+            </p>
 
-          <p>
-            正確率：
-            ${player1Accuracy}%
-          </p>
+            <p>
+              正確率：
+              <strong>${player1Accuracy}%</strong>
+            </p>
 
-          ${submissionMessage(
-            submissions[0],
-            '玩家 1'
-          )}
-        </section>
+            ${submissionMessage(
+              submissions[0],
+              '玩家 1'
+            )}
+          </section>
 
-        <section>
-          <h2>玩家 2</h2>
+          <section class="result-player-card">
+            <h2>玩家 2</h2>
 
-          <p>
-            個案編號：
-            ${player2.caseId}
-          </p>
+            <p>
+              個案編號：
+              <strong>${escapeHtml(player2.caseId)}</strong>
+            </p>
 
-          <p>
-            答對：
-            ${result2.summary.correct_count}
-          </p>
+            <p>
+              答對：
+              <strong>${result2.summary.correct_count}</strong>
+            </p>
 
-          <p>
-            答錯：
-            ${result2.summary.wrong_count}
-          </p>
+            <p>
+              答錯：
+              <strong>${result2.summary.wrong_count}</strong>
+            </p>
 
-          <p>
-            正確率：
-            ${player2Accuracy}%
-          </p>
+            <p>
+              正確率：
+              <strong>${player2Accuracy}%</strong>
+            </p>
 
-          ${submissionMessage(
-            submissions[1],
-            '玩家 2'
-          )}
-        </section>
+            ${submissionMessage(
+              submissions[1],
+              '玩家 2'
+            )}
+          </section>
+        </div>
 
-        <button
-          type="button"
-          id="play-again"
-        >
-          再玩一次
-        </button>
+        <div class="result-actions">
+          <button
+            type="button"
+            id="play-again"
+          >
+            再玩一次
+          </button>
+
+          ${
+            cameFromLobby
+              ? '<button type="button" id="back-to-lobby">回遊戲大廳</button>'
+              : ''
+          }
+        </div>
       `;
 
       document
@@ -821,6 +739,16 @@ async function startSession(player1, player2) {
             window.location.reload();
           }
         );
+
+      // 雙人版手動返回，讓兩位受試者先看完成績與送出狀態。
+      if (cameFromLobby) {
+        document
+          .getElementById('back-to-lobby')
+          .addEventListener(
+            'click',
+            returnToLobby
+          );
+      }
     } catch (error) {
       removeSharedEvents();
 
@@ -835,9 +763,6 @@ async function startSession(player1, player2) {
     }
 }
 
-/*
-  手動表單：獨立執行（不經大廳）時用。
-*/
 form.addEventListener(
   'submit',
 
@@ -886,11 +811,7 @@ form.addEventListener(
   }
 );
 
-/*
-  大廳進場：兩位學生都已在大廳登入，受試者資料讀 sessionStorage 就有，
-  只有 currentDay 要跟中介平台查。任一位查不到、或兩位算出來不一致，就整場
-  退回手動表單——雙人兩邊的 currentDay 必須相同，猜其中一個沒有意義。
-*/
+// 雙人 currentDay 必須一致；無法可靠推導時退回手動表單。
 async function bootFromLobby() {
   const session = readLobbySession();
   if (!session || session.mode !== 'double') return false;
@@ -915,6 +836,8 @@ async function bootFromLobby() {
     console.warn('無法自動判斷 currentDay，改由人工填寫：', err);
     return false;
   }
+
+  cameFromLobby = true;
 
   await startSession(
     { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay },

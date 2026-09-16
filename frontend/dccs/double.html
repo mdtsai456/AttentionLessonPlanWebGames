@@ -18,7 +18,6 @@
 
 <body>
   <div id="app">
-    <!-- 遊戲資料填寫畫面 -->
     <form id="setup-form" hidden>
       <h1>賽道攔截 DCCS－雙人模式</h1>
 
@@ -112,12 +111,10 @@
       </button>
     </form>
 
-    <!-- 雙人遊戲 -->
     <main
       id="double-game"
       hidden
     >
-      <!-- 玩家 1 -->
       <section class="player-panel player-one">
         <h2>玩家 1：A／D</h2>
 
@@ -127,7 +124,6 @@
         ></div>
       </section>
 
-      <!-- 玩家 2 -->
       <section class="player-panel player-two">
         <h2>玩家 2：←／→</h2>
 
@@ -137,20 +133,12 @@
         ></div>
       </section>
 
-      <!--
-        雙人共用提示畫面。
-
-        原本左右遊戲各自產生的開始畫面與關卡畫面，
-        會由 CSS 隱藏。
-
-        double.js 使用這個共用畫面顯示一次即可。
-      -->
+      <!-- 左右遊戲共用一份提示，避免兩側重複顯示。 -->
       <div
         id="shared-overlay"
         class="shared-overlay"
       >
-        <div class="shared-card">
-          <!-- 載入畫面 -->
+        <div class="shared-card dccs-panel">
           <section
             id="shared-loading"
             class="shared-screen"
@@ -162,7 +150,6 @@
             </p>
           </section>
 
-          <!-- 操作說明（共用一份；不可讓左右兩側各跑一次教學） -->
           <section
             id="shared-tutorial"
             class="shared-screen"
@@ -179,7 +166,6 @@
             </p>
           </section>
 
-          <!-- 開始畫面 -->
           <section
             id="shared-title"
             class="shared-screen"
@@ -198,33 +184,35 @@
             <p id="shared-player-info"></p>
           </section>
 
-          <!-- 關卡提示畫面 -->
           <section
             id="shared-level"
             class="shared-screen"
             hidden
           >
-            <div id="shared-level-badge">
+            <div
+              id="shared-level-badge"
+              class="dccs-level-badge"
+            >
               第 1 關
             </div>
 
-            <h1 id="shared-level-message">
+            <p
+              id="shared-level-message"
+              class="dccs-level-message"
+            >
               準備開始第 1 關！
-            </h1>
+            </p>
 
             <button
               type="button"
               id="shared-continue"
+              class="dccs-level-continue"
             >
               繼續
             </button>
 
-            <p class="shared-hint">
-              也可以按空白鍵繼續
-            </p>
           </section>
 
-          <!-- 錯誤畫面 -->
           <section
             id="shared-error"
             class="shared-screen"
@@ -240,7 +228,6 @@
       </div>
     </main>
 
-    <!-- 最後成績 -->
     <div
       id="final-result"
       hidden

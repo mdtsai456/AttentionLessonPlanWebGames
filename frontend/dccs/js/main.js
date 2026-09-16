@@ -2,6 +2,7 @@
 
 import { mountDCCS } from './dccs.js';
 import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
+import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
 function parseQuery() {
   const params = new URLSearchParams(window.location.search);
@@ -27,9 +28,7 @@ function showFormNotice(message) {
 }
 
 /**
- * 從大廳（frontend/games.html）進來時，受試者資料讀 sessionStorage 就有，
- * 只有 currentDay 要跟中介平台查。查不到就退回手動表單並把已知欄位填好——
- * 寧可讓現場人員補一個欄位，也不要猜一個 currentDay 污染研究資料。
+ * 讀取大廳玩家並查詢 currentDay；查不到時回傳表單預填資料，不猜測值。
  *
  * @returns {Promise<{student: object, fromLobby: boolean} | {prefill: object}>}
  */
@@ -86,8 +85,7 @@ function parseSeed(seedParam) {
 async function main() {
   const query = parseQuery();
 
-  // 優先序：網址參數（人為明示覆寫，除錯用）> 大廳的 sessionStorage >
-  // 手動表單。獨立執行的行為完全照舊。
+  // 資料來源優先序：網址參數 > 大廳 sessionStorage > 手動表單。
   let student = null;
   let fromLobby = false;
   let prefill = query;
@@ -122,7 +120,16 @@ async function main() {
   const seed = parseSeed(query.seed);
   const container = document.getElementById('game-root');
 
-  const handle = mountDCCS({ container, student, seed });
+  const sessionSeconds = readSessionSecondsOverride();
+  if (sessionSeconds !== null) markDebugSession(sessionSeconds);
+
+  const handle = mountDCCS({
+    container,
+    student,
+    seed,
+    ...(sessionSeconds !== null ? { sessionSeconds } : {}),
+  });
+
   await handle.done;
 
   // 從大廳進來的，玩完自己走回去；獨立執行則留在結算畫面。

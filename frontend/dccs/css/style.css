@@ -1,7 +1,4 @@
-/* 賽道攔截 DCCS — 殼的樣式：只有 body/#app 與輸入表單。
-   遊戲本身的畫面層（載入中／標題／結算／錯誤）樣式由
-   game/js/ui/overlays.js 注入自己的 <style>（class 前綴 dccs-），
-   不寫在這裡，避免跟 main 專案的樣式互撞（見 SPEC 4.16）。 */
+/* 單人頁外殼；遊戲畫面層樣式由 overlays.js 注入。 */
 
 * {
   box-sizing: border-box;
@@ -26,9 +23,6 @@ html, body {
   background: #000;
 }
 
-/* mountDCCS() 的 container：畫布與遊戲自己的畫面層都會建在這裡面，
-   dccs.js 會把它設成 position: relative（見 SPEC 4.15），這裡先讓它
-   填滿整個殼。 */
 #game-root {
   position: absolute;
   inset: 0;
@@ -69,7 +63,6 @@ html, body {
   line-height: 1.5;
 }
 
-/* 從大廳進來、但 currentDay 自動判斷失敗時的提示（見 js/main.js）。 */
 .hint.notice {
   color: #ffd479;
 }

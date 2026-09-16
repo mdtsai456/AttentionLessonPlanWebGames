@@ -10,16 +10,11 @@ import { buildPayload, submitResult, flushPendingResults } from './net/client.js
 import { resolveSubmitUrl } from './net/apiBase.js';
 import { createOverlays } from './ui/overlays.js';
 
-// 前一場送不出去的成績重送一次即可；同一頁掛兩個實例（雙人模式）時，
-// 只有先掛的那個會觸發，避免兩邊搶同一批暫存。
+// 雙人頁只允許一個實例重送暫存成績。
 let pendingFlushStarted = false;
 
 /**
- * 單頁操作說明的內容。**只講操作，不講答題規則**——SPEC 1.4 明定規則不
- * 顯示給玩家，要自己從畫面推；講出來等於把要測的認知彈性直接送給受試者。
- *
- * 版面刻意做成上下兩排，對應遊戲畫面裡形狀閥在上、物件閥在下的位置，
- * 讓「上排／下排」這兩個詞不必解釋。
+ * 單頁操作說明；依 SPEC 1.4 不揭露答題規則。
  *
  * @param {object} manifest
  * @param {string} assetBase manifest 相對路徑的基準網址
@@ -163,19 +158,14 @@ export function mountDCCS(options) {
     opts.assetBase ||
     new URL('../', import.meta.url).href;
 
-  // 單人模式預設使用 Single.png。
-  // 雙人模式可傳入 null，不讓個別 Canvas 再畫背景。
   const backgroundKey =
     opts.backgroundKey === undefined
       ? 'single'
       : opts.backgroundKey;
 
-  // 雙人模式使用透明 Canvas，顯示下面共同的 Double.png。
   const transparentBackground =
     !!opts.transparentBackground;
 
-  // 單人模式維持 16:9。
-  // 雙人模式傳入 null，讓畫面填滿左右半邊。
   const viewportAspect =
     opts.viewportAspect === undefined
       ? 16 / 9
@@ -183,7 +173,6 @@ export function mountDCCS(options) {
 
   const autoStart = !!opts.autoStart;
 
-  // 教學畫面。autoStart 時不顯示（雙人由外層殼統一帶）。
   const showTutorial =
     opts.showTutorial !== false;
 
@@ -207,12 +196,7 @@ export function mountDCCS(options) {
       ? opts.onPhase
       : null;
 
-  // 場次進行中離開頁面，這一場的成績就沒了——沒有中途續玩機制，逐題紀錄
-  // 只存在記憶體裡。故在這些階段掛上離開確認。
-  //
-  // 兩個瀏覽器限制要知道：提示文字**不可自訂**（一律是瀏覽器的制式問句），
-  // 且使用者必須先與頁面互動過才會觸發——標題畫面要按空白鍵才開始，這個
-  // 條件天然成立。
+  // 逐題資料只在記憶體中；進行中離頁會遺失，需觸發瀏覽器制式確認。
   const PHASES_IN_PROGRESS = new Set([
     'level-prompt',
     'playing',
