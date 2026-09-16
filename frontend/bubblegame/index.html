@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>泡泡方向遊戲</title>
+    <script type="module" crossorigin src="./assets/index-game-sessions.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CSFhwMtM.css">
+    <link rel="stylesheet" href="./single-score.css">
+    <link rel="stylesheet" href="./result-upload.css">
+    <script type="module" src="./exit-confirmation.js"></script>
+    <script type="module" src="./result-upload.js"></script>
+  </head>
+  <body>
+    <main class="game" aria-label="泡泡方向遊戲">
+      <section class="start-screen" id="start-screen" aria-labelledby="start-title">
+        <p class="eyebrow">BUBBLE FOCUS</p>
+        <h1 id="start-title">泡泡方向遊戲</h1>
+        <p>設定遊戲時間，選擇遊戲模式開始。</p>
+        <div class="setup-fields">
+          <label class="duration-field" for="duration-input">遊戲時間（分鐘）
+            <input id="duration-input" type="number" min="1" max="60" value="10" />
+          </label>
+          <label class="duration-field" for="current-day-input">第幾個施測日
+            <input id="current-day-input" type="number" min="1" max="365" value="1" required />
+          </label>
+        </div>
+        <div class="start-actions">
+          <button id="start-single-button" type="button">單人遊戲</button>
+          <button id="start-multi-button" type="button">雙人遊戲</button>
+        </div>
+        <p id="login-status" role="status"></p>
+        <a class="back-to-lobby is-hidden" href="../games.html">返回遊戲大廳</a>
+      </section>
+
+      <section class="play-screen is-hidden" id="play-screen" aria-label="遊戲畫面">
+        <header class="hud">
+          <div class="hud-score hud-score--left"><span class="score-label--single">分數</span><span class="score-label--multi">左側分數</span><output id="left-score-display">0</output></div>
+          <div class="hud-center">
+            <span>剩餘時間</span>
+            <time id="timer-display" datetime="PT10M">10:00</time>
+            <p class="instruction">觀察發亮的目標氣泡，按下對應方向鍵。</p>
+            <button id="leave-game-button" class="leave-game-button" type="button">提前離開</button>
+          </div>
+          <div class="hud-score hud-score--right"><span>右側分數</span><output id="right-score-display">0</output></div>
+        </header>
+        <section class="player-layout">
+          <div class="player-panel player-panel--left">
+            <div class="player-label">WASD</div>
+            <section id="left-arena" class="game-arena" aria-label="左側玩家遊戲區域"></section>
+            <div id="left-feedback" class="player-feedback" aria-live="polite"></div>
+          </div>
+          <div class="player-panel player-panel--right">
+            <div class="player-label">方向鍵</div>
+            <section id="right-arena" class="game-arena" aria-label="右側玩家遊戲區域"></section>
+            <div id="right-feedback" class="player-feedback" aria-live="polite"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <div id="feedback-flash" class="feedback-message" aria-hidden="true"></div>
+
+    <div
+      class="overlay is-hidden"
+      id="result-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="result-title"
+    >
+      <section class="result-panel">
+        <p class="eyebrow">TIME'S UP</p>
+        <h1 id="result-title">遊戲結束</h1>
+        <div class="results-grid">
+          <section class="result-player" id="left-result">
+            <h2 id="left-result-title">玩家</h2>
+            <output class="final-score" id="left-final-score">0</output>
+            <dl class="stats-grid">
+              <div><dt>正確率</dt><dd id="left-accuracy-display">0%</dd></div>
+              <div><dt>平均反應時間</dt><dd id="left-average-reaction-display">--</dd></div>
+              <div><dt>正確平均反應時間</dt><dd id="left-correct-reaction-display">--</dd></div>
+              <div><dt>最高連擊</dt><dd id="left-max-combo-display">0</dd></div>
+            </dl>
+          </section>
+          <section class="result-player" id="right-result">
+            <h2 id="right-result-title">右側玩家</h2>
+            <output class="final-score" id="right-final-score">0</output>
+            <dl class="stats-grid">
+              <div><dt>正確率</dt><dd id="right-accuracy-display">0%</dd></div>
+              <div><dt>平均反應時間</dt><dd id="right-average-reaction-display">--</dd></div>
+              <div><dt>正確平均反應時間</dt><dd id="right-correct-reaction-display">--</dd></div>
+              <div><dt>最高連擊</dt><dd id="right-max-combo-display">0</dd></div>
+            </dl>
+          </section>
+        </div>
+        <p id="save-status" role="status" aria-live="polite"></p>
+        <button id="retry-save-button" class="is-hidden" type="button">重試儲存</button>
+        <button id="restart-button" type="button">
+          返回設定
+        </button>
+        <a class="back-to-lobby is-hidden" href="../games.html">返回遊戲大廳</a>
+      </section>
+    </div>
+
+  </body>
+</html>

@@ -49,6 +49,18 @@ async function authedFetch(path, options = {}) {
 }
 
 export const API = {
+  async submitGameSession(payload) {
+    const res = await fetch(`${BASE_URL}/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(typeof body?.detail === "string" ? body.detail : `儲存失敗（HTTP ${res.status}）`);
+    if (!body?.sessionId) throw new Error("後端未回傳場次編號");
+    return body;
+  },
+
   // 靜態遊戲清單（公開，遊戲大廳用）
   async getGames() {
     const res = await fetch(`${BASE_URL}/games`);

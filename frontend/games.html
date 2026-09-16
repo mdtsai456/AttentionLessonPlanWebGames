@@ -38,7 +38,9 @@
           <div class="game-icon">🫧</div>
           <div class="game-name">漂浮泡泡 (EFT)</div>
           <div class="game-desc" id="desc-eft">視覺搜尋與鑲嵌圖形認知評測</div>
-          <button class="btn-play">開始挑戰</button>
+          <div class="game-actions">
+            <button class="btn-play">開始挑戰</button>
+          </div>
         </div>
       </div>
 
@@ -83,9 +85,13 @@
           const gameType = e.target.closest(".game-item").getAttribute("data-game");
           let pageNum = 0;
 
+          if (gameType === "EFT") {
+            window.location.href = `bubblegame/index.html?mode=${btn.dataset.mode}`;
+            return;
+          }
+
           if (gameType === "DAT")  pageNum = isDouble ? 5 : 2;
           if (gameType === "DCCS") pageNum = isDouble ? 6 : 3;
-          if (gameType === "EFT")  pageNum = isDouble ? 7 : 4;
 
           alert(`【啟動 Unity 遊戲】\n項目：${gameType} (${isDouble ? "雙人" : "單人"})\n對應頁面：頁面 ${pageNum}\n學生代號：${s1Id} ${isDouble ? "與 " + s2Id : ""}`);
         });

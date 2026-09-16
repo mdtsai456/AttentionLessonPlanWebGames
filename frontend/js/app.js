@@ -152,6 +152,10 @@ document.addEventListener("DOMContentLoaded", () => {
         showError("學生 2 帳號或密碼錯誤。");
         return;
       }
+      if (result1.studentKey === result2.studentKey && result1.school === result2.school) {
+        showError("雙人模式需要兩位不同學生登入。");
+        return;
+      }
     }
 
     sessionStorage.clear();
@@ -160,11 +164,15 @@ document.addEventListener("DOMContentLoaded", () => {
     sessionStorage.setItem("token", result1.token);
     sessionStorage.setItem("student1_token", result1.token);
     sessionStorage.setItem("student1_key", result1.studentKey);
+    sessionStorage.setItem("student1_grade", result1.grade || "");
+    sessionStorage.setItem("student1_case_id", result1.caseId || "");
     sessionStorage.setItem("student1_school", result1.school);
 
     if (result2) {
       sessionStorage.setItem("student2_token", result2.token);
       sessionStorage.setItem("student2_key", result2.studentKey);
+      sessionStorage.setItem("student2_grade", result2.grade || "");
+      sessionStorage.setItem("student2_case_id", result2.caseId || "");
       sessionStorage.setItem("student2_school", result2.school);
     }
 
