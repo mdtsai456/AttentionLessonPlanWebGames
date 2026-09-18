@@ -358,3 +358,64 @@ button:disabled {
   justify-content: center;
   gap: 1cqw;
 }
+
+/* 滿關遮罩 */
+.modal-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+/* 仿圖片卡片主體 */
+.stage-clear-card {
+  background: #f0f0f0;
+  border-radius: 40px;
+  padding: 40px 60px;
+  text-align: center;
+  min-width: 320px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 藍色膠囊標題 */
+.stage-title-badge {
+  background: #2b9ed8;
+  color: white;
+  padding: 8px 30px;
+  border-radius: 20px;
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+/* 提示文字 */
+.stage-clear-text {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 35px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+/* 綠色繼續按鈕 */
+.btn-continue {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 50px;
+  font-size: 1.2rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.btn-continue:hover {
+  background: #43a047;
+}
