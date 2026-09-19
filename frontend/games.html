@@ -86,7 +86,7 @@
           let pageNum = 0;
 
           if (gameType === "EFT") {
-            window.location.href = `bubblegame/index.html?mode=${btn.dataset.mode}`;
+            window.location.href = `bubblegame/dist/index.html?mode=${isDouble ? "double" : "single"}`;
             return;
           }
 
