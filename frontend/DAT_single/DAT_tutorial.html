@@ -1,0 +1,65 @@
+    <!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAT 動物追擊令 - 遊戲教學</title>
+  <link rel="stylesheet" href="DAT_tutorial.css">
+  <script src="DAT_tutorial.js" defer></script>
+</head>
+<body>
+
+  <main class="tutorial-container">
+    
+    <!-- 畫面一：遊玩說明 -->
+    <section id="step-1" class="tutorial-card">
+      <div class="header-badge">動物追擊令</div>
+      <div class="card-content">
+        <p class="intro-text">
+          你是捕動物高手，準備抓住跑來跑去的動物！但要注意，瞄準開關只有「答對」才會有效！只有當這三件事對了，才能按下選擇鍵：
+        </p>
+        <ol class="rule-list">
+          <li>按鈕變了顏色</li>
+          <li>顏色的「名字」和「顏色」是一樣的</li>
+          <li>算式的答案是對的</li>
+        </ol>
+        <p class="warning-text">抓錯會浪費力氣喔～看準題目再抓才能獲得高分！</p>
+      </div>
+      <button id="btn-to-step2" class="btn-green" type="button">繼續</button>
+    </section>
+
+    <!-- 畫面二：題型說明 (動態卡片) -->
+    <section id="step-2" class="tutorial-card" hidden>
+      <div class="header-badge">題型說明</div>
+      <div class="card-content">
+        <p id="type-title" class="type-instruction">加載中...</p>
+        <p id="type-example" class="type-sub"></p>
+        
+        <div class="carousel-container">
+          <button id="prev-type" class="nav-arrow" type="button" aria-label="上一題">◀</button>
+          
+          <div class="type-preview-box" id="preview-box">
+            <!-- 預覽內容由 JS 動態渲染 -->
+          </div>
+          
+          <button id="next-type" class="nav-arrow" type="button" aria-label="下一題">▶</button>
+        </div>
+      </div>
+      <button id="btn-to-step3" class="btn-green-solid" type="button">跳過說明/下一步</button>
+    </section>
+
+    <!-- 畫面三：選擇練習還是直接開始 -->
+    <section id="step-3" class="tutorial-card" hidden>
+      <div class="card-content">
+        <h2 class="prompt-title">理解了嗎？<br>來練習一下吧！</h2>
+        <div class="action-buttons">
+          <button id="btn-practice" class="btn-outline" type="button">練習一下</button>
+          <button id="btn-start" class="btn-green-solid" type="button">不練習，直接開始</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

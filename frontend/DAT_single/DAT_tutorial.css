@@ -1,0 +1,243 @@
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #e89e37;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  color: #333;
+}
+
+/* 容器維持 16:9 比例，與 DAT 遊戲畫面一致 */
+.tutorial-container {
+  position: relative;
+  width: min(95vw, 1100px);
+  aspect-ratio: 16 / 9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2%;
+}
+
+/* 通用白底卡片外框 */
+.tutorial-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #f4f4f4;
+  border: 8px solid #ffffff;
+  border-radius: 48px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3rem 2.5rem 2rem;
+}
+
+/* 頂部藍色標題膠囊 */
+.header-badge {
+  position: absolute;
+  top: -32px;
+  background: #258ee0;
+  color: #ffffff;
+  font-size: 2.2rem;
+  font-weight: bold;
+  padding: 0.4em 2.2em;
+  border-radius: 40px;
+  box-shadow: 0 5px 0 #18639e, inset 0 -3px 0 rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.1em;
+}
+
+/* 內容區域 */
+.card-content {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  font-size: 1.35rem;
+  line-height: 1.8;
+  color: #333;
+}
+
+/* 畫面一：說明文字 */
+.intro-text {
+  margin: 0 0 0.8rem;
+  text-align: justify;
+  width: 90%;
+}
+
+.rule-list {
+  margin: 0 0 1rem;
+  padding-left: 2.5rem;
+  width: 90%;
+}
+
+.warning-text {
+  margin: 0;
+  font-weight: bold;
+  color: #222;
+}
+
+/* 畫面二：題型說明輪播區 */
+.type-instruction {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin: 0 0 0.2rem;
+  text-align: center;
+}
+
+.type-sub {
+  font-size: 1.2rem;
+  color: #555;
+  margin: 0 0 1rem;
+}
+
+.carousel-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  width: 100%;
+  flex: 1;
+}
+
+.type-preview-box {
+  width: 65%;
+  height: 180px;
+  background: #c3ad99;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.preview-badge {
+  padding: 0.4rem 2rem;
+  border-radius: 8px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.preview-hint {
+  font-size: 1rem;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 左右箭頭按鈕 */
+.nav-arrow {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #3eb549;
+  border: 4px solid #ffffff;
+  color: white;
+  font-size: 1.8rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 0 #287a30;
+  transition: transform 0.1s;
+}
+
+.nav-arrow:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #287a30;
+}
+
+.nav-arrow:disabled {
+  background: #ccc;
+  box-shadow: 0 4px 0 #aaa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 畫面三：練習選擇卡片 */
+.prompt-title {
+  font-size: 2.2rem;
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  width: 60%;
+  max-width: 360px;
+}
+
+/* 通用綠色膠囊按鈕 */
+.btn-green {
+  background: #3eb549;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0.5em 2.5em;
+  border: 3px solid #ffffff;
+  border-radius: 35px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #287a30;
+  transition: transform 0.1s;
+}
+
+.btn-green-outline {
+  background: #ffffff;
+  color: #3eb549;
+  font-size: 1.3rem;
+  font-weight: bold;
+  padding: 0.4em 2em;
+  border: 3px solid #3eb549;
+  border-radius: 35px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #287a30;
+}
+
+.btn-outline {
+  background: #ffffff;
+  color: #3eb549;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0.6em;
+  border: 3px solid #3eb549;
+  border-radius: 35px;
+  cursor: pointer;
+  text-align: center;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.btn-green-solid {
+  background: #3eb549;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0.6em;
+  border: 3px solid #ffffff;
+  border-radius: 35px;
+  cursor: pointer;
+  text-align: center;
+  box-shadow: 0 5px 0 #287a30;
+}
+
+button:active {
+  transform: translateY(2px);
+}
+
+[hidden] {
+  display: none !important;
+}
