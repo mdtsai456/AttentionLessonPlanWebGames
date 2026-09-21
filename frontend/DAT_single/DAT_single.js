@@ -21,13 +21,15 @@ let submitted = false;
 let questions = [], index = 0, score = 0, wrong = 0, offTarget = 0, timedOut = 0;
 let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
 const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
+let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
 let isFirstAim = true; //判斷瞄準動物之後開始計時
 const STAGE_COUNT = isPractice ? 1 : 3;
 const QUESTIONS_PER_STAGE = isPractice ? 5 : 5;
 function startGame() {
   // 設定題數：練習模式 5 題，正式模式固定 15 題
-const totalQuestions = STAGE_COUNT * QUESTIONS_PER_STAGE;
+  gameStartTime = Date.now();
+  const totalQuestions = STAGE_COUNT * QUESTIONS_PER_STAGE;
   questions = generateRandomQuestions(totalQuestions);
 
   index = score = wrong = offTarget = timedOut = elapsed = 0;
@@ -273,19 +275,17 @@ function finishGame() {
   $('summary').textContent = `誤按 ${wrong} 題・判斷正確但未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
   $('accuracy').textContent = `得分率 ${Math.round(score / questions.length * 100)}%`;
 
-  const $startGameBtn = $('btn-start-game'); // 取得新增的正式遊戲按鈕
+  const $startGameBtn =$('btn-start-game'); // 取得結束選單的第二個按鈕
 
   if (isPractice) {
     $('result-title').textContent = '練習結束';
     
-    // 按鈕一：再練習一次 (重跑 startGame 重新練習)
+    // 按鈕一：再練習一次
     $('restart').textContent = '再練習一次';
-    $('restart').class
     $('restart').onclick = startGame;
 
-    // 按鈕二：進入正式遊戲 (顯示按鈕並設定跳轉)
-    if ($startGameBtn) {
-      $startGameBtn.hidden = false;
+    // 按鈕二：進入正式遊戲
+    if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '進入正式遊戲';
       $startGameBtn.onclick = () => {
         window.location.href = 'DAT_single.html?mode=game';
@@ -298,9 +298,12 @@ function finishGame() {
     $('restart').textContent = '再玩一次';
     $('restart').onclick = startGame;
 
-    // 按鈕二：隱藏進入正式遊戲按鈕
-    if ($startGameBtn) {
-      $startGameBtn.hidden = true;
+    // 按鈕二：返回遊戲大廳 (跳轉到 games.html)
+    if ($startGameBtn) {$startGameBtn.hidden = false;
+      $startGameBtn.textContent = '返回遊戲大廳';
+      $startGameBtn.onclick = () => {
+        window.location.href = '../games.html';
+      };
     }
 
     // 呼叫 API 上傳資料庫 (僅正式模式)
@@ -317,18 +320,104 @@ function finishGame() {
 }
 
 // 寫入後端 API (預留介面)
-function saveGameDataToBackend(data) {
-  console.log('[API] 上傳正式遊戲數據：', data);
-  /*
-  fetch('/api/game/record', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(res => res.json())
-    .then(res => console.log('寫入成功:', res))
-    .catch(err => console.error('寫入失敗:', err));
-  */
+// 寫入中介平台 / 資料庫 API
+function finishGame() {
+  phase = 'finished';
+  keys.clear(); pointerDirections.clear();
+  $('pause').disabled = true;
+  $('final-score').textContent = `${score} / ${questions.length} 分`;
+  $('summary').textContent = `誤按 ${wrong} 題・判斷正確但未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
+  $('accuracy').textContent = `得分率 ${Math.round(score / questions.length * 100)}%`;
+
+  const $startGameBtn =$('btn-start-game');
+
+  if (isPractice) {
+    $('result-title').textContent = '練習結束';
+    $('restart').textContent = '再練習一次';
+    $('restart').onclick = startGame;
+
+    if ($startGameBtn) {$startGameBtn.hidden = false;
+      $startGameBtn.textContent = '進入正式遊戲';
+      $startGameBtn.onclick = () => {
+        window.location.href = 'DAT_single.html?mode=game';
+      };
+    }
+  } else {
+    $('result-title').textContent = '挑戰完成！';
+    $('restart').textContent = '再玩一次';
+    $('restart').onclick = startGame;
+
+    if ($startGameBtn) {$startGameBtn.hidden = false;
+      $startGameBtn.textContent = '返回遊戲大廳';
+      $startGameBtn.onclick = () => {
+        window.location.href = '../games.html';
+      };
+    }
+
+    // 呼叫 API 上傳資料庫 (補齊 duration 與 stage)
+    saveGameDataToBackend({
+      score: score,
+      wrong: wrong,
+      offTarget: offTarget,
+      timedOut: timedOut,
+      accuracy: Math.round(score / questions.length * 100),
+      duration: Date.now() - gameStartTime, // 補上毫秒數
+      stage: STAGE_COUNT                    // 補上總關卡數
+    });
+  }
+
+  $('results').hidden = false; 
 }
+
+async function saveGameDataToBackend(data) {
+  const url = "https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions";
+
+  const grade = sessionStorage.getItem('grade') || 'G1';
+  const caseId = sessionStorage.getItem('caseId') || 'S03';
+  const school = sessionStorage.getItem('school') || 'KMU'; // ⚠️ 需嚴格符合 KMU 或 NTHU-01~07
+  const currentDay = parseInt(sessionStorage.getItem('currentDay') || '1', 10);
+
+  const payload = {
+    lessonId: "1140908_DAT",
+    data: {
+      grade: grade,
+      caseId: caseId,
+      school: school,
+      currentDay: currentDay,
+      startTime: gameStartTime,
+      endTime: Date.now(),
+      mode: "single",
+      stats: [
+        { apiname: "DAT_correct",  value: data.score },
+        { apiname: "DAT_wrong",    value: data.wrong },
+        { apiname: "DAT_accuracy", value: data.accuracy / 100 },
+        { apiname: "DAT_duration", value: data.duration }, // 正確對應傳入的 duration
+        { apiname: "DAT_stage",    value: data.stage }    // 正確對應傳入的 stage
+      ]
+    }
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 201) {
+      const result = await res.json();
+      console.log('✅ [API 成功] 資料已成功寫入資料庫！Session ID:', result.sessionId);
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      console.error(`❌ [API 錯誤 ${res.status}]:`, errData.detail || '寫入失敗');
+    }
+  } catch (err) {
+    console.error('❌ [API 網路連線異常]:', err);
+  }
+}
+
 
 function move(delta) {
   const directions = new Set([...keys].map((key) => bindings[key]).concat([...pointerDirections.values()]));
