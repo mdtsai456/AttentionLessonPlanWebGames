@@ -1,7 +1,9 @@
 ## 目前寫在本地SQL lite 之後將api.js中
-const API_BASE_URL = "http://127.0.0.1:5001";
-改為onst API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
+const API_BASE_URL = "http://127.0.0.1:5002";
+改為 const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
 
+cd frontend/DAT_double
+python local_sqlite_server.py
 
 cd "\backend"
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001

@@ -1,10 +1,10 @@
 import { sendSessionToApi } from './api.js';
 import { generateQuestionSet } from './questions.js';
 
-export const ROUND_MS = 10 * 1000;//秒數
+export const ROUND_MS = 1 * 1000;//秒數
 export const AIM_SPEED = 45;
 export const ANIMAL_SPEED = 4;
-export const TOTAL_STAGES = 5;//關卡數量
+export const TOTAL_STAGES = 1;//關卡數量
 // 目前關卡:5 題目:12/每關 秒數:10 => 5*12*10 = 600 秒 = 10 分鐘
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);

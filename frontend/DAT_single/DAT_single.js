@@ -24,8 +24,8 @@ const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
 let isFirstAim = true; //判斷瞄準動物之後開始計時
-const STAGE_COUNT = isPractice ? 1 : 3;
-const QUESTIONS_PER_STAGE = isPractice ? 5 : 5;
+const STAGE_COUNT = isPractice ? 1 : 2;
+const QUESTIONS_PER_STAGE = isPractice ? 2 : 3;
 function startGame() {
   // 設定題數：練習模式 5 題，正式模式固定 15 題
   gameStartTime = Date.now();
@@ -370,7 +370,8 @@ function finishGame() {
 }
 
 async function saveGameDataToBackend(data) {
-  const url = "https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions";
+  const url = "http://127.0.0.1:5002/api/sessions";//https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions
+
 
   const grade = sessionStorage.getItem('grade') || 'G1';
   const caseId = sessionStorage.getItem('caseId') || 'S03';
