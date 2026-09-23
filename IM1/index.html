@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WedGame · 指令出擊</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage" aria-label="指令出擊">
+      <div class="world" id="world">
+        <div class="scene" id="scene">
+          <div class="bg" id="bg"></div>
+          <div class="doors" id="doors"></div>
+          <div class="zones" id="zones"></div>
+        </div>
+      </div>
+
+      <div class="player" id="player">
+        <img
+          id="player-img"
+          src="img/player/dog_idle_01.png"
+          alt=""
+          draggable="false"
+        />
+      </div>
+
+      <div class="hud-score" aria-live="polite">
+        <span class="hud-chip hud-chip-gold">得分</span>
+        <span class="hud-box" id="score-box">0 分</span>
+      </div>
+
+      <div class="hud-timer" aria-live="polite">
+        <span class="hud-chip hud-chip-sky">剩餘</span>
+        <span class="hud-box" id="timer-box">45 秒</span>
+      </div>
+
+      <section class="backpack" aria-label="背包">
+        <img class="backpack-art" src="img/backbag.png" alt="" draggable="false" />
+        <div class="backpack-slots" id="backpack"></div>
+      </section>
+
+      <div class="minimap-wrap">
+        <p class="room-name" id="room-name">廚房</p>
+        <div class="minimap" id="minimap" aria-label="房間小地圖"></div>
+      </div>
+      <p class="feedback" id="feedback" aria-live="assertive"></p>
+      <div class="fade" id="fade"></div>
+
+      <section class="panel is-hidden" id="problem-panel" aria-label="本關題目">
+        <h1 class="title" id="problem-title">第 1 關</h1>
+        <p class="label" id="problem-text">請看題目</p>
+        <div class="problem-items" id="problem-items"></div>
+        <p class="hint" id="problem-hint">靠近物品按空白鍵拿取，放進背包</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-green" id="start-stage-btn">
+            開始
+          </button>
+        </div>
+      </section>
+
+      <section class="modal-overlay is-hidden" id="midway-panel" aria-label="中場休息">
+        <div class="stage-clear-card">
+          <div class="stage-title-badge">挑戰完成！</div>
+          <p class="stage-clear-text" id="midway-text">第 3 關已結束<br>要繼續遊玩嗎？</p>
+          <div class="stage-clear-actions">
+            <button type="button" class="btn btn-green" id="continue-btn">
+              繼續遊玩
+            </button>
+            <button type="button" class="btn btn-sky" id="midway-back-btn">
+              返回遊戲大廳
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="result is-hidden" id="result" aria-label="結算">
+        <h1 class="title" id="result-title">闖關結束</h1>
+        <p class="result-score" id="result-score">0 / 6 分</p>
+        <p class="label" id="result-hint">記住指令，走到對的房間拿放物品</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-green" id="replay-btn">
+            再玩一次
+          </button>
+          <button type="button" class="btn btn-sky" id="back-btn">
+            返回遊戲大廳
+          </button>
+        </div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

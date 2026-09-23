@@ -1,0 +1,24 @@
+[project]
+name = "attention-lesson-plan-transfer-data-platform"
+version = "0.3.0"
+description = "注意力教案的遊戲資料中介 API：FastAPI 讀寫 MariaDB，接收 Unity 遊戲結果並供前端與研究查詢。"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pymysql>=1.1.0",
+    "python-dotenv>=1.0.0",
+    # anyio 4.10+ 對 anyio.abc.BlockingPortal 發 DeprecationWarning，而
+    # starlette.testclient 仍走舊路徑；pytest.ini 的 filterwarnings=error
+    # 會讓測試連收集都失敗。鎖在 4.10 以下直到 starlette 端修正。
+    "anyio<4.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "httpx>=0.27.0",
+]
+
+[tool.uv]
+package = false

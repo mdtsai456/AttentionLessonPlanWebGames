@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>注意力教案 — 資料檢視 Demo</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #fff; --ink: #1c2733; --muted: #667; --line: #e2e6ea;
+    --accent: #2f6feb; --accent-soft: #e8f0fe;
+    --single: #2f6feb; --double: #e6892f; --ok: #1f9d55;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 20px; }
+  header h1 { margin: 0; font-size: 17px; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 18px 20px 60px; }
+  .tabs { display: flex; gap: 8px; margin: 4px 0 16px; }
+  .tabs button { flex: 0 0 auto; padding: 8px 16px; border: 1px solid var(--line); background: var(--card);
+                 border-radius: 999px; cursor: pointer; font: inherit; }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px;
+            color: var(--muted); margin-bottom: 14px; min-height: 22px; }
+  .crumbs .chip { background: var(--accent-soft); color: var(--accent); padding: 2px 9px; border-radius: 6px; }
+  .crumbs button.link { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 15px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .pick { text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px;
+          background: #fbfcfd; cursor: pointer; font: inherit; }
+  .pick:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .pick .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+  .badge.single { background: #e8f0fe; color: var(--single); }
+  .badge.double { background: #fdefe0; color: var(--double); }
+  .statline { display: flex; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .statline b { color: var(--ink); font-size: 15px; }
+  .muted { color: var(--muted); }
+  .err { color: #c0392b; background: #fdecea; border: 1px solid #f5c6cb; padding: 10px 12px; border-radius: 8px; }
+  .legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); margin: 4px 0 2px; }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 5px; }
+  .chartbox { overflow-x: auto; }
+  svg text { font: 11px sans-serif; fill: var(--muted); }
+  .spin { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>注意力教案 — 資料檢視 Demo</h1>
+  <p>後端 API 的驗收畫面（<code>/demo</code>）。不是正式前端，只是把「選人 → 看進度」的流程畫出來。資料取自目前連線的資料庫。</p>
+</header>
+
+<div class="wrap">
+  <div class="tabs" role="tablist">
+    <button role="tab" data-flow="teacher" aria-selected="true">老師端</button>
+    <button role="tab" data-flow="student" aria-selected="false">小朋友端</button>
+  </div>
+
+  <div class="crumbs" id="crumbs"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+// 用 <template> 解析，這樣 <tr>/<td> 等在非 <table> 情境也不會被瀏覽器丟掉。
+const $ = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstElementChild; };
+const view = document.getElementById('view');
+const crumbsEl = document.getElementById('crumbs');
+const state = { flow: 'teacher', school: null, schoolName: null, teacher: null, student: null };
+
+async function api(path) {
+  const r = await fetch(path, { headers: { 'Accept': 'application/json' } });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch {}
+    throw new Error(`${r.status} — ${detail}`);
+  }
+  return r.json();
+}
+
+function setView(node) { view.replaceChildren(node); }
+function loading(msg = '載入中…') { setView($(`<div class="card spin">${msg}</div>`)); }
+function showError(e) { setView($(`<div class="err">出錯了：${e.message}</div>`)); }
+const pct = (x) => (x == null ? '—' : Math.round(x * 100) + '%');
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function renderCrumbs() {
+  crumbsEl.replaceChildren();
+  const add = (label, onBack) => {
+    if (onBack) {
+      const b = $(`<button class="link">${esc(label)}</button>`);
+      b.onclick = onBack; crumbsEl.append(b);
+    } else {
+      crumbsEl.append($(`<span class="chip">${esc(label)}</span>`));
+    }
+    crumbsEl.append(document.createTextNode(' ▸ '));
+  };
+  if (state.school) add(state.schoolName || state.school, () => pickSchoolStep());
+  if (state.teacher) add('老師：' + state.teacher.name, () => pickTeacherStep());
+  if (state.student) add('學生：' + state.student, null);
+  if (crumbsEl.lastChild && crumbsEl.lastChild.nodeType === 3) crumbsEl.lastChild.remove();
+}
+
+// --- 流程步驟 ---
+
+async function pickSchoolStep() {
+  state.school = state.teacher = state.student = null;
+  renderCrumbs(); loading();
+  try {
+    const { schools } = await api('/api/schools');
+    const card = $(`<div class="card"><h2>選擇場域</h2></div>`);
+    const grid = $(`<div class="grid"></div>`);
+    if (!schools.length) grid.append($(`<div class="muted">資料庫裡沒有場域。先跑 <code>python seed_directory.py</code>。</div>`));
+    for (const s of schools) {
+      const b = $(`<button class="pick"><div>${esc(s.displayName)}</div><div class="sub">${esc(s.school)}</div></button>`);
+      b.onclick = () => { state.school = s.school; state.schoolName = s.displayName; nextAfterSchool(); };
+      grid.append(b);
+    }
+    card.append(grid); setView(card);
+  } catch (e) { showError(e); }
+}
+
+function nextAfterSchool() {
+  if (state.flow === 'teacher') pickTeacherStep();
+  else pickStudentStep();
+}
+
+async function pickTeacherStep() {
+  state.teacher = state.student = null;
+  renderCrumbs(); loading();
+  try {
+    const { teachers } = await api(`/api/schools/${encodeURIComponent(state.school)}/teachers`);
+    const card = $(`<div class="card"><h2>選擇老師</h2></div>`);
+    const grid = $(`<div class="grid"></div>`);
+    if (!teachers.length) grid.append($(`<div class="muted">這個場域還沒有老師。</div>`));
+    for (const t of teachers) {
+      const b = $(`<button class="pick"><div>${esc(t.name)}</div><div class="sub">teacherId ${t.teacherId}</div></button>`);
+      b.onclick = () => { state.teacher = t; teacherStudentsStep(); };
+      grid.append(b);
+    }
+    card.append(grid); setView(card);
+  } catch (e) { showError(e); }
+}
+
+async function teacherStudentsStep() {
+  state.student = null;
+  renderCrumbs(); loading();
+  try {
+    const data = await api(`/api/teachers/${state.teacher.teacherId}/students`);
+    const card = $(`<div class="card"></div>`);
+    card.append($(`<h2>${esc(data.teacherName)} 名下的學生（${esc(data.school)}，共 ${data.studentCount} 位）</h2>`));
+    card.append(studentsTable(data.students, sk => openReport(sk)));
+    setView(card);
+  } catch (e) { showError(e); }
+}
+
+async function pickStudentStep() {
+  state.student = null;
+  renderCrumbs(); loading();
+  try {
+    const data = await api(`/api/students?school=${encodeURIComponent(state.school)}`);
+    const card = $(`<div class="card"></div>`);
+    card.append($(`<h2>${esc(state.schoolName)} 的學生（共 ${data.studentCount} 位）— 選自己</h2>`));
+    card.append(studentsTable(data.students, sk => openReport(sk)));
+    setView(card);
+  } catch (e) { showError(e); }
+}
+
+function studentsTable(students, onClick) {
+  const t = $(`<table><thead><tr><th>學生</th><th>年級</th><th>場次數</th><th>最後遊玩</th><th></th></tr></thead><tbody></tbody></table>`);
+  const tb = t.querySelector('tbody');
+  if (!students.length) tb.append($(`<tr><td colspan="5" class="muted">沒有學生</td></tr>`));
+  for (const s of students) {
+    const tr = $(`<tr>
+      <td><b>${esc(s.studentKey)}</b></td>
+      <td>${esc(s.grade)}</td>
+      <td>${s.sessionCount}</td>
+      <td class="muted">${s.lastPlayedAt ? esc(s.lastPlayedAt) : '—'}</td>
+      <td><button class="link">看進度 ▸</button></td>
+    </tr>`);
+    tr.querySelector('button').onclick = () => onClick(s.studentKey);
+    tb.append(tr);
+  }
+  return t;
+}
+
+// --- 報告頁 ---
+
+async function openReport(studentKey) {
+  state.student = studentKey;
+  renderCrumbs(); loading('讀取報告…');
+  try {
+    const rep = await api(`/api/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(state.school)}`);
+    renderReport(rep);
+  } catch (e) { showError(e); }
+}
+
+function renderReport(rep) {
+  const box = document.createDocumentFragment();
+
+  const head = $(`<div class="card"></div>`);
+  head.append($(`<h2>${esc(rep.studentKey)} 的遊玩進度</h2>`));
+  head.append($(`<div class="statline">
+    <span>場域 <b>${esc(rep.school)}</b></span>
+    <span>總場次 <b>${rep.totalSessions}</b></span>
+    <span>年級 <b>${esc(rep.grade)}</b></span>
+  </div>`));
+  box.append(head);
+
+  // 各遊戲 × 模式 彙總
+  const sum = $(`<div class="card"><h2>各遊戲彙總（單人 / 雙人分列）</h2></div>`);
+  const st = $(`<table><thead><tr><th>遊戲</th><th>模式</th><th>場次</th><th>平均正確率</th><th>累計答對</th><th>累計答錯</th></tr></thead><tbody></tbody></table>`);
+  for (const g of rep.summaryByGame) {
+    st.querySelector('tbody').append($(`<tr>
+      <td><b>${esc(g.gameType)}</b></td>
+      <td><span class="badge ${g.mode}">${g.mode === 'double' ? '雙人' : '單人'}</span></td>
+      <td>${g.sessionCount}</td>
+      <td>${pct(g.avgAccuracy)}</td>
+      <td>${g.totalCorrect}</td>
+      <td>${g.totalWrong}</td>
+    </tr>`));
+  }
+  sum.append(st);
+  box.append(sum);
+
+  // 趨勢圖：每款遊戲一張，單人實線 / 雙人虛線
+  const trendCard = $(`<div class="card"><h2>正確率趨勢（單人版 vs 雙人版）</h2>
+    <div class="legend"><span><i style="border-color:var(--single)"></i>單人版</span>
+    <span><i style="border-color:var(--double);border-top-style:dashed"></i>雙人版</span></div></div>`);
+  const byGame = {};
+  for (const tr of rep.trends) {
+    const acc = tr.items.find(i => i.type === 'accuracy');
+    if (!acc) continue;
+    (byGame[tr.gameType] ||= []).push({ mode: tr.mode, points: acc.stats });
+  }
+  const games = Object.keys(byGame).sort();
+  if (!games.length) trendCard.append($(`<div class="muted">沒有可畫的趨勢資料。</div>`));
+  for (const game of games) {
+    trendCard.append($(`<div style="margin-top:10px;font-weight:600">${esc(game)}</div>`));
+    trendCard.append(lineChart(byGame[game]));
+  }
+  box.append(trendCard);
+
+  // 場次明細（最近 25 筆）
+  const recCard = $(`<div class="card"><h2>場次明細（最近 25 筆）</h2></div>`);
+  const rt = $(`<table><thead><tr><th>時間</th><th>遊戲</th><th>模式</th><th>第幾天</th><th>正確率</th><th>答對/題數</th></tr></thead><tbody></tbody></table>`);
+  for (const r of rep.records.slice(0, 25)) {
+    const s = r.stats;
+    rt.querySelector('tbody').append($(`<tr>
+      <td class="muted">${esc(r.startTime)}</td>
+      <td><b>${esc(r.gameType)}</b></td>
+      <td><span class="badge ${r.mode}">${r.mode === 'double' ? '雙人' : '單人'}</span></td>
+      <td>${r.currentDay}</td>
+      <td>${s ? pct(s.accuracy) : '—'}</td>
+      <td>${s ? s.correctCount + ' / ' + s.stage : '—'}</td>
+    </tr>`));
+  }
+  recCard.append(rt);
+  box.append(recCard);
+
+  view.replaceChildren(box);
+}
+
+// 極簡 SVG 折線圖：series = [{mode, points:[{time,value}]}]
+function lineChart(series) {
+  const W = 760, H = 170, padL = 38, padR = 12, padT = 12, padB = 26;
+  const all = series.flatMap(s => s.points);
+  if (!all.length) return $(`<div class="muted">（無資料）</div>`);
+  const n = Math.max(...series.map(s => s.points.length));
+  const x = (i, len) => padL + (len <= 1 ? 0 : (i / (len - 1)) * (W - padL - padR));
+  const y = (v) => padT + (1 - v) * (H - padT - padB); // value 0..1
+  const box = $(`<div class="chartbox"></div>`);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+  // y 軸格線 0/25/50/75/100%
+  for (const g of [0, .25, .5, .75, 1]) {
+    svg += `<line x1="${padL}" y1="${y(g)}" x2="${W - padR}" y2="${y(g)}" stroke="#eef1f4"/>`;
+    svg += `<text x="4" y="${y(g) + 3}">${g * 100}%</text>`;
+  }
+  for (const s of series) {
+    const col = s.mode === 'double' ? 'var(--double)' : 'var(--single)';
+    const dash = s.mode === 'double' ? '5 4' : '0';
+    const pts = s.points.map((p, i) => `${x(i, s.points.length)},${y(p.value)}`).join(' ');
+    svg += `<polyline fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" points="${pts}"/>`;
+    for (const [i, p] of s.points.entries())
+      svg += `<circle cx="${x(i, s.points.length)}" cy="${y(p.value)}" r="2.5" fill="${col}"/>`;
+  }
+  svg += `<text x="${padL}" y="${H - 8}">舊</text><text x="${W - padR - 14}" y="${H - 8}">新</text>`;
+  svg += `</svg>`;
+  box.innerHTML = svg;
+  return box;
+}
+
+// --- tabs ---
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+    state.flow = b.dataset.flow;
+    state.school = state.teacher = state.student = null;
+    history.replaceState(null, '', location.pathname);
+    pickSchoolStep();
+  };
+});
+
+// 深連結：/demo?school=KMU&student=G1_S01 直接開該學生報告（方便分享 / 截圖）
+const qs = new URLSearchParams(location.search);
+if (qs.get('school') && qs.get('student')) {
+  state.school = qs.get('school');
+  state.schoolName = qs.get('schoolName') || qs.get('school');
+  openReport(qs.get('student'));
+} else {
+  pickSchoolStep();
+}
+</script>
+</body>
+</html>

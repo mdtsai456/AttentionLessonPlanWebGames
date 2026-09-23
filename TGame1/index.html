@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WedGame · 勇闖迷宮</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage" aria-label="勇闖迷宮">
+      <div class="world" id="world">
+        <div class="scene" id="scene">
+          <div class="bg is-show" data-bg="back"></div>
+          <div class="bg" data-bg="near"></div>
+          <div class="bg" data-bg="turn-left"></div>
+          <div class="bg" data-bg="turn-right"></div>
+          <img
+            class="item item-left"
+            id="item-left"
+            alt=""
+            draggable="false"
+          />
+          <img
+            class="item item-right"
+            id="item-right"
+            alt=""
+            draggable="false"
+          />
+        </div>
+      </div>
+
+      <div class="player" id="player">
+          <img
+            id="player-img"
+            src="img/playerBack.png"
+            alt=""
+            draggable="false"
+          />
+          <div
+            class="player-placeholder is-hidden"
+            id="player-placeholder"
+            aria-hidden="true"
+          >
+            <div class="ph-hair"></div>
+            <div class="ph-body"></div>
+            <div class="ph-legs"></div>
+          </div>
+      </div>
+
+      <div class="hud-score" aria-live="polite">
+        <span class="hud-chip hud-chip-gold">得分</span>
+        <span class="hud-box" id="score-box">0 分</span>
+      </div>
+
+      <div class="hud-timer" aria-live="polite">
+        <span class="hud-chip hud-chip-sky">剩餘</span>
+        <span class="hud-box" id="timer-box">60 秒</span>
+      </div>
+
+      <div class="hud-level" aria-live="polite">
+        <span class="hud-chip hud-chip-sky">關卡</span>
+        <span class="hud-box" id="level-box">1 / 6</span>
+      </div>
+
+      <p class="prompt" id="prompt">請選擇符合題目的方向</p>
+      <p class="feedback" id="feedback" aria-live="assertive"></p>
+
+      <section class="result is-hidden" id="result" aria-label="結算">
+        <h1 class="title" id="result-title">闖關結束</h1>
+        <p class="result-score" id="result-score">0 / 8 分</p>
+        <p class="label" id="result-hint">用左右鍵選擇正確的岔路</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-green" id="replay-btn">
+            再玩一次
+          </button>
+          <button type="button" class="btn btn-sky" id="back-btn">
+            返回遊戲大廳
+          </button>
+        </div>
+      </section>
+
+      <div class="modal-overlay is-hidden" id="stage-clear-modal">
+        <div class="stage-clear-card">
+          <div class="stage-title-badge" id="stage-clear-title">第 1 關結束</div>
+          <p class="stage-clear-text" id="stage-clear-text">準備開始下一關嘍！</p>
+          <div class="stage-clear-actions">
+            <button type="button" class="btn btn-green" id="btn-next-stage">繼續</button>
+            <button type="button" class="btn btn-sky is-hidden" id="btn-lobby">返回遊戲大廳</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

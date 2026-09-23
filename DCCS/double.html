@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>賽道攔截 DCCS－雙人模式</title>
+  <link
+    rel="stylesheet"
+    href="./css/double.css"
+  >
+  <script>
+    window.API_BASE_URL = "http://127.0.0.1:5001/api";
+  </script>
+</head>
+
+<body>
+  <div id="app">
+    <form id="setup-form" hidden></form>
+
+    <main
+      id="double-game"
+      hidden
+    >
+      <section class="player-panel player-one">
+        <h2>玩家 1：A／D</h2>
+
+        <div
+          id="player1-game"
+          class="game-root"
+        ></div>
+      </section>
+
+      <section class="player-panel player-two">
+        <h2>玩家 2：←／→</h2>
+
+        <div
+          id="player2-game"
+          class="game-root"
+        ></div>
+      </section>
+
+      <!-- 左右遊戲共用一份提示，避免兩側重複顯示。 -->
+      <div
+        id="shared-overlay"
+        class="shared-overlay"
+      >
+        <div class="shared-card dccs-panel">
+          <section
+            id="shared-loading"
+            class="shared-screen"
+          >
+            <h1>載入中…</h1>
+
+            <p>
+              正在準備兩位玩家的遊戲
+            </p>
+          </section>
+
+          <section
+            id="shared-tutorial"
+            class="shared-screen"
+            hidden
+          >
+            <div id="shared-tutorial-body"></div>
+
+            <p class="dccs-tutorial-keyhint">
+              按
+              <span class="dccs-kbd">Enter</span>
+              或
+              <span class="dccs-kbd">空白鍵</span>
+              開始
+            </p>
+          </section>
+
+          <section
+            id="shared-title"
+            class="shared-screen"
+            hidden
+          >
+            <h1>賽道攔截 · DCCS</h1>
+
+            <p class="shared-hint">
+              按
+              <span class="shared-key">Enter</span>
+              或
+              <span class="shared-key">空白鍵</span>
+              開始
+            </p>
+
+            <p id="shared-player-info"></p>
+          </section>
+
+          <section
+            id="shared-level"
+            class="shared-screen"
+            hidden
+          >
+            <div
+              id="shared-level-badge"
+              class="dccs-level-badge"
+            >
+              第 1 關
+            </div>
+
+            <p
+              id="shared-level-message"
+              class="dccs-level-message"
+            >
+              準備開始第 1 關！
+            </p>
+
+            <button
+              type="button"
+              id="shared-continue"
+              class="dccs-level-continue"
+            >
+              繼續
+            </button>
+
+          </section>
+
+          <section
+            id="shared-error"
+            class="shared-screen"
+            hidden
+          >
+            <h1>遊戲發生錯誤</h1>
+
+            <p id="shared-error-message">
+              無法載入雙人遊戲。
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div
+      id="final-result"
+      hidden
+    ></div>
+  </div>
+
+  <script
+    type="module"
+    src="./js/double.js"
+  ></script>
+</body>
+</html>

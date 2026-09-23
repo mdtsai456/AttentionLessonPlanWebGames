@@ -1,0 +1,444 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+
+  background: #111;
+  color: white;
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Noto Sans TC",
+    "PingFang TC",
+    "Microsoft JhengHei",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 遊戲資料填寫表單 */
+
+#setup-form {
+  width: min(720px, 92%);
+  margin: 30px auto;
+  padding: 24px;
+
+  background: #20252d;
+  border: 1px solid #394353;
+  border-radius: 16px;
+}
+
+#setup-form[hidden] {
+  display: none;
+}
+
+#setup-form h1 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.student-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+#setup-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  margin-bottom: 14px;
+}
+
+#setup-form input,
+#setup-form select {
+  width: 100%;
+  padding: 10px;
+
+  color: white;
+  background: #11151b;
+
+  border: 1px solid #4b5668;
+  border-radius: 7px;
+
+  font-size: 16px;
+}
+
+.control-hint {
+  text-align: center;
+}
+
+#setup-form button {
+  width: 100%;
+  padding: 12px;
+
+  color: white;
+  background: #4f7cff;
+
+  border: 0;
+  border-radius: 8px;
+
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#setup-form button:hover {
+  background: #6890ff;
+}
+
+/* 雙人遊戲主畫面 */
+
+#double-game {
+  position: relative;
+
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+
+  overflow: hidden;
+  background: #111;
+}
+
+#double-game[hidden] {
+  display: none;
+}
+
+.player-panel {
+  position: relative;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: hidden;
+
+  background-image:
+    url("../assets/Single.png");
+
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.player-one {
+  border-right: 2px solid
+    rgba(255, 255, 255, 0.35);
+}
+
+.player-panel h2 {
+  display: none;
+}
+
+.game-root {
+  position: absolute;
+  inset: 0;
+
+  overflow: hidden;
+  background: transparent;
+}
+
+.game-root canvas {
+  background: transparent !important;
+}
+
+/* 雙人模式只顯示外層共用提示。 */
+.game-root > .dccs-overlays {
+  display: none !important;
+}
+
+/* 雙人共用提示畫面 */
+
+.shared-overlay {
+  position: absolute;
+  inset: 0;
+
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  background:
+    rgba(0, 0, 0, 0.72);
+}
+
+.shared-overlay[hidden] {
+  display: none;
+}
+
+.shared-card {
+  width: min(92vw, 480px);
+  min-height: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 2rem 2.5rem;
+
+  color: #eee;
+  background: #14181f;
+
+  border: 1px solid #2c333f;
+  border-radius: 12px;
+
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+}
+
+.shared-screen {
+  width: 100%;
+}
+
+.shared-screen:not(#shared-tutorial) {
+  text-align: center;
+}
+
+.shared-screen[hidden] {
+  display: none;
+}
+
+/* 操作說明獨立鋪滿視窗，不受雙人遊戲 16:9 畫布限制。
+   其餘版型直接使用 overlays.js 的 .dccs-overlay-tutorial / .dccs-panel。 */
+.shared-overlay.tutorial-mode {
+  position: fixed;
+}
+
+.shared-screen:not(#shared-tutorial):not(#shared-level) h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+.shared-screen:not(#shared-tutorial):not(#shared-level) p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.shared-hint {
+  color: #dce8ff;
+}
+
+.shared-key {
+  display: inline-block;
+
+  margin: 0 3px;
+  padding: 0.1em 0.5em;
+
+  color: white;
+  background: #283445;
+
+  border: 1px solid #63738a;
+  border-radius: 4px;
+}
+
+#shared-player-info {
+  margin-top: 0.75rem;
+
+  color: #91a4c2;
+
+  font-size: 0.8rem;
+}
+
+/* 共用關卡提示畫面 */
+.shared-overlay.level-mode {
+  position: fixed;
+}
+
+#shared-level:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* 單人版顯示關卡提示時會把焦點放在按鈕上；雙人版為避免空白鍵誤觸不能真的
+   focus，但保留相同的視覺焦點圈。 */
+.shared-overlay.level-mode .dccs-level-continue {
+  outline: 4px solid rgba(56, 169, 0, 0.25);
+  outline-offset: 4px;
+}
+
+/* 最後成績畫面 */
+
+#final-result {
+  width: min(960px, 94vw);
+  max-height: calc(100vh - 32px);
+  margin: 16px auto;
+  padding: clamp(20px, 3vw, 32px);
+  overflow-y: auto;
+
+  background: #20252d;
+  border: 1px solid #394353;
+  border-radius: 16px;
+
+  text-align: center;
+}
+
+#final-result[hidden] {
+  display: none;
+}
+
+.result-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+}
+
+.result-pair-id {
+  margin: 0.45rem 0 1.1rem;
+  color: #91a4c2;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.result-players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+
+#final-result .result-player-card {
+  margin: 0;
+  padding: clamp(16px, 2.4vw, 24px);
+
+  background:
+    rgba(255, 255, 255, 0.05);
+
+  border-radius: 12px;
+  text-align: left;
+}
+
+.result-player-card h2 {
+  margin: 0 0 0.85rem;
+  color: #fff;
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  text-align: center;
+}
+
+.result-player-card p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.45rem 0;
+  color: #c7d0df;
+}
+
+.result-player-card strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-player-card .save-success,
+.result-player-card .save-error {
+  display: block;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.result-player-card .save-success {
+  color: #8ee6a4;
+}
+
+.result-player-card .save-error {
+  color: #ffb1b1;
+}
+
+.result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 1.25rem;
+}
+
+#final-result button {
+  padding: 12px 30px;
+
+  color: white;
+  background: #4f7cff;
+
+  border: 0;
+  border-radius: 8px;
+
+  cursor: pointer;
+}
+
+#back-to-lobby {
+  background: #2c333f;
+}
+
+/* 小螢幕調整 */
+
+@media (max-width: 900px) {
+  .student-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  #final-result {
+    width: 96vw;
+    padding: 14px;
+  }
+
+  .result-players {
+    gap: 8px;
+  }
+
+  #final-result .result-player-card {
+    padding: 12px 10px;
+  }
+
+  .result-player-card p {
+    display: block;
+    margin: 0.55rem 0;
+    text-align: center;
+  }
+
+  .result-player-card strong {
+    display: block;
+    margin-top: 0.12rem;
+  }
+
+  .result-actions {
+    flex-wrap: wrap;
+  }
+}

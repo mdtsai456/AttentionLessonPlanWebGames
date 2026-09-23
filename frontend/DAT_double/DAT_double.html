@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAT 動物追擊令・雙人版</title>
+  <link rel="stylesheet" href="DAT_double.css">
+  <script src="assets/animals/rabbit-hit-mask.js" defer></script>
+  <!-- 修改前：<script src="DAT_double.js" defer></script> -->
+<!-- 修改後： -->
+<!-- <script type="module" src="DAT_double.js" defer></script> -->
+<script type="module" src="js/main.js" defer></script>
+</head>
+<body>
+  <main class="game" aria-label="動物追擊令雙人遊戲">
+    <!-- 【新增】雙人合一呈現的遊戲教學頁面 (說明書) -->
+    <div class="overlay" id="tutorial-overlay">
+      <section class="tutorial-card">
+        <h1>DAT 動物追擊令・遊戲說明</h1>
+        <div class="instructions-content">
+          <div class="instruction-col">
+            <h2>🎮 玩家一 (左側)</h2>
+            <p>• 移動：<strong>W / A / S / D</strong></p>
+            <p>• 作答：<strong>空白鍵 (Space)</strong></p>
+          </div>
+          <div class="instruction-col">
+            <h2>🎮 玩家二 (右側)</h2>
+            <p>• 移動：<strong>鍵盤方向鍵 (↑ / ↓ / ← / →)</strong></p>
+            <p>• 作答：<strong>Enter 鍵</strong></p>
+          </div>
+        </div>
+        <div class="rule-box">
+          <h3>📌 遊戲規則</h3>
+          <p>1. 題目出現後，先移動準心瞄準動物（讓準心與動物 <strong>Overlap 重疊</strong>）。</p>
+          <p>2. 判斷題目是否正確：<strong>正確請按作答鍵，不正確請保持瞄準但不按鍵</strong>。</p>
+        </div>
+        <button class="primary" id="start-practice-btn" type="button">進入練習模式</button>
+      </section>
+    </div>
+    
+    <section class="player player-1" aria-label="玩家一">
+    <!--      -->
+    <aside class="progress-panel">
+      <span class="progress-label">動物追擊令</span>
+      <div class="progress-track" data-ui="progress" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="12" ariavaluenow="0">
+        <div data-ui="progress-fill"></div>
+      </div>
+    </aside>
+    <header class="score"><span>玩家一</span><strong data-ui="score">0 分</strong></header>
+
+    <div class="round" data-ui="round">第 1 / 12 題</div>
+    <button class="pause" data-ui="pause" type="button" disabled>暫停</button>
+    <section class="question-panel" aria-label="判斷題目">
+      <div class="question"><span class="caption" data-ui="question-type">等待瞄準</span><strong data-ui="question-text">—</strong></div>
+      <div class="time"><span data-ui="time-text">尚未開始</span><div class="time-track"><div data-ui="time-fill"></div></div></div>
+    </section>
+    <div class="animal-field" data-ui="field" aria-label="動物與玩家準心">
+      <div class="animal" data-ui="animal">
+        <img class="animal-image" data-ui="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+      </div>
+      <img class="crosshair" data-ui="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
+    </div>
+    <section class="answer-panel" aria-label="作答區">
+      <p class="rule">WASD 移動準心 · 正確按空白鍵，不正確不按</p>
+      <p data-ui="feedback" role="status" aria-live="polite">素材載入中…</p>
+      <div class="answer-buttons">
+        <button class="capture" data-ui="answer-true" type="button" disabled>正確 <span>空白鍵 / 點選</span></button>
+      </div>
+    </section>
+    <div class="movement" aria-label="準心方向控制">
+      <button data-move="up" aria-label="準心向上">↑</button>
+      <button data-move="left" aria-label="準心向左">←</button>
+      <button data-move="down" aria-label="準心向下">↓</button>
+      <button data-move="right" aria-label="準心向右">→</button>
+    </div>
+    <div class="overlay" data-ui="results" hidden>
+      <section class="result-card" role="dialog" aria-label="玩家一挑戰完成">
+        <h1 data-ui="result-title">挑戰完成！</h1>
+        <strong data-ui="final-score"></strong>
+        <p data-ui="summary"></p>
+        <p data-ui="accuracy"></p>
+        <button class="primary" data-ui="restart" type="button">再玩一次</button>
+      </section>
+    </div>
+    </section>
+    
+    <section class="player player-2" aria-label="玩家二">
+      <aside class="progress-panel">
+        <span class="progress-label">動物追擊令</span>
+        <!-- aria-valuemax:題數 -->
+        <div class="progress-track" data-ui="progress" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="12" aria-valuenow="0">
+          <div data-ui="progress-fill"></div>
+        </div>
+      </aside>
+      
+    <header class="score"><span>玩家二</span><strong data-ui="score">0 分</strong></header>
+    <div class="round" data-ui="round">第 1 / 12 題</div>
+    <button class="pause" data-ui="pause" type="button" disabled>暫停</button>
+    <section class="question-panel" aria-label="判斷題目">
+      <div class="question"><span class="caption" data-ui="question-type">等待瞄準</span><strong data-ui="question-text">—</strong></div>
+      <div class="time"><span data-ui="time-text">尚未開始</span><div class="time-track"><div data-ui="time-fill"></div></div></div>
+    </section>
+    <div class="animal-field" data-ui="field" aria-label="動物與玩家準心">
+      <div class="animal" data-ui="animal">
+        <img class="animal-image" data-ui="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+      </div>
+      <img class="crosshair" data-ui="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
+    </div>
+    <section class="answer-panel" aria-label="作答區">
+      <p class="rule">方向鍵 移動準心 · 正確按Enter，不正確不按</p>
+      <p data-ui="feedback" role="status" aria-live="polite">素材載入中…</p>
+      <div class="answer-buttons">
+        <button class="capture" data-ui="answer-true" type="button" disabled>正確 <span>Enter / 點選</span></button>
+      </div>
+    </section>
+    <div class="movement" aria-label="準心方向控制">
+      <button data-move="up" aria-label="準心向上">↑</button>
+      <button data-move="left" aria-label="準心向左">←</button>
+      <button data-move="down" aria-label="準心向下">↓</button>
+      <button data-move="right" aria-label="準心向右">→</button>
+    </div>
+    <!-- 玩家一 / 玩家二 結算覆蓋層 -->
+    <div class="overlay" data-ui="results" hidden>
+      <section class="result-card" role="dialog" aria-label="玩家二挑戰完成">
+        <h1 data-ui="result-title">挑戰完成！</h1>
+        <strong data-ui="final-score"></strong>
+        <p data-ui="summary"></p>
+        <p data-ui="accuracy"></p>
+        <button class="primary" data-ui="restart" type="button">再玩一次</button>
+        <button class="secondary" data-ui="back-home" type="button">返回首頁</button> <!-- 導回首頁按鈕 -->
+      </section>
+    </div>
+      </section>
+    </section>
+          <!-- 中途離開遊戲的警告彈窗 -->
+    <div class="overlay" id="leave-warning-overlay" hidden>
+      <section class="result-card leave-card">
+        <h2>⚠️ 確定要離開遊戲嗎？</h2>
+        <p class="warning-text">若沒有完整遊玩並通關，當前遊戲數據將不會儲存並直接遺失！</p>
+        <div class="warning-actions">
+          <button class="secondary" id="btn-cancel-leave" type="button">繼續遊玩</button>
+          <button class="danger" id="btn-confirm-leave" type="button">確定離開 (數據不保存)</button>
+        </div>
+    </div>
+  </main>
+</body>
+</html>
