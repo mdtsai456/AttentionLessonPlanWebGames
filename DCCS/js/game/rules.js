@@ -28,7 +28,10 @@ export function isCorrect(rule, target, answer) {
     return !!target.frame && answer.id === target.frame.id;
   }
   if (rule === 'category') {
-    return !!target.content && answer.categoryId === target.content.categoryId;
+    return !!target.content && (
+      answer.id === target.content.id ||
+      answer.categoryId === target.content.categoryId
+    );
   }
   if (rule === 'model') {
     return !!target.content && answer.id === target.content.id;

@@ -266,15 +266,10 @@ export class Track {
 
     const target = this._target;
 
-    // 每次按下排入一格；每幀持續推進已排入的動畫。
-    if (this._valveShape) {
-      if (shapePresses > 0) this._valveShape.step(shapePresses);
-      this._valveShape.update(dt);
-    }
-    if (this._valveObject) {
-      if (objectPresses > 0) this._valveObject.step(objectPresses);
-      this._valveObject.update(dt);
-    }
+    // 先把已經在轉的動畫走完並判定，這一幀新按的鍵下一幀才開始轉，
+    // 避免目標剛好通過時，按鍵把還停在正中間的正確答案帶走。
+    if (this._valveShape) this._valveShape.update(dt);
+    if (this._valveObject) this._valveObject.update(dt);
 
     stepTarget(target, dt, CONFIG.TARGET_SPEED);
 
@@ -299,6 +294,9 @@ export class Track {
       target.passedObject = true;
       this._judge(this._valveObject, target);
     }
+
+    if (this._valveShape && shapePresses > 0) this._valveShape.step(shapePresses);
+    if (this._valveObject && objectPresses > 0) this._valveObject.step(objectPresses);
 
     if (hasReachedZ(target, 0)) {
       if (!this._activateNextLevel()) this._spawnTrial();

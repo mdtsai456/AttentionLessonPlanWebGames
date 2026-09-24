@@ -943,6 +943,7 @@ async function finishOrAdvance() {
     showMidway();
     return;
   }
+  await window.showStageClear(nextIndex);
   prepareStage();
 }
 

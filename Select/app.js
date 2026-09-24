@@ -132,24 +132,24 @@ async function enterSelectedGame() {
   const isDouble = storedMode === "double" || storedMode === "dual";
   const ROUTES = {
     DCCS: {
-      single: "../DCCS/index.html",
-      double: "../DCCS/double.html",
+      single: "../tutorial/DCCS_tutorial.html",
+      double: "../tutorial/DCCS_double_tutorial.html",
     },
     EFT: {
-      single: "../DAT_single/DAT_tutorial.html",
-      double: "../DAT_double/DAT_double.html",
+      single: "../tutorial/DAT_tutorial.html",
+      double: "../tutorial/DAT_double_tutorial.html",
     },
     DAT: {
-      single: "../EFT_single/EFT_single.html",
-      double: "../EFT_double/EFT_double.html",
+      single: "../tutorial/EFT_tutorial.html",
+      double: "../tutorial/EFT_double_tutorial.html",
     },
     TGame: {
-      single: "../TGame1/index.html",
-      double: "../TGame2/index.html",
+      single: "../tutorial/TGame_tutorial.html",
+      double: "../tutorial/TGame_double_tutorial.html",
     },
     InstructionGame: {
-      single: "../IM1/index.html",
-      double: "../IM1/index.html",
+      single: "../tutorial/InstructionGame_tutorial.html",
+      double: "../tutorial/InstructionGame_tutorial.html",
     },
   };
   const pages = ROUTES[game.id];

@@ -1,5 +1,9 @@
 // 可調整每局題數與作答後的回饋時間。素材順序：上、下、左、右。
-const TOTAL_ROUNDS = 20;
+const STAGE_COUNT = 6;
+const QUESTIONS_PER_STAGE = 6;
+const TOTAL_ROUNDS = STAGE_COUNT * QUESTIONS_PER_STAGE;
+const MID_STAGE = 3;
+const MID_ROUND = MID_STAGE * QUESTIONS_PER_STAGE;
 const FEEDBACK_MS = 1100;
 const TARGET_MS = 1000;
 const styles = [
@@ -8,11 +12,11 @@ const styles = [
   { normal: 6138, opposite: 6134 },
   { normal: 6146, opposite: 6142 }
 ];
-function createPlayer(element, keyBindings) {
+function createPlayer(element, keyBindings, playerIndex) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
   const buttons = [...element.querySelectorAll('[data-direction]')];
   const panel = element.querySelector('.answer-panel');
-  let questions = [], index = 0, score = 0, phase = 'intro', timer;
+  let questions = [], index = 0, score = 0, phase = 'intro', timer, passedMid = false;
   const pick = (items) => items[Math.floor(Math.random() * items.length)];
   function shuffle(items) {
     for (let i = items.length - 1; i > 0; i--) {
@@ -35,7 +39,9 @@ function createPlayer(element, keyBindings) {
     setEnabled(false);
     delete panel.dataset.result;
     $('feedback').textContent = '記住黃色泡泡的位置';
-    $('round').textContent = `第 ${index + 1} / ${TOTAL_ROUNDS} 題`;
+    const stage = Math.floor(index / QUESTIONS_PER_STAGE) + 1;
+    const questionNo = (index % QUESTIONS_PER_STAGE) + 1;
+    $('round').textContent = `第 ${questionNo} / ${QUESTIONS_PER_STAGE} 題（第 ${stage} / ${STAGE_COUNT} 關）`;
     const field = $('bubble-field');
     field.replaceChildren();
     const question = questions[index];
@@ -71,7 +77,7 @@ function createPlayer(element, keyBindings) {
   }
   function startGame() {
     clearTimeout(timer);
-    index = 0; score = 0;
+    index = 0; score = 0; passedMid = false;
     // 四種條件平均分配，避免一局只有單一方向或規則。
     questions = shuffle(Array.from({ length: TOTAL_ROUNDS }, (_, i) => ({
       direction: i % 2 ? 'right' : 'left', opposite: Math.floor(i / 2) % 2 === 1,
@@ -93,6 +99,21 @@ function createPlayer(element, keyBindings) {
     $('feedback').textContent = correct ? '答對了！＋1 分' : `${question.opposite ? '虛線要反向！' : '再加油！'}應選${expected === 'left' ? '左 ←' : '右 →'}`;
     index++; updateProgress();
     timer = setTimeout(() => {
+      if (index === MID_ROUND && !passedMid) {
+        phase = 'break';
+        $('feedback').textContent = '第 3 關已結束，等待另一位玩家';
+        waitForMidBreak(playerIndex, () => {
+          passedMid = true;
+          renderQuestion();
+        });
+        return;
+      }
+      if (index % QUESTIONS_PER_STAGE === 0 && index < TOTAL_ROUNDS) {
+        phase = 'stage_clear';
+        $('feedback').textContent = `第 ${index / QUESTIONS_PER_STAGE} 關已結束，等待另一位玩家`;
+        waitForStageClear(playerIndex, index / QUESTIONS_PER_STAGE, () => renderQuestion());
+        return;
+      }
       if (index < TOTAL_ROUNDS) { renderQuestion(); }
       else {
         phase = 'finished';
@@ -116,9 +137,46 @@ function createPlayer(element, keyBindings) {
 
 // 兩位玩家的題目、計時與分數各自獨立。
 const players = [
-  createPlayer(document.querySelector('.player-1'), { KeyA: 'left', KeyD: 'right' }),
-  createPlayer(document.querySelector('.player-2'), { ArrowLeft: 'left', ArrowRight: 'right' })
+  createPlayer(document.querySelector('.player-1'), { KeyA: 'left', KeyD: 'right' }, 0),
+  createPlayer(document.querySelector('.player-2'), { ArrowLeft: 'left', ArrowRight: 'right' }, 1)
 ];
+
+const midWait = [false, false];
+const midResume = [null, null];
+
+const stageWait = [null, null];
+const stageResume = [null, null];
+
+function waitForStageClear(playerIndex, level, resume) {
+  stageWait[playerIndex] = level;
+  stageResume[playerIndex] = resume;
+  if (stageWait[0] !== level || stageWait[1] !== level) return;
+  window.showStageClear(level).then(() => {
+    const resumes = stageResume.slice();
+    stageWait[0] = stageWait[1] = null;
+    stageResume[0] = stageResume[1] = null;
+    resumes.forEach((fn) => fn && fn());
+  });
+}
+
+function waitForMidBreak(playerIndex, resume) {
+  midWait[playerIndex] = true;
+  midResume[playerIndex] = resume;
+  if (midWait[0] && midWait[1]) {
+    document.getElementById('mid-break').hidden = false;
+  }
+}
+
+document.getElementById('mid-continue').addEventListener('click', () => {
+  const resumes = midResume.slice();
+  midWait[0] = midWait[1] = false;
+  midResume[0] = midResume[1] = null;
+  document.getElementById('mid-break').hidden = true;
+  resumes.forEach((resume) => resume && resume());
+});
+document.getElementById('mid-lobby').addEventListener('click', () => {
+  window.location.href = '../Select/index.html';
+});
 
 // 預先載入素材後，同時開始兩位玩家的第一題。
 const imagePaths = [

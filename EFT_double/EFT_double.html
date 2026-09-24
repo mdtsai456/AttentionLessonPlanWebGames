@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EFT 漂浮泡泡・雙人版</title>
-  <link rel="stylesheet" href="EFT_double.css">
+  <link rel="stylesheet" href="EFT_double.css?v=3">
+  <script src="../shared/stage-clear.js" defer></script>
   <script src="EFT_double.js" defer></script>
 </head>
 <body>
@@ -12,10 +13,10 @@
     <section class="player player-1" aria-label="玩家一">
     <aside class="progress-panel">
       <span class="progress-label">漂浮泡泡</span>
-      <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0"><div data-ui="progress-fill"></div></div>
+      <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div data-ui="progress-fill"></div></div>
     </aside>
     <header class="score"><span>玩家一</span><strong data-ui="score">0 分</strong></header>
-    <div class="round" data-ui="round">第 1 / 20 題</div>
+    <div class="round" data-ui="round">第 1 / 6 題（第 1 / 6 關）</div>
     <div class="bubble-field" data-ui="bubble-field" aria-label="請觀察黃色亮起的目標泡泡"></div>
     <section class="answer-panel" aria-label="作答區">
       <h1>作答</h1>
@@ -35,10 +36,10 @@
     <section class="player player-2" aria-label="玩家二">
     <aside class="progress-panel">
       <span class="progress-label">漂浮泡泡</span>
-      <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0"><div data-ui="progress-fill"></div></div>
+      <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div data-ui="progress-fill"></div></div>
     </aside>
     <header class="score"><span>玩家二</span><strong data-ui="score">0 分</strong></header>
-    <div class="round" data-ui="round">第 1 / 20 題</div>
+    <div class="round" data-ui="round">第 1 / 6 題（第 1 / 6 關）</div>
     <div class="bubble-field" data-ui="bubble-field" aria-label="請觀察黃色亮起的目標泡泡"></div>
     <section class="answer-panel" aria-label="作答區">
       <h1>作答</h1>
@@ -55,6 +56,14 @@
       </section>
     </div>
     </section>
+    <div class="overlay" id="mid-break" hidden>
+      <section class="mid-card" role="dialog" aria-modal="true" aria-label="前 10 題結束">
+        <h2>挑戰完成！</h2>
+        <p>第 3 關已結束<br>要繼續遊玩嗎？</p>
+        <button id="mid-continue" class="primary" type="button">繼續遊玩</button>
+        <button id="mid-lobby" class="mid-lobby" type="button">返回大廳</button>
+      </section>
+    </div>
   </main>
 </body>
 </html>

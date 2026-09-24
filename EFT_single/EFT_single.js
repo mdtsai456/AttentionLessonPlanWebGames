@@ -1,6 +1,9 @@
 // 可調整每局題數與作答後的回饋時間。素材順序：上、下、左、右。
-const TOTAL_ROUNDS = 20;
-const MID_ROUND = 10;
+const STAGE_COUNT = 6;
+const QUESTIONS_PER_STAGE = 6;
+const TOTAL_ROUNDS = STAGE_COUNT * QUESTIONS_PER_STAGE;
+const MID_STAGE = 3;
+const MID_ROUND = MID_STAGE * QUESTIONS_PER_STAGE;
 const FEEDBACK_MS = 1100;
 const TARGET_MS = 1000;
 const styles = [
@@ -36,7 +39,9 @@ function renderQuestion() {
   setEnabled(false);
   delete panel.dataset.result;
   $('feedback').textContent = '記住黃色泡泡的位置';
-  $('round').textContent = `第 ${index + 1} / ${TOTAL_ROUNDS} 題`;
+  const stage = Math.floor(index / QUESTIONS_PER_STAGE) + 1;
+  const questionNo = (index % QUESTIONS_PER_STAGE) + 1;
+  $('round').textContent = `第 ${questionNo} / ${QUESTIONS_PER_STAGE} 題（第 ${stage} / ${STAGE_COUNT} 關）`;
   const field = $('bubble-field');
   field.replaceChildren();
   const question = questions[index];
@@ -105,7 +110,7 @@ function finishGame() {
   $('accuracy').textContent = `答對 ${score} 題・正確率 ${Math.round(score / TOTAL_ROUNDS * 100)}%`;
   $('results').hidden = false;
   $('restart').focus();
-  void saveCurrentRun(TOTAL_ROUNDS);
+  void saveCurrentRun(STAGE_COUNT);
 }
 
 function saveCurrentRun(stage) {
@@ -182,6 +187,11 @@ function answer(direction) {
       showMidBreak();
       return;
     }
+    if (index % QUESTIONS_PER_STAGE === 0 && index < TOTAL_ROUNDS) {
+      phase = 'stage_clear';
+      window.showStageClear(index / QUESTIONS_PER_STAGE).then(() => renderQuestion());
+      return;
+    }
     if (index < TOTAL_ROUNDS) {
       renderQuestion();
       return;
@@ -210,7 +220,7 @@ $('btn-continue').addEventListener('click', () => {
 $('btn-lobby').addEventListener('click', async () => {
   $('btn-continue').disabled = true;
   $('btn-lobby').disabled = true;
-  await saveCurrentRun(MID_ROUND);
+  await saveCurrentRun(MID_STAGE);
   returnToLobby();
 });
 // 等圖片載入完成才開始，讓第一題也能完整顯示黃色目標一秒。

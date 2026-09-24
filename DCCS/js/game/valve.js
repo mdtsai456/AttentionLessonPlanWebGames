@@ -66,8 +66,20 @@ export class Valve {
 
   centerIndex() {
     const n = this.items.length;
-    const idx = Math.round(this.theta);
-    return wrapUnsigned(idx, n);
+    // 先停在已轉完的那一格。轉動到一半時，兩邊一樣近就維持這一格，
+    // 避免 Math.round 在負向閥門提早跳到下一格，把還在正中間的正確答案判錯。
+    let best = wrapUnsigned(this.direction * this._settledSteps, n);
+    let bestAbs = Infinity;
+    const theta = this.theta;
+    for (let i = 0; i < n; i++) {
+      const off = wrapUnsigned(this.direction * (i - theta) + 0.5, n) - 0.5;
+      const abs = Math.abs(off);
+      if (abs < bestAbs - 1e-6) {
+        bestAbs = abs;
+        best = i;
+      }
+    }
+    return best;
   }
 
   answer() {

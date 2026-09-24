@@ -132,5 +132,5 @@ export async function resolveCurrentDay(player) {
 }
 
 export function returnToLobby() {
-  window.location.href = '../games.html';
+  window.location.href = '../../Home/index.html';
 }

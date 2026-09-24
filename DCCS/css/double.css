@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "MaokenAssortedSans";
+  src: url("../fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 120%;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -11,17 +19,7 @@ body {
   background: #111;
   color: white;
 
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "Noto Sans TC",
-    "PingFang TC",
-    "Microsoft JhengHei",
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: "MaokenAssortedSans", "Microsoft JhengHei", sans-serif;
 }
 
 body {
@@ -119,8 +117,8 @@ select {
 #double-game {
   position: relative;
 
-  width: min(100vw, calc(100vh * 16 / 9));
-  height: min(100vh, calc(100vw * 9 / 16));
+  width: 100vw;
+  height: 100vh;
 
   margin: 0 auto;
 
@@ -278,13 +276,30 @@ select {
   position: fixed;
 }
 
-#shared-level:not([hidden]) {
+#shared-level:not([hidden]),
+#shared-break:not([hidden]) {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.75rem;
   width: 100%;
   height: 100%;
+  padding-top: clamp(48px, 7vh, 72px);
+  box-sizing: border-box;
+}
+
+#shared-level .dccs-level-message,
+#shared-break .dccs-level-message {
+  margin: 0;
+}
+
+#shared-break .dccs-break-actions {
+  width: min(80%, 280px);
+}
+
+#shared-level .dccs-level-continue {
+  margin-top: 0.25rem;
 }
 
 /* 單人版顯示關卡提示時會把焦點放在按鈕上；雙人版為避免空白鍵誤觸不能真的

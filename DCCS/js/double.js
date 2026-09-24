@@ -1,4 +1,4 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=2';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js';
@@ -31,6 +31,15 @@ const sharedTutorialBody =
 
 const sharedLevel =
   document.getElementById('shared-level');
+
+const sharedBreak =
+  document.getElementById('shared-break');
+
+const sharedBreakContinue =
+  document.getElementById('shared-break-continue');
+
+const sharedBreakLobby =
+  document.getElementById('shared-break-lobby');
 
 const sharedError =
   document.getElementById('shared-error');
@@ -70,22 +79,27 @@ function showSharedScreen(target) {
     sharedTutorial,
     sharedTitle,
     sharedLevel,
+    sharedBreak,
     sharedError,
   ];
 
   for (const screen of screens) {
+    if (!screen) continue;
     screen.hidden =
       screen !== target;
   }
 
+  const levelStyle =
+    target === sharedLevel || target === sharedBreak;
+
   sharedOverlay.classList.toggle(
     'level-mode',
-    target === sharedLevel
+    levelStyle
   );
 
   sharedOverlay.classList.toggle(
     'dccs-overlay-level',
-    target === sharedLevel
+    levelStyle
   );
 
   sharedOverlay.classList.toggle(
@@ -267,11 +281,13 @@ async function startSession(player1, player2) {
 
     showSharedScreen(sharedLoading);
 
-    await showSharedTutorial();
+    // 操作說明改由 tutorial/DCCS_tutorial.html 進入前顯示。
 
-    sharedPlayerInfo.textContent =
-      `玩家 1：${player1.caseId}　｜　` +
-      `玩家 2：${player2.caseId}`;
+    if (sharedPlayerInfo) {
+      sharedPlayerInfo.textContent =
+        `玩家 1：${player1.caseId}　｜　` +
+        `玩家 2：${player2.caseId}`;
+    }
 
     const playerPhases = {
       1: 'loading',
@@ -288,7 +304,7 @@ async function startSession(player1, player2) {
     function getInternalContinueButtons() {
       return Array.from(
         doubleGame.querySelectorAll(
-          '.dccs-level-continue'
+          '.game-root .dccs-overlay-level:not(.dccs-overlay-break) .dccs-level-continue'
         )
       );
     }
@@ -341,6 +357,36 @@ async function startSession(player1, player2) {
       }
     }
 
+    function showSharedBreak() {
+      canContinueWithSpace = !spaceDown;
+
+      showSharedScreen(sharedBreak);
+
+      if (
+        document.activeElement &&
+        typeof document.activeElement.blur ===
+          'function'
+      ) {
+        document.activeElement.blur();
+      }
+    }
+
+    function chooseBreak(choice) {
+      const buttons = doubleGame.querySelectorAll(
+        `.game-root [data-break="${choice}"]`
+      );
+
+      if (buttons.length < 2) {
+        return;
+      }
+
+      canContinueWithSpace = false;
+
+      for (const button of buttons) {
+        button.click();
+      }
+    }
+
     function continueBothPlayers() {
       if (continueLocked) {
         return;
@@ -386,6 +432,14 @@ async function startSession(player1, player2) {
           sharedTitle
         );
 
+        return;
+      }
+
+      if (
+        playerPhases[1] === 'continue-or-lobby' &&
+        playerPhases[2] === 'continue-or-lobby'
+      ) {
+        window.setTimeout(showSharedBreak, 0);
         return;
       }
 
@@ -465,6 +519,14 @@ async function startSession(player1, player2) {
         canContinueWithSpace
       ) {
         continueBothPlayers();
+        return;
+      }
+
+      if (
+        !sharedBreak.hidden &&
+        canContinueWithSpace
+      ) {
+        chooseBreak('continue');
       }
     }
 
@@ -480,7 +542,7 @@ async function startSession(player1, player2) {
 
       spaceDown = false;
 
-      if (!sharedLevel.hidden) {
+      if (!sharedLevel.hidden || !sharedBreak.hidden) {
         canContinueWithSpace = true;
       }
     }
@@ -499,6 +561,26 @@ async function startSession(player1, player2) {
     sharedContinue.addEventListener(
       'click',
       handleSharedContinue
+    );
+
+    function handleBreakContinue(event) {
+      event.preventDefault();
+      chooseBreak('continue');
+    }
+
+    function handleBreakLobby(event) {
+      event.preventDefault();
+      chooseBreak('lobby');
+    }
+
+    sharedBreakContinue.addEventListener(
+      'click',
+      handleBreakContinue
+    );
+
+    sharedBreakLobby.addEventListener(
+      'click',
+      handleBreakLobby
     );
 
     function removeSharedEvents() {
@@ -521,6 +603,16 @@ async function startSession(player1, player2) {
       sharedContinue.removeEventListener(
         'click',
         handleSharedContinue
+      );
+
+      sharedBreakContinue.removeEventListener(
+        'click',
+        handleBreakContinue
+      );
+
+      sharedBreakLobby.removeEventListener(
+        'click',
+        handleBreakLobby
       );
     }
 
@@ -644,6 +736,8 @@ async function startSession(player1, player2) {
           100
         ).toFixed(1);
 
+      // 結算表先隱藏，成績送出後直接回 Home。需要時再把下面整段註解打開。
+      /*
       doubleGame.hidden = true;
       hideSharedOverlay();
       finalResult.hidden = false;
@@ -751,6 +845,8 @@ async function startSession(player1, player2) {
             returnToLobby
           );
       }
+      */
+      window.location.href = '../Select/index.html';
     } catch (error) {
       removeSharedEvents();
 

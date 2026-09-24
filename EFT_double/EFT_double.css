@@ -1,15 +1,26 @@
+@font-face {
+  font-family: "MaokenAssortedSans";
+  src: url("fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 120%;
+}
+
 /* 基本設定 */
 * {
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
-  min-height: 100svh;
-  display: grid;
-  place-items: center;
   background: #164e62;
-  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  font-family: "MaokenAssortedSans", "Microsoft JhengHei", "PingFang TC", sans-serif;
   color: #175467;
 }
 
@@ -30,8 +41,10 @@ button:focus-visible {
 
 /* 雙人畫面：左右各一半，1cqw 為各自遊戲區寬度的 1%。 */
 .game {
-  width: min(100vw, 177.68svh);
-  aspect-ratio: 1672 / 941;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
@@ -53,13 +66,13 @@ button:focus-visible {
 .progress-panel {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 4.8%;
+  width: 4.2%;
   background: #fffbedee;
-  border-radius: 0 3cqw 3cqw 0;
+  border-radius: 0 2cqw 2cqw 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2cqw;
+  gap: 1.2cqw;
   padding: 2% 0;
 }
 
@@ -71,14 +84,14 @@ button:focus-visible {
 
 /* 題數往內移，避開右側進度條。 */
 .player-2 .round {
-  right: 7%;
+  right: 8%;
 }
 
 .progress-label {
   writing-mode: vertical-rl;
-  font-size: 2.8cqw;
+  font-size: 2.1cqw;
   font-weight: 800;
-  letter-spacing: .15em;
+  letter-spacing: .12em;
 }
 
 .progress-track {
@@ -103,29 +116,29 @@ button:focus-visible {
 /* 分數與題數 */
 .score {
   position: absolute;
-  left: 7.4%;
-  top: 3%;
+  left: 7%;
+  top: 2.2%;
   display: flex;
   align-items: center;
-  width: 51%;
-  height: 8%;
-  border: .6cqw solid white;
-  border-radius: .8cqw;
+  width: 46%;
+  height: 6.6%;
+  border: .4cqw solid white;
+  border-radius: .7cqw;
   background: #f4fffd;
-  box-shadow: 0 .2cqw .4cqw #16647333;
-  font-size: 3cqw;
+  box-shadow: 0 .15cqw .3cqw #16647333;
+  font-size: 2.2cqw;
 }
 
 .score span {
   display: grid;
   place-items: center;
-  height: 140%;
-  width: 35%;
+  height: 100%;
+  width: 34%;
   background: linear-gradient(#ffce44,#e9a719);
-  border-radius: .8cqw;
+  border-radius: .5cqw;
   color: white;
   font-weight: 900;
-  text-shadow: 0 .15cqw #996723;
+  text-shadow: 0 .1cqw #996723;
 }
 
 .score strong {
@@ -136,27 +149,27 @@ button:focus-visible {
 .round {
   position: absolute;
   right: 3%;
-  top: 5%;
-  font-size: 2.3cqw;
+  top: 2.4%;
+  font-size: 1.85cqw;
   font-weight: bold;
   background: #ffffffd9;
-  padding: .5em 1em;
+  padding: .35em .8em;
   border-radius: 2em;
 }
 
 /* 泡泡區域：left / top 調位置，width / height 調範圍 */
 .bubble-field {
   position: absolute;
-  left: 10%;
-  top: 17%;
-  width: 83%;
-  height: 42%;
+  left: 12%;
+  top: 12%;
+  width: 78%;
+  height: 48%;
 }
 
 /* 泡泡大小：width 為泡泡區域寬度的百分比；各顆位置由 JS 的 positions 設定 */
 .bubble {
   position: absolute;
-  width: 23%;
+  width: 22%;
   aspect-ratio: 1;
 }
 
@@ -173,68 +186,68 @@ button:focus-visible {
 /* 中央作答區與提示文字 */
 .answer-panel {
   position: absolute;
-  left: 32%;
-  bottom: 3%;
+  left: 30%;
+  bottom: 2%;
   width: 40%;
-  height: 24%;
+  height: 28%;
   background: #287fae70;
   border: .2cqw solid #c0faff66;
-  border-radius: 3cqw;
+  border-radius: 2cqw;
   display: flex;
   flex-direction: column;
   justify-content: center;
   text-align: center;
-  padding: 1cqw;
+  padding: .4cqw;
   color: white;
 }
 
 .answer-panel h1 {
   position: absolute;
-  top: -4.2cqw;
+  top: -3.6cqw;
   left: 0;
   width: 100%;
-  font-size: 4cqw;
+  font-size: 3.8cqw;
   margin: 0;
-  text-shadow: 0 .25cqw #378cab;
+  text-shadow: 0 .15cqw #378cab;
 }
 
 [data-ui="feedback"] {
-  font-size: 3cqw;
+  font-size: 2.4cqw;
   font-weight: bold;
-  margin: .5em 0;
+  margin: .2em 0;
 }
 
 .keyboard-hint {
-  font-size: 2cqw;
-  margin: .5em 0;
+  font-size: 1.75cqw;
+  margin: .15em 0;
 }
 
 /* 左右作答按鈕：width 調大小，bottom 調垂直位置 */
 .direction {
   position: absolute;
-  bottom: 9%;
-  width: 17%;
+  bottom: 5%;
+  width: 16%;
   aspect-ratio: 1;
-  border: 1.3cqw solid #efffff;
-  border-radius: 3.5cqw;
+  border: .7cqw solid #efffff;
+  border-radius: 2cqw;
   background: #cf79f4;
-  box-shadow: 0 .3cqw .25cqw #24788c33;
+  box-shadow: 0 .2cqw .2cqw #24788c33;
   display: grid;
   place-items: center;
   color: #933acf;
 }
 
 .direction span {
-  font-size: 6cqw;
+  font-size: 5.4cqw;
   line-height: 1;
 }
 
 .direction.left {
-  left: 11%;
+  left: 10%;
 }
 
 .direction.right {
-  right: 7%;
+  right: 8%;
 }
 
 .direction:hover:not(:disabled) {
@@ -283,15 +296,15 @@ button:focus-visible {
 .result-card h2 {
   position: absolute;
   top: -3%;
-  left: 32%;
-  width: 36%;
+  left: 28%;
+  width: 44%;
   margin: 0;
   padding: .25em;
   border-radius: 2cqw;
   background: #24afe0;
   color: white;
-  font-size: 3.6cqw;
-  box-shadow: .3cqw .4cqw #168eb7;
+  font-size: 2.4cqw;
+  box-shadow: .2cqw .25cqw #168eb7;
 }
 
 /* 再玩一次按鈕 */
@@ -301,7 +314,7 @@ button:focus-visible {
   border-radius: 3em;
   background: #2ec75b;
   color: white;
-  font-size: 2.5cqw;
+  font-size: 1.7cqw;
   font-weight: bold;
   box-shadow: 0 .25cqw #1ba548;
 }
@@ -316,7 +329,7 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 1cqw;
-  font-size: 3cqw;
+  font-size: 1.8cqw;
 }
 
 .result-card p {
@@ -325,10 +338,56 @@ button:focus-visible {
 
 [data-ui="final-score"] {
   color: #139bc1;
-  font-size: 6cqw;
+  font-size: 3.2cqw;
 }
 
 /* 減少動態效果的偏好設定 */
+#mid-break {
+  z-index: 8;
+  background: rgba(44, 24, 8, 0.45);
+}
+
+.mid-card {
+  width: min(420px, 46%);
+  padding: 1.6rem 1.4rem 1.3rem;
+  border-radius: 28px;
+  background: #fffefd;
+  text-align: center;
+}
+
+.mid-card h2 {
+  position: static;
+  width: auto;
+  margin: 0 0 0.6rem;
+  padding: 0.35em 0.8em;
+  font-size: 1.6rem;
+}
+
+.mid-card p {
+  margin: 0 0 0.8rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.mid-card .primary,
+.mid-lobby {
+  display: block;
+  width: min(240px, 80%);
+  margin: 0.55rem auto 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55em 1.2em;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mid-lobby {
+  background: #24afe0;
+  color: white;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

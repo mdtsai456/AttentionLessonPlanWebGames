@@ -96,6 +96,7 @@ const session = {
   startedAt: 0,
   timerId: null,
   endReason: "",
+  pastMid: false,
 };
 
 const players = {
@@ -108,6 +109,22 @@ replayBtn.addEventListener("click", () => {
 });
 
 backBtn.addEventListener("click", () => {
+  location.href = "../Select/index.html";
+});
+
+const midBreakEl = document.getElementById("mid-break");
+document.getElementById("mid-continue").addEventListener("click", () => {
+  session.pastMid = true;
+  session.playing = true;
+  players.p1.midReady = false;
+  players.p2.midReady = false;
+  midBreakEl.classList.add("is-hidden");
+  clearInterval(session.timerId);
+  session.timerId = setInterval(tick, 1000);
+  presentNextQuestion(players.p1);
+  presentNextQuestion(players.p2);
+});
+document.getElementById("mid-lobby").addEventListener("click", () => {
   location.href = "../Select/index.html";
 });
 
@@ -204,13 +221,17 @@ function startGame(timeLimitSec) {
   session.playing = true;
   session.startedAt = Date.now();
   session.endReason = "";
+  session.pastMid = false;
   resultEl.classList.add("is-hidden");
+  document.getElementById("mid-break").classList.add("is-hidden");
 
   [players.p1, players.p2].forEach((player) => {
     player.index = 0;
     player.score = 0;
     player.busy = false;
     player.finished = false;
+    player.midReady = false;
+    player.stageReady = 0;
     player.answers = [];
     player.promptEl.classList.remove("is-hidden");
     player.itemLeft.classList.remove("is-fading");
@@ -223,6 +244,12 @@ function startGame(timeLimitSec) {
 
   renderTimer();
   session.timerId = setInterval(tick, 1000);
+}
+
+function showMidBreak() {
+  session.playing = false;
+  clearInterval(session.timerId);
+  document.getElementById("mid-break").classList.remove("is-hidden");
 }
 
 function tick() {
@@ -306,6 +333,33 @@ async function chooseDirection(player, choice) {
     return;
   }
 
+  if (!session.pastMid && player.index === 2) {
+    player.midReady = true;
+    player.busy = true;
+    player.promptEl.textContent = "等待對方完成第 3 關";
+    if (players.p1.midReady && players.p2.midReady) showMidBreak();
+    return;
+  }
+
+  const finishedLevel = player.index + 1;
+  player.stageReady = finishedLevel;
+  player.busy = true;
+  player.promptEl.textContent = `等待對方完成第 ${finishedLevel} 關`;
+  if (players.p1.stageReady === finishedLevel && players.p2.stageReady === finishedLevel) {
+    session.playing = false;
+    clearInterval(session.timerId);
+    window.showStageClear(finishedLevel).then(() => {
+      players.p1.stageReady = 0;
+      players.p2.stageReady = 0;
+      session.playing = true;
+      session.timerId = setInterval(tick, 1000);
+      presentNextQuestion(players.p1);
+      presentNextQuestion(players.p2);
+    });
+  }
+}
+
+async function presentNextQuestion(player) {
   player.index += 1;
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");

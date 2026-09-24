@@ -1,6 +1,6 @@
 // 獨立執行殼。學生資料只來自 Home 登入，這裡不再顯示選單。
 
-import { mountDCCS } from './dccs.js';
+import { mountDCCS } from './dccs.js?v=2';
 import { readLobbySession, returnToLobby } from './lobby.js';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
@@ -51,6 +51,9 @@ async function main() {
     container: document.getElementById('game-root'),
     student,
     seed: parseSeed(),
+    showTutorial: false,
+    autoStart: true,
+    viewportAspect: null,
     ...(sessionSeconds !== null ? { sessionSeconds } : {}),
   });
 

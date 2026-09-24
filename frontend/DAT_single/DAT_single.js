@@ -298,11 +298,11 @@ function finishGame() {
     $('restart').textContent = '再玩一次';
     $('restart').onclick = startGame;
 
-    // 按鈕二：返回遊戲大廳 (跳轉到 games.html)
+    // 按鈕二：返回登入首頁 (跳轉到 Home/index.html)
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
       $startGameBtn.onclick = () => {
-        window.location.href = '../games.html';
+        window.location.href = '../../Home/index.html';
       };
     }
 
@@ -350,7 +350,7 @@ function finishGame() {
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
       $startGameBtn.onclick = () => {
-        window.location.href = '../games.html';
+        window.location.href = '../../Home/index.html';
       };
     }
 

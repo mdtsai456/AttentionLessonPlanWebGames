@@ -2,7 +2,7 @@ import { API } from './api.js';
 
 // 2026-09-11：帳密登入上線後，身份在登入頁就確定了（見 docs/adr/0004）。
 // 這頁不再有「選場域→選老師」兩層下拉，也拿掉「學生自查模式」——
-// 學生現在有自己的登入+遊戲大廳（games.html），不會用這頁。
+// 學生現在從 Home/index.html 登入，不會用這頁。
 // 未登入（沒有 token）一律導回登入頁。
 
 const token = sessionStorage.getItem('token');

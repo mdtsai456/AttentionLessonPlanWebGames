@@ -11,11 +11,14 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
-  min-height: 100svh;
-  display: grid;
-  place-items: center;
   background: #164e62;
   font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
   color: #175467;
@@ -38,12 +41,13 @@ button:focus-visible {
 
 /* 遊戲背景與整體比例（1cqw = 遊戲區寬度的 1%） */
 .game {
-  position: relative;
-  width: min(100vw, 177.68svh);
-  aspect-ratio: 1672 / 941;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   container-type: inline-size;
-  background: #2cbfd3 url("assets/background.png") center / 100% 100% no-repeat;
+  background: #2cbfd3 url("assets/background.png") center / cover no-repeat;
 }
 
 /* 左側進度條 */

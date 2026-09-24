@@ -93,6 +93,15 @@
         <span class="hud-box" id="timer-box">60 秒</span>
       </div>
 
+      <section class="result is-hidden" id="mid-break" aria-label="第 3 關結束">
+        <h1 class="title">挑戰完成！</h1>
+        <p class="label">第 3 關已結束<br>要繼續遊玩嗎？</p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-green" id="mid-continue">繼續遊玩</button>
+          <button type="button" class="btn btn-sky" id="mid-lobby">返回大廳</button>
+        </div>
+      </section>
+
       <section class="result is-hidden" id="result" aria-label="結算">
         <h1 class="title" id="result-title">闖關結束</h1>
         <p class="result-score" id="result-score-p1">P1：0 / 8 分</p>
@@ -108,6 +117,7 @@
         </div>
       </section>
     </main>
+    <script src="../shared/stage-clear.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

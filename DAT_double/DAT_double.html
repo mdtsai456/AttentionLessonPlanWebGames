@@ -4,40 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DAT 動物追擊令・雙人版</title>
-  <link rel="stylesheet" href="DAT_double.css">
+  <link rel="stylesheet" href="DAT_double.css?v=3">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
 <!-- <script type="module" src="DAT_double.js" defer></script> -->
+<script src="../shared/stage-clear.js" defer></script>
 <script type="module" src="js/main.js" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
-    <!-- 【新增】雙人合一呈現的遊戲教學頁面 (說明書) -->
-    <div class="overlay" id="tutorial-overlay">
-      <section class="tutorial-card">
-        <h1>DAT 動物追擊令・遊戲說明</h1>
-        <div class="instructions-content">
-          <div class="instruction-col">
-            <h2>🎮 玩家一 (左側)</h2>
-            <p>• 移動：<strong>W / A / S / D</strong></p>
-            <p>• 作答：<strong>空白鍵 (Space)</strong></p>
-          </div>
-          <div class="instruction-col">
-            <h2>🎮 玩家二 (右側)</h2>
-            <p>• 移動：<strong>鍵盤方向鍵 (↑ / ↓ / ← / →)</strong></p>
-            <p>• 作答：<strong>Enter 鍵</strong></p>
-          </div>
-        </div>
-        <div class="rule-box">
-          <h3>📌 遊戲規則</h3>
-          <p>1. 題目出現後，先移動準心瞄準動物（讓準心與動物 <strong>Overlap 重疊</strong>）。</p>
-          <p>2. 判斷題目是否正確：<strong>正確請按作答鍵，不正確請保持瞄準但不按鍵</strong>。</p>
-        </div>
-        <button class="primary" id="start-practice-btn" type="button">進入練習模式</button>
-      </section>
-    </div>
-    
+    <button type="button" id="enter-formal-btn" class="enter-formal" hidden>進入正式遊戲</button>
     <section class="player player-1" aria-label="玩家一">
     <!--      -->
     <aside class="progress-panel">
@@ -132,6 +109,16 @@
     </div>
       </section>
     </section>
+    <div class="overlay" id="mid-break" hidden>
+      <section class="stage-clear-card" role="dialog" aria-modal="true" aria-label="第 3 關結束">
+        <div class="stage-title-badge">挑戰完成！</div>
+        <p class="stage-clear-text">第 3 關已結束<br>要繼續遊玩嗎？</p>
+        <div class="stage-clear-actions">
+          <button class="btn-continue" id="mid-continue" type="button">繼續遊玩</button>
+          <button class="btn-lobby" id="mid-lobby" type="button">返回遊戲大廳</button>
+        </div>
+      </section>
+    </div>
           <!-- 中途離開遊戲的警告彈窗 -->
     <div class="overlay" id="leave-warning-overlay" hidden>
       <section class="result-card leave-card">

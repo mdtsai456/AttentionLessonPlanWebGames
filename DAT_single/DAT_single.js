@@ -231,12 +231,14 @@ function showStageClearModal(completedStage) {
   pointerDirections.clear();
 
   const isMidBreak = completedStage === MID_STAGE;
-  $('stage-clear-title').textContent = isMidBreak ? '挑戰完成！' : `第 ${completedStage} 關結束`;
-  $('stage-clear-text').innerHTML = isMidBreak
-    ? '第 3 關已結束<br>要繼續遊玩嗎？'
-    : '準備開始下一關嘍！';
-  $('btn-next-stage').textContent = isMidBreak ? '繼續遊玩' : '繼續';
-  $('btn-lobby').hidden = !isMidBreak;
+  if (!isMidBreak) {
+    window.showStageClear(completedStage).then(continueNextStage);
+    return;
+  }
+  $('stage-clear-title').textContent = '挑戰完成！';
+  $('stage-clear-text').innerHTML = '第 3 關已結束<br>要繼續遊玩嗎？';
+  $('btn-next-stage').textContent = '繼續遊玩';
+  $('btn-lobby').hidden = false;
   $('stage-clear-modal').hidden = false;
 }
 

@@ -1,6 +1,6 @@
 // API 前綴：瀏覽器端 JS 沒有真正的環境變數，這裡用等價的兩層機制：
 // 1. 部署時可在載入本檔案「之前」設定 `window.API_BASE_URL`（例如在 index.html
-//    / dms.html / games.html 加一段 `<script>window.API_BASE_URL = "https://...";</script>`），
+//    / dms.html / Home/index.html 加一段 `<script>window.API_BASE_URL = "https://...";</script>`），
 //    不用改這支檔案就能切換環境。
 // 2. 沒設定時，依目前頁面的 hostname 自動判斷：本機開發（localhost/127.0.0.1）
 //    用同 hostname 換成後端的 5001 port；其他情況一律指向正式部署的 Zeabur。
@@ -22,7 +22,7 @@ const BASE_URL = resolveBaseUrl();
 // （見 docs/adr/0004-teacher-student-password-login.md）。這裡統一讀
 // sessionStorage 的 "token"：老師登入、學生單人登入都存在這個共用鍵，
 // 因為同一個分頁同一時間只會走其中一種角色的畫面（dms.html 只給老師、
-// games.html 只給學生），不會互相踩到。雙人模式的兩個學生 token 另外存在
+// Home/index.html 登入後學生進選遊戲頁），不會互相踩到。雙人模式的兩個學生 token 另外存在
 // student1_token / student2_token，不經過這支共用的驗證 fetch。
 function authHeaders() {
   const token = sessionStorage.getItem("token");

@@ -1,0 +1,91 @@
+@font-face {
+  font-family: "MaokenAssortedSans";
+  src: url("../Home/fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 120%;
+}
+
+.shared-stage-clear {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.2vw, 30px);
+  font-family: "Nunito", "MaokenAssortedSans", "Microsoft JhengHei", sans-serif;
+  color: #2f5d3a;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+    url("../Home/img/HomeBack.png") center / cover no-repeat;
+}
+
+.shared-stage-clear[hidden] {
+  display: none !important;
+}
+
+.shared-stage-clear-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(86%, 640px);
+  min-height: min(52%, 360px);
+  padding: clamp(56px, 9vh, 88px) clamp(24px, 5vw, 56px) clamp(24px, 4vh, 40px);
+  text-align: center;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 10px 0 rgba(90, 170, 210, 0.22),
+    0 22px 36px rgba(80, 140, 90, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.shared-stage-clear-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -38%);
+  min-width: clamp(160px, 42%, 240px);
+  padding: clamp(10px, 1.8vh, 16px) clamp(22px, 4vw, 36px);
+  border-radius: 999px;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+  color: #fff;
+  font-size: clamp(1.15rem, 2.6vw, 1.7rem);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.shared-stage-clear-text {
+  margin: 0 0 1.4rem;
+  color: #3f8f4e;
+  font-size: clamp(1.45rem, 3vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+.shared-stage-clear-btn {
+  width: min(80%, 280px);
+  padding: clamp(10px, 1.8vh, 14px) 28px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(#9ee36a, #6ec94a);
+  box-shadow: 0 6px 0 #4aa43a, 0 10px 14px rgba(70, 140, 60, 0.28);
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.shared-stage-clear-btn:active {
+  transform: translateY(4px);
+  background: linear-gradient(#4fbe3c, #3a9a2c);
+  box-shadow: none;
+}

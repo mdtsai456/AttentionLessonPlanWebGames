@@ -14,7 +14,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     backHomeBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      getState().safeNavigateTo('../games.html');
+      getState().safeNavigateTo('../../Home/index.html');
     });
   }
 

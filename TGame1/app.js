@@ -292,7 +292,7 @@ function endLevel() {
     return;
   }
   if (state.level < STAGE_COUNT) {
-    showStageClear(false);
+    window.showStageClear(state.level).then(continueNextStage);
     return;
   }
   finishGame("complete");

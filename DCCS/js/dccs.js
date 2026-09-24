@@ -8,7 +8,7 @@ import { Track } from './game/track.js';
 import { createStats } from './game/stats.js';
 import { buildPayload, submitResult, flushPendingResults } from './net/client.js';
 import { resolveSubmitUrl } from './net/apiBase.js';
-import { createOverlays } from './ui/overlays.js';
+import { createOverlays } from './ui/overlays.js?v=2';
 
 // 雙人頁只允許一個實例重送暫存成績。
 let pendingFlushStarted = false;
@@ -358,9 +358,7 @@ export function mountDCCS(options) {
   let sessionId = '';
   let startedAtMs = null;
   let destroyed = false;
-  let titleKeyHandler = null;
   let unloadHandler = null;
-  let resolveTitleWait = null;
   let settleDone;
   let rejectDone;
 
@@ -396,23 +394,6 @@ export function mountDCCS(options) {
 
     resizeObserver.disconnect();
     guardUnload(false);
-
-    if (titleKeyHandler) {
-      window.removeEventListener(
-        'keydown',
-        titleKeyHandler
-      );
-
-      titleKeyHandler = null;
-    }
-
-    if (resolveTitleWait) {
-      const resolve =
-        resolveTitleWait;
-
-      resolveTitleWait = null;
-      resolve();
-    }
   }
 
   function buildResultPayload(
@@ -563,53 +544,6 @@ export function mountDCCS(options) {
         await overlays.showTutorial(
           buildTutorialContent(manifest, assetBase)
         );
-
-        if (destroyed) {
-          return;
-        }
-      }
-
-      if (!autoStart && !tutorialStartsSession) {
-        emitPhase('title');
-
-        overlays.showTitle({
-          grade: student.grade,
-          caseId: student.caseId,
-          school: student.school,
-          currentDay: student.currentDay,
-          seed,
-        });
-
-        await new Promise((resolve) => {
-          resolveTitleWait = resolve;
-
-          titleKeyHandler = (event) => {
-            if (
-              event.code !== 'Space' &&
-              event.code !== 'Enter' &&
-              event.code !== 'NumpadEnter'
-            ) {
-              return;
-            }
-
-            // 空白鍵預設會捲動頁面；遊戲嵌在別人的頁面裡時會整頁跳一下。
-            event.preventDefault();
-
-            window.removeEventListener(
-              'keydown',
-              titleKeyHandler
-            );
-
-            titleKeyHandler = null;
-            resolveTitleWait = null;
-            resolve();
-          };
-
-          window.addEventListener(
-            'keydown',
-            titleKeyHandler
-          );
-        });
 
         if (destroyed) {
           return;
@@ -878,7 +812,17 @@ export function mountDCCS(options) {
                 }
               }
 
-              await waitForLevelPrompt(currentLevel);
+              if (previousLevel !== 3) {
+                levelPromptActive = true;
+                await window.showStageClear(previousLevel);
+                if (destroyed) return;
+                if (input) {
+                  input.takePresses('rotateShape');
+                  input.takePresses('rotateObject');
+                }
+                levelPromptActive = false;
+                emitPhase('playing');
+              }
             })();
           }
         },

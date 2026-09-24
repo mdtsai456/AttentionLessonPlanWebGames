@@ -125,6 +125,38 @@
           </section>
 
           <section
+            id="shared-break"
+            class="shared-screen"
+            hidden
+          >
+            <div class="dccs-level-badge">挑戰完成！</div>
+
+            <p class="dccs-level-message">
+              第 3 關已結束<br />要繼續遊玩嗎？
+            </p>
+
+            <div class="dccs-break-actions">
+              <button
+                type="button"
+                id="shared-break-continue"
+                class="dccs-level-continue"
+                data-break="continue"
+              >
+                繼續遊玩
+              </button>
+
+              <button
+                type="button"
+                id="shared-break-lobby"
+                class="dccs-break-lobby"
+                data-break="lobby"
+              >
+                返回遊戲大廳
+              </button>
+            </div>
+          </section>
+
+          <section
             id="shared-error"
             class="shared-screen"
             hidden
@@ -145,9 +177,10 @@
     ></div>
   </div>
 
+  <script src="../shared/stage-clear.js"></script>
   <script
     type="module"
-    src="./js/double.js"
+    src="./js/double.js?v=2"
   ></script>
 </body>
 </html>

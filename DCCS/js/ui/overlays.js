@@ -5,7 +5,7 @@ const STYLE_ATTR = 'data-dccs-style';
 const CSS = `
 @font-face {
   font-family: "MaokenAssortedSans";
-  src: url("../Home/fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  src: url("fonts/MaokenAssortedSans-TC.ttf") format("truetype");
   font-weight: 400 800;
   font-display: swap;
   size-adjust: 120%;
@@ -641,10 +641,7 @@ export function renderTutorialInto(element, content) {
   eyebrowEl.textContent = '操作說明';
   headerEl.appendChild(eyebrowEl);
 
-  const titleEl = document.createElement('h1');
-  titleEl.className = 'dccs-tutorial-title';
-  titleEl.textContent = content.title || '';
-  headerEl.appendChild(titleEl);
+ 
 
   const leadEl = document.createElement('p');
   leadEl.className = 'dccs-tutorial-lead';
@@ -745,13 +742,7 @@ export function createOverlays(container) {
     'dccs-overlay-loading',
     '<h1>載入中…</h1><p class="dccs-hint dccs-loading-detail">正在準備素材</p>'
   );
-  const titleEl = buildOverlay(
-    'dccs-overlay-title',
-    '<h1>賽道攔截 · DCCS</h1>' +
-      '<p class="dccs-hint">按 <span class="dccs-kbd">Enter</span> 或 ' +
-      '<span class="dccs-kbd">空白鍵</span> 開始</p>' +
-      '<p class="dccs-hint dccs-small dccs-title-meta"></p>'
-  );
+  
   const levelEl = buildOverlay(
     'dccs-overlay-level',
     '<div class="dccs-level-badge"></div>' +
@@ -799,7 +790,7 @@ export function createOverlays(container) {
   );
 
   wrapper.appendChild(loadingEl);
-  wrapper.appendChild(titleEl);
+  
   wrapper.appendChild(levelEl);
   wrapper.appendChild(breakEl);
   wrapper.appendChild(resultEl);
@@ -807,7 +798,7 @@ export function createOverlays(container) {
   wrapper.appendChild(tutorialEl);
   container.appendChild(wrapper);
 
-  const all = [loadingEl, titleEl, levelEl, breakEl, resultEl, errorEl, tutorialEl];
+  const all = [loadingEl, levelEl, breakEl, resultEl, errorEl, tutorialEl];
   const levelButton = levelEl.querySelector('.dccs-level-continue');
   const breakContinueButton = breakEl.querySelector('[data-break="continue"]');
   const breakLobbyButton = breakEl.querySelector('[data-break="lobby"]');
@@ -850,6 +841,10 @@ export function createOverlays(container) {
 
   function hideAll() {
     for (const el of all) el.hidden = true;
+    const active = document.activeElement;
+    if (active && active !== document.body && typeof active.blur === 'function') {
+      active.blur();
+    }
   }
 
   function showLoading(detail) {
@@ -857,15 +852,7 @@ export function createOverlays(container) {
     showOnly(loadingEl);
   }
 
-  function showTitle(meta) {
-    const metaEl = titleEl.querySelector('.dccs-title-meta');
-    metaEl.textContent = meta
-      ? Object.entries(meta)
-          .map(([k, v]) => `${k}=${v}`)
-          .join(' ')
-      : '';
-    showOnly(titleEl);
-  }
+  
 
   function showContinueOrLobby() {
     showOnly(breakEl);
@@ -986,7 +973,6 @@ export function createOverlays(container) {
 
   return {
     showLoading,
-    showTitle,
     showLevelPrompt,
     showContinueOrLobby,
     showTutorial,

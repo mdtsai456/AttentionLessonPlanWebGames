@@ -1,16 +1,27 @@
+@font-face {
+  font-family: "MaokenAssortedSans";
+  src: url("../Home/fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 120%;
+}
+
 /* 基本設定 */
 * {
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
-  min-height: 100svh;
-  display: grid;
-  place-items: center;
   background: #594331;
   color: #65462f;
-  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  font-family: "MaokenAssortedSans", "Microsoft JhengHei", sans-serif;
 }
 
 button {
@@ -30,14 +41,15 @@ button:focus-visible {
 
 /* 整張雙人背景依原始比例呈現，不切割或重複鋪圖。 */
 .game {
-  position: relative;
+  position: fixed;
+  inset: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: min(100vw, 177.68svh);
-  aspect-ratio: 1672 / 941;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   container-type: inline-size;
-  background: #ffd39d url("assets/background.png") center / 100% 100% no-repeat;
+  background: #ffd39d url("assets/background.png") center / cover no-repeat;
 }
 
 /* 每位玩家占一半；1cqw 為各自區域寬度的 1%。 */
@@ -101,23 +113,23 @@ button:focus-visible {
 .score {
   position: absolute;
   left: 8%;
-  top: 3%;
-  width: 43%;
-  height: 8%;
+  top: 2.2%;
+  width: 38%;
+  height: 5.2%;
   display: flex;
   align-items: center;
-  border: .5cqw solid white;
-  border-radius: 1cqw;
+  border: .28cqw solid white;
+  border-radius: .7cqw;
   background: #fff8e9;
-  font-size: 3cqw;
+  font-size: 1.8cqw;
 }
 
 .score span {
   display: grid;
   place-items: center;
-  width: 36%;
-  height: 125%;
-  border-radius: .8cqw;
+  width: 34%;
+  height: 100%;
+  border-radius: .55cqw;
   background: #efac2f;
   color: white;
   font-weight: bold;
@@ -131,30 +143,31 @@ button:focus-visible {
 .round,
 .pause {
   position: absolute;
-  top: 4%;
-  padding: .5em 1em;
+  top: 2.6%;
+  padding: .28em .55em;
   border: 0;
   border-radius: 2em;
   background: #fff9e9;
-  font-size: 2.1cqw;
+  font-size: 1.45cqw;
   color: #65462f;
+  white-space: nowrap;
 }
 
 .round {
-  right: 19%;
+  right: 15%;
 }
 
 .pause {
-  right: 4%;
+  right: 3%;
 }
 
 /* 題目卡：色名字色與算式並排 */
 .question-panel {
   position: absolute;
-  top: 15%;
-  left: 12%;
-  width: 78%;
-  height: 20%;
+  top: 10%;
+  left: 10%;
+  width: 82%;
+  height: 14%;
   display: grid;
   grid-template-columns: 1fr;
   gap: 1cqw;
@@ -178,7 +191,7 @@ button:focus-visible {
 }
 
 .question strong {
-  font-size: 4.8cqw;
+  font-size: 3.4cqw;
 }
 
 .time {
@@ -209,10 +222,10 @@ button:focus-visible {
 /* 動物移動區：各幀位置由 JS 的 updateScene 設定。 */
 .animal-field {
   position: absolute;
-  left: 9%;
-  top: 35%;
+  left: 8%;
+  top: 27%;
   width: 86%;
-  height: 40%;
+  height: 38%;
 }
 
 .animal {
@@ -251,33 +264,34 @@ button:focus-visible {
 /* 正確時按下作答按鈕，不正確則等待。 */
 .answer-panel {
   position: absolute;
-  left: 12%;
-  bottom: 3%;
-  width: 80%;
+  left: 22%;
+  right: 4%;
+  bottom: 2%;
+  width: auto;
   text-align: center;
 }
 
 .rule {
   margin: 0;
-  font-size: 2.2cqw;
+  font-size: 1.7cqw;
   font-weight: bold;
 }
 
 [data-ui="feedback"] {
-  min-height: 1.4em;
-  margin: .4em 0 .7em;
-  font-size: 2.2cqw;
+  min-height: 1.2em;
+  margin: .15em 0 .35em;
+  font-size: 1.7cqw;
 }
 
 .capture {
   min-width: 28%;
-  padding: .25em 1.4em;
+  padding: .2em 1.1em;
   border: .55cqw solid #fffaf2;
   border-radius: 2cqw;
   background: #a253d5;
   box-shadow: 0 .3cqw .4cqw #8d623733;
   color: #fff;
-  font-size: 3.5cqw;
+  font-size: 2.6cqw;
   font-weight: bold;
 }
 
@@ -302,8 +316,100 @@ button:disabled {
   inset: 0;
   display: grid;
   place-items: center;
-  z-index: 5;
+  z-index: 8;
   background: #67442975;
+}
+
+#mid-break {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+#mid-break .stage-clear-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(46%, 640px);
+  min-height: min(52%, 360px);
+  padding: clamp(56px, 8vh, 88px) clamp(24px, 4vw, 56px) clamp(24px, 4vh, 40px);
+  text-align: center;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 10px 0 rgba(90, 170, 210, 0.22),
+    0 22px 36px rgba(80, 140, 90, 0.18);
+}
+
+#mid-break .stage-title-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -38%);
+  min-width: clamp(160px, 42%, 240px);
+  padding: clamp(10px, 1.6vh, 16px) clamp(22px, 3vw, 36px);
+  border-radius: 999px;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+  color: #fff;
+  font-size: clamp(1.15rem, 2.2vw, 1.7rem);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#mid-break .stage-clear-text {
+  margin: 0.4rem 0 1.1rem;
+  color: #3f8f4e;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+}
+
+#mid-break .stage-clear-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(80%, 280px);
+}
+
+#mid-break .btn-continue,
+#mid-break .btn-lobby {
+  width: 100%;
+  margin: 0;
+  padding: clamp(10px, 1.6vh, 14px) 28px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#mid-break .btn-continue {
+  background: linear-gradient(#9ee36a, #6ec94a);
+  box-shadow: 0 6px 0 #4aa43a, 0 10px 14px rgba(70, 140, 60, 0.28);
+}
+
+#mid-break .btn-lobby {
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+}
+
+#mid-break .btn-continue:active {
+  transform: translateY(4px);
+  background: linear-gradient(#4fbe3c, #3a9a2c);
+  box-shadow: none;
+}
+
+#mid-break .btn-lobby:active {
+  transform: translateY(4px);
+  background: linear-gradient(#3aa3d0, #2b86b4);
+  box-shadow: none;
 }
 
 .result-card {
@@ -346,13 +452,42 @@ button:disabled {
 }
 
 /* 觸控方向鍵：按住持續移動，可同時按作答按鈕。 */
+.enter-formal {
+  position: absolute;
+  right: 2%;
+  bottom: 2.4%;
+  z-index: 6;
+  width: max-content;
+  padding: 0.55em 1.15em;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(#9ee36a, #6ec94a);
+  box-shadow: 0 0.28cqw 0 #4aa43a, 0 0.45cqw 0.7cqw rgba(70, 140, 60, 0.28);
+  color: #fff;
+  font-size: 1.15cqw;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.enter-formal:hover {
+  filter: brightness(1.04);
+}
+
+.enter-formal:active {
+  transform: translateY(0.22cqw);
+  background: linear-gradient(#4fbe3c, #3a9a2c);
+  box-shadow: none;
+}
+
 .movement {
   position: absolute;
   left: 7%;
-  bottom: 4%;
+  bottom: 3%;
   display: grid;
-  grid-template-columns: repeat(3, 4.5cqw);
-  gap: .35cqw;
+  grid-template-columns: repeat(3, 4cqw);
+  gap: .3cqw;
 }
 
 .movement button {

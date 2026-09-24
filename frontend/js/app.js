@@ -168,6 +168,6 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionStorage.setItem("student2_school", result2.school);
     }
 
-    window.location.href = "games.html";
+    window.location.href = "../Home/index.html";
   }
 });

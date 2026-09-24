@@ -53,7 +53,7 @@ document.querySelectorAll('[data-ui="back-home"]').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    safeNavigateTo('../games.html');
+    safeNavigateTo('../../Home/index.html');
   });
 });
 
@@ -62,7 +62,7 @@ if (btnConfirmLeave) {
   btnConfirmLeave.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    safeNavigateTo('../games.html');
+    safeNavigateTo('../../Home/index.html');
   });
 }
 

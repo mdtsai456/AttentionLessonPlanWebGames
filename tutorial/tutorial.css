@@ -25,7 +25,6 @@ body {
 }
 
 .tutorial-container {
-  position: relative;
   width: min(94vw, 900px);
   min-height: min(86vh, 620px);
   display: flex;
@@ -76,116 +75,43 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  margin-top: 0.4rem;
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  line-height: 1.7;
+  gap: 1rem;
   color: #3f5d48;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 1.6;
 }
 
-.intro-text {
-  margin: 0 0 0.8rem;
-  text-align: justify;
-  width: 90%;
+.player-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.player-card,
+.rule-box {
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  background: #eef5ff;
+  border: 2px solid #dce9fb;
+  text-align: left;
+}
+
+.player-card h2,
+.rule-box h3 {
+  margin: 0 0 0.45rem;
+  color: #3f8f4e;
+  font-size: clamp(1.05rem, 2.1vw, 1.3rem);
+  font-weight: 800;
+}
+
+.player-card p,
+.rule-list {
+  margin: 0.2rem 0;
 }
 
 .rule-list {
-  margin: 0 0 1rem;
-  padding-left: 2rem;
-  width: 90%;
-}
-
-.warning-text {
-  margin: 0;
-  font-weight: 800;
-  color: #3f8f4e;
-}
-
-.type-instruction {
-  margin: 0 0 0.25rem;
-  color: #3f8f4e;
-  font-size: clamp(1.2rem, 2.4vw, 1.5rem);
-  font-weight: 800;
-  text-align: center;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
-}
-
-.type-sub {
-  margin: 0 0 1rem;
-  color: #5b6980;
-  font-size: clamp(0.95rem, 1.8vw, 1.12rem);
-}
-
-.carousel-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.2rem;
-  width: 100%;
-  flex: 1;
-}
-
-.type-preview-box {
-  width: 65%;
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: #eef5ff;
-  border: 2px solid #dce9fb;
-  border-radius: 20px;
-}
-
-.preview-badge {
-  margin-bottom: 0.5rem;
-  padding: 0.4rem 2rem;
-  border-radius: 12px;
-  font-size: 1.3rem;
-  font-weight: 800;
-}
-
-.preview-hint {
-  color: #5b6980;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.nav-arrow {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: linear-gradient(#9ee36a, #6ec94a);
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 5px 0 #4aa43a, 0 8px 12px rgba(70, 140, 60, 0.24);
-}
-
-.nav-arrow:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: none;
-}
-
-.nav-arrow:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-  box-shadow: none;
-}
-
-.prompt-title {
-  margin: 0 0 1.6rem;
-  color: #3f8f4e;
-  font-size: clamp(1.6rem, 3.2vw, 2.2rem);
-  font-weight: 800;
-  line-height: 1.45;
-  text-align: center;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+  padding-left: 1.3rem;
 }
 
 .action-buttons {
@@ -193,65 +119,46 @@ body {
   flex-direction: column;
   gap: 0.9rem;
   width: min(70%, 320px);
+  margin-top: 0.6rem;
 }
 
 .btn-green,
-.btn-green-solid,
-.btn-outline,
-.btn-green-outline {
-  appearance: none;
-  width: min(70%, 260px);
+.btn-outline {
+  display: grid;
+  place-items: center;
+  width: 100%;
   padding: 0.65rem 1.4rem;
-  border: none;
   border-radius: 999px;
-  font-family: inherit;
+  color: #fff;
   font-size: clamp(1.05rem, 2.2vw, 1.3rem);
   font-weight: 800;
   letter-spacing: 0.04em;
-  cursor: pointer;
+  text-decoration: none;
 }
 
-.btn-green,
-.btn-green-solid {
+.btn-green {
   background: linear-gradient(#9ee36a, #6ec94a);
-  color: #fff;
   box-shadow: 0 6px 0 #4aa43a, 0 10px 14px rgba(70, 140, 60, 0.28);
 }
 
-.btn-outline,
-.btn-green-outline {
-  width: 100%;
+.btn-outline {
   background: linear-gradient(#8ed8f6, #57b8e8);
-  color: #fff;
   box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
 }
 
-.btn-green-solid {
-  width: 100%;
-}
-
 .btn-green:hover,
-.btn-green-solid:hover,
-.btn-outline:hover,
-.btn-green-outline:hover,
-.nav-arrow:hover:not(:disabled) {
+.btn-outline:hover {
   filter: brightness(1.04);
 }
 
-.btn-green:active,
-.btn-green-solid:active {
+.btn-green:active {
   transform: translateY(4px);
   background: linear-gradient(#4fbe3c, #3a9a2c);
   box-shadow: none;
 }
 
-.btn-outline:active,
-.btn-green-outline:active {
-  transform: translateY(4px);
-  background: linear-gradient(#3aa3d0, #2b86b4);
-  box-shadow: none;
-}
-
-[hidden] {
-  display: none !important;
+@media (max-width: 680px) {
+  .player-grid {
+    grid-template-columns: 1fr;
+  }
 }

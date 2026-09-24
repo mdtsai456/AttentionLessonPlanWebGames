@@ -1,11 +1,13 @@
 import { sendSessionToApi } from './api.js';
 import { generateQuestionSet } from './questions.js';
 
-export const ROUND_MS = 1 * 1000;//秒數
+export const ROUND_MS = 4000;
 export const AIM_SPEED = 45;
 export const ANIMAL_SPEED = 4;
-export const TOTAL_STAGES = 1;//關卡數量
-// 目前關卡:5 題目:12/每關 秒數:10 => 5*12*10 = 600 秒 = 10 分鐘
+export const TOTAL_STAGES = 6;
+const PRACTICE_STAGES = 1;
+const PRACTICE_QUESTIONS = 2;
+const GAME_QUESTIONS = 3;
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
 
@@ -19,18 +21,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   $('pause').addEventListener('click', () => {
-    if (phase === 'aiming' || phase === 'answer') {
-      getState().players.forEach(p => p.pauseGame && p.pauseGame());
-      const warningOverlay = document.getElementById('leave-warning-overlay');
-      if (warningOverlay) warningOverlay.hidden = false;
-    } else {
-      paused = !paused;
-      lastTime = undefined;
-      keys.clear(); 
-      pointerDirections.clear();
-      $('pause').textContent = paused ? '繼續' : '暫停';
-      enableAnswers(!paused && phase === 'answer' && !submitted);
-    }
+    if (getState().playMode === 'game') return;
+    paused = !paused;
+    lastTime = undefined;
+    keys.clear();
+    pointerDirections.clear();
+    $('pause').textContent = paused ? '繼續' : '暫停';
+    enableAnswers(!paused && phase === 'answer' && !submitted);
   });
 
   const answerButtons = [$('answer-true')];
@@ -50,15 +47,21 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
   const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 
-  function loadStageQuestions(stage) {
-    const questionsPerStage = 12; //題數
-    questions = generateQuestionSet(questionsPerStage);
+  let stageCount = TOTAL_STAGES;
+  let questionsPerStage = GAME_QUESTIONS;
+  let clearedMidBreak = false;
+
+  function loadStageQuestions() {
+    questions = generateQuestionSet(questionsPerStage, isPractice);
   }
 
   function startPractice() {
     isPractice = true;
+    stageCount = PRACTICE_STAGES;
+    questionsPerStage = PRACTICE_QUESTIONS;
+    currentStage = 1;
     getState().playerPracticeFinished[playerIndex] = false;
-    questions = generateQuestionSet(2, true);
+    questions = generateQuestionSet(questionsPerStage, true);
 
     resetPlayerState(true);
     $('field').dataset.mode = 'practice';
@@ -75,13 +78,16 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   function startGame() {
     isPractice = false;
-    currentStage = 1;//設定關卡為第一關
+    stageCount = TOTAL_STAGES;
+    questionsPerStage = GAME_QUESTIONS;
+    currentStage = 1;
+    clearedMidBreak = false;
     startTimeMs = Date.now();
     
     score = wrong = offTarget = timedOut = elapsed = 0;
     
-    loadStageQuestions(currentStage);
-    totalStageQuestionsCount = questions.length * TOTAL_STAGES;
+    loadStageQuestions();
+    totalStageQuestionsCount = questionsPerStage * stageCount;
     
     resetPlayerState(false);
     
@@ -115,10 +121,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   function updateProgress() {
     $('score').textContent = `${score} 分`;
-    $('round').textContent = `第 ${currentStage}/${TOTAL_STAGES} 關 (題 ${Math.min(index + 1, questions.length)}/${questions.length})`;
-    
+    $('round').textContent = isPractice
+      ? `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (練習關卡)`
+      : `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (第 ${currentStage} / ${stageCount} 關)`;
+
     const currentTotalCompleted = (currentStage - 1) * questions.length + index;
-    const totalMax = totalStageQuestionsCount || (questions.length * TOTAL_STAGES);
+    const totalMax = totalStageQuestionsCount || (questions.length * stageCount);
     $('progress').setAttribute('aria-valuemax', totalMax);
     $('progress').setAttribute('aria-valuenow', currentTotalCompleted);
     $('progress-fill').style.height = `${(currentTotalCompleted / totalMax) * 100}%`;
@@ -189,6 +197,23 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     updateProgress();
   }
 
+  function beginNextStage() {
+    currentStage++;
+    resetPlayerState(false);
+    loadStageQuestions();
+
+    $('question-type').textContent = `第 ${currentStage} 關過場`;
+    $('question-text').textContent = '🎯 請移動準心重新瞄準動物';
+    $('question-text').style.color = '#a253d5';
+    $('time-text').textContent = '尚未開始';
+    $('time-fill').style.width = '100%';
+    $('feedback').textContent = `恭喜通過第 ${currentStage - 1} 關！請重新瞄準動物`;
+    $('animal').dataset.result = '';
+    enableAnswers(false);
+    updateProgress();
+    renderPositions();
+  }
+
   function endQuestion() {
     if (!submitted) recordResult(false);
     const message = $('feedback').textContent;
@@ -202,20 +227,23 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       if (isPractice) {
         finishPractice();
       } else {
-        if (currentStage < TOTAL_STAGES) {
-          currentStage++;
-          resetPlayerState(false);
-          loadStageQuestions(currentStage);
-
-          $('question-type').textContent = `第 ${currentStage} 關過場`;
-          $('question-text').textContent = '🎯 請移動準心重新瞄準動物';
-          $('question-text').style.color = '#a253d5';
-          $('time-text').textContent = '尚未開始';
-          $('time-fill').style.width = '100%';
-          $('feedback').textContent = `恭喜通過第 ${currentStage - 1} 關！請重新瞄準動物`;
-          $('animal').dataset.result = '';
+        if (currentStage < stageCount) {
+          if (currentStage === 3 && !clearedMidBreak) {
+            phase = 'mid_break';
+            enableAnswers(false);
+            $('feedback').textContent = '第 3 關已結束，等待另一位玩家';
+            getState().waitForMidBreak(playerIndex, () => {
+              clearedMidBreak = true;
+              beginNextStage();
+            });
+            return;
+          }
+          phase = 'stage_clear';
           enableAnswers(false);
-          updateProgress(); renderPositions();
+          $('feedback').textContent = `第 ${currentStage} 關已結束，等待另一位玩家`;
+          getState().waitForStageClear(playerIndex, currentStage, () => {
+            beginNextStage();
+          });
         } else {
           finishGame();
         }
@@ -227,17 +255,9 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     phase = 'practice_done';
     enableAnswers(false);
     $('question-type').textContent = '【練習完成】';
-    $('question-text').textContent = '✅ 準備進入正式遊戲';
+    $('question-text').textContent = '練習完成';
     $('question-text').style.color = '#328647';
-    $('feedback').textContent = '練習結束，等待另一位玩家…';
-    
-    getState().playerPracticeFinished[playerIndex] = true;
-
-    if (getState().playerPracticeFinished[0] && getState().playerPracticeFinished[1]) {
-      setTimeout(() => {
-        getState().players.forEach((p) => p.startGame());
-      }, 1500);
-    }
+    $('feedback').textContent = '練習結束。這段不會寫入進度。';
   }
 
   async function finishGame() {
@@ -245,7 +265,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     endTimeMs = Date.now();
     keys.clear(); pointerDirections.clear();
 
-    const totalQuestions = totalStageQuestionsCount || (questions.length * TOTAL_STAGES); 
+    const totalQuestions = totalStageQuestionsCount || (questions.length * stageCount); 
     const accuracyValue = parseFloat((score / Math.max(1, totalQuestions)).toFixed(2));
     const durationMs = endTimeMs - startTimeMs;
 
@@ -281,7 +301,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
           { apiname: "EFT_wrong",    value: wrong },
           { apiname: "EFT_accuracy", value: accuracyValue },
           { apiname: "EFT_duration", value: durationMs },
-          { apiname: "EFT_stage",    value: TOTAL_STAGES }
+          { apiname: "EFT_stage",    value: stageCount }
         ]
       }
     };

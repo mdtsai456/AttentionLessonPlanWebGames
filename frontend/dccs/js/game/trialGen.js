@@ -165,13 +165,23 @@ export function createTrialGenerator(manifest, rng) {
     const shapeItems = shuffle(rng, deck.shapes);
     const objectItems = shuffle(rng, deck.objects);
 
-    const target = {
-      frame: shapeItems[pickIndex(rng, shapeItems.length)],
-      content:
-        level.objectRule === 'category'
-          ? nextCategoryTarget(deck)
-          : objectItems[pickIndex(rng, objectItems.length)],
-    };
+    // 外框從本題形狀選項抽出，所以一定在 shapeItems 裡。
+    const frame = shapeItems[pickIndex(rng, shapeItems.length)];
+    let content =
+      level.objectRule === 'category'
+        ? nextCategoryTarget(deck)
+        : objectItems[pickIndex(rng, objectItems.length)];
+
+    // category 題目來自該類全部圖片，選項原本只有代表圖。
+    // 把同 categoryId 的那一格換成這張題目圖，中間圖案才一定出現在選項裡。
+    if (level.objectRule === 'category' && content) {
+      const optionIndex = objectItems.findIndex(
+        (item) => item.categoryId === content.categoryId
+      );
+      if (optionIndex !== -1) objectItems[optionIndex] = content;
+    }
+
+    const target = { frame, content };
 
     return {
       type: 'compound',

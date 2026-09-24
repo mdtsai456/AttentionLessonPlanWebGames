@@ -1,9 +1,8 @@
-// SPEC 4.7 — HUD 繪製。不使用外部字型，一律使用 system font stack。
+// SPEC 4.7 — HUD 繪製。字型為 DCCS/fonts 的 MaokenAssortedSans。
 
 import { CONFIG } from '../config.js';
 
-const FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif';
+const FONT_STACK = '"MaokenAssortedSans", "Microsoft JhengHei", sans-serif';
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -26,9 +25,9 @@ export function drawHud(ctx, viewport, state) {
 }
 
 function drawScorePill(ctx, vx, vy, w, h, score, level) {
-  const pillX = vx + 0.10 * w;
-  const pillY = vy + 0.04 * h;
-  const pillW = 0.30 * w;
+  const pillX = vx + 0.08 * w;
+  const pillY = vy + 0.02 * h;
+  const pillW = 0.42 * w;
   const pillH = 0.07 * h;
   const radius = pillH / 2;
 
@@ -40,9 +39,9 @@ function drawScorePill(ctx, vx, vy, w, h, score, level) {
   ctx.restore();
 
   // SCORE_BAR_FULL 是視覺滿格基準，不是分數上限。
-  const barMargin = pillW * 0.05;
+  const barMargin = pillW * 0.09;
   const barX = pillX + barMargin;
-  const barY = pillY + pillH * 0.62;
+  const barY = pillY + pillH * 0.66;
   const barW = pillW * 0.42;
   const barH = pillH * 0.16;
   const scoreRatio = Math.max(0, Math.min(1, score / CONFIG.SCORE_BAR_FULL));
@@ -61,7 +60,7 @@ function drawScorePill(ctx, vx, vy, w, h, score, level) {
   ctx.font = `bold ${Math.round(pillH * 0.4)}px ${FONT_STACK}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillText(`得分 ${score}`, pillX + barMargin, pillY + pillH * 0.32);
+  ctx.fillText(`得分 ${score}`, pillX + barMargin, pillY + pillH * 0.38);
   ctx.restore();
 
   // 關卡總數由 manifest 決定，此處只顯示目前序號。
@@ -71,7 +70,7 @@ function drawScorePill(ctx, vx, vy, w, h, score, level) {
     ctx.font = `${Math.round(pillH * 0.32)}px ${FONT_STACK}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'right';
-    ctx.fillText(`第 ${level} 關`, pillX + pillW - barMargin, pillY + pillH * 0.32);
+    ctx.fillText(`第 ${level} 關`, pillX + pillW - barMargin, pillY + pillH * 0.38);
     ctx.restore();
   }
 }
