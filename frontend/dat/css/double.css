@@ -37,7 +37,7 @@ button:focus-visible {
   aspect-ratio: 1672 / 941;
   overflow: hidden;
   container-type: inline-size;
-  background: #ffd39d url("assets/background.png") center / 100% 100% no-repeat;
+  background: #ffd39d url("../assets/double_background.png") center / 100% 100% no-repeat;
 }
 
 /* 每位玩家占一半；1cqw 為各自區域寬度的 1%。 */
