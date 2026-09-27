@@ -4,7 +4,7 @@ export const COLOR_POOL = [
   { name: '紅色', hex: '#c52c35' },
   { name: '藍色', hex: '#215cc1' },
   { name: '綠色', hex: '#168047' },
-  { name: '黃色', hex: '#c48221' },
+  { name: '黃色', hex: '#ffff00' },
   { name: '紫色', hex: '#7d3c98' },
   { name: '橘色', hex: '#e08e2b' },
 ];

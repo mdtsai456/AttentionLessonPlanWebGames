@@ -80,10 +80,10 @@ nextBtn.addEventListener('click', () => {
 // 畫面三：模式選擇事件
 document.getElementById('btn-practice').addEventListener('click', () => {
   // 跳轉至練習模式
-  window.location.href = 'index.html?mode=practice';
+  window.location.href = 'single.html?mode=practice';
 });
 
 document.getElementById('btn-start').addEventListener('click', () => {
   // 跳轉至正式遊戲
-  window.location.href = 'index.html?mode=game';
+  window.location.href = 'single.html?mode=game';
 });

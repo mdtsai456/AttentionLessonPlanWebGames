@@ -3,7 +3,7 @@
  */
 
 // 指向本地 local_sqlite_server.py 後端埠號
-const API_BASE_URL = "http://127.0.0.1:5002";
+const API_BASE_URL = "http://127.0.0.1:5001";
 // const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app"; // 切換至中央伺服器時取消這行註解
 
 /**

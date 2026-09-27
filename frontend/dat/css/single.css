@@ -35,7 +35,7 @@ button:focus-visible {
   aspect-ratio: 1672 / 941;
   overflow: hidden;
   container-type: inline-size;
-  background: #ffd39d url("assets/background.png") center / 100% 100% no-repeat;
+  background: #ffd39d url("../assets/single_background.png") center / 100% 100% no-repeat;
 }
 
 /* 左側進度條 */
@@ -319,6 +319,17 @@ button:disabled {
   font-weight: bold;
 }
 
+.primary_white {
+  padding: .5em 2em;
+  border: 3px solid #3eb549;
+  border-radius: 2em;
+  background: white;
+  color: #359d59;
+  font-size: 2cqw;
+  font-weight: bold;
+}
+
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
@@ -418,4 +429,45 @@ button:disabled {
 
 .btn-continue:hover {
   background: #43a047;
+}
+
+.btn-danger {
+  background: #d9534f;
+  color: white;
+  border: none;
+  padding: 10px 50px;
+  font-size: 1.2rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+
+/* ----------------------------------
+   中途離開警示彈窗與按鈕樣式
+---------------------------------- */
+.warning-text {
+  color: #c52c35;
+  font-size: 2cqw;
+  font-weight: bold;
+  margin: 1.5cqw 0;
+  line-height: 1.4;
+}
+
+.result-actions, .warning-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.5cqw;
+  margin-top: 1.5cqw;
+}
+
+button.secondary {
+  background: #8c5828;
+  color: #fff;
+  border: none;
+  padding: 0.6em 1.5em;
+  border-radius: 1cqw;
+  font-size: 1.8cqw;
+  cursor: pointer;
 }

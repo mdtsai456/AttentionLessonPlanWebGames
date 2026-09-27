@@ -1,5 +1,5 @@
-import { sendSessionToApi } from './api.js';
-import { generateQuestionSet } from './questions.js';
+import { sendSessionToApi } from './double_api.js';
+import { generateQuestionSet } from './double_questions.js';
 
 export const ROUND_MS = 1 * 1000;//秒數
 export const AIM_SPEED = 45;
@@ -14,7 +14,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     backHomeBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      getState().safeNavigateTo('../../games.html');
+      getState().safeNavigateTo('../games.html');
     });
   }
 
@@ -239,7 +239,51 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       }, 1500);
     }
   }
+  //中離遊戲
+  async function submitMidGameLeave() {
+    // 只有在正式遊戲進行中 (aiming 或 answer 階段) 且有記錄到開始時間才發送
+    if (isPractice || startTimeMs === 0) return;
 
+    const leaveTimeMs = Date.now();
+    const durationMs = leaveTimeMs - startTimeMs;
+    const totalQuestions = totalStageQuestionsCount || (questions.length * TOTAL_STAGES);
+    const accuracyValue = score > 0 ? parseFloat((score / Math.max(1, index)).toFixed(2)) : 0;
+// ------------------------------------------------------------------
+  // 1. 判斷目前是哪位學生（playerIndex: 0 讀取學生一，1 讀取學生二）
+  // ------------------------------------------------------------------
+  const isP1 = (playerIndex === 0);
+  const rawStudentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || (isP1 ? "G1_S01" : "G1_S02");
+  const schoolKey     = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
+  const currentDay    = parseInt(sessionStorage.getItem("current_day") || "1", 10);
+
+  // 2. 拆解 G1_S01 / G1_S02 取得 grade 與 caseId
+  const gradeKey  = rawStudentKey.includes("_") ? rawStudentKey.split("_")[0] : "G1";
+  const studentId = rawStudentKey.includes("_") ? rawStudentKey.split("_")[1] : rawStudentKey;
+
+    const payload = {
+      lessonId: "1140908_DAT",
+      data: {
+        grade: gradeKey,
+        caseId: studentId,
+        school: schoolKey,
+        currentDay: currentDay,
+        startTime: startTimeMs,
+        endTime: leaveTimeMs,
+        mode: "double",
+        pairId: getState().currentGamePairId, // 共用同一個 UUID
+        stats: [
+          { apiname: "DAT_correct",  value: score },
+          { apiname: "DAT_wrong",    value: wrong },
+          { apiname: "DAT_accuracy", value: accuracyValue },
+          { apiname: "DAT_duration", value: durationMs },
+          { apiname: "DAT_stage",    value: currentStage }
+        ]
+      }
+    };
+
+    console.log(`[Player ${playerIndex + 1}] 中途離開上傳數據中...`, payload);
+    await sendSessionToApi(payload);
+  }
   async function finishGame() {
     phase = 'finished';
     endTimeMs = Date.now();
@@ -255,33 +299,65 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    const isP1 = (playerIndex === 0);
-    const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || (isP1 ? "S01" : "S02");
-    const schoolKey  = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
-    const gradeKey   = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
-    const currentDay = parseInt(sessionStorage.getItem("current_day") || "1", 10);
+    // const isP1 = (playerIndex === 0);
+    // const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || (isP1 ? "S01" : "S02");
+    // const schoolKey  = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
+    // const gradeKey   = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
+    // const currentDay = parseInt(sessionStorage.getItem("current_day") || "1", 10);
 
-    const payload = {
-      lessonId: "1140908_DAT",
-      data: {
-        grade: gradeKey,
-        caseId: studentKey,
-        school: schoolKey,
-        currentDay: currentDay,
-        startTime: startTimeMs,
-        endTime: endTimeMs,
-        mode: "double",
-        pairId: getState().currentGamePairId,
-        stats: [
-          { apiname: "DAT_correct",  value: score },
-          { apiname: "DAT_wrong",    value: wrong },
-          { apiname: "DAT_accuracy", value: accuracyValue },
-          { apiname: "DAT_duration", value: durationMs },
-          { apiname: "DAT_stage",    value: TOTAL_STAGES }
-        ]
-      }
-    };
+    // const payload = {
+    //   lessonId: "1140908_DAT",
+    //   data: {
+    //     grade: gradeKey,
+    //     caseId: studentKey,
+    //     school: schoolKey,
+    //     currentDay: currentDay,
+    //     startTime: startTimeMs,
+    //     endTime: endTimeMs,
+    //     mode: "double",
+    //     pairId: getState().currentGamePairId,
+    //     stats: [
+    //       { apiname: "DAT_correct",  value: score },
+    //       { apiname: "DAT_wrong",    value: wrong },
+    //       { apiname: "DAT_accuracy", value: accuracyValue },
+    //       { apiname: "DAT_duration", value: durationMs },
+    //       { apiname: "DAT_stage",    value: TOTAL_STAGES }
+    //     ]
+    //   }
+    // };
+// ------------------------------------------------------------------
+  // 1. 判斷目前是哪位學生（playerIndex: 0 讀取學生一，1 讀取學生二）
+  // ------------------------------------------------------------------
+  const isP1 = (playerIndex === 0);
+  const rawStudentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || (isP1 ? "G1_S01" : "G1_S02");
+  const schoolKey     = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
+  const currentDay    = parseInt(sessionStorage.getItem("current_day") || "1", 10);
 
+  // 2. 拆解 G1_S01 / G1_S02 取得 grade 與 caseId
+  const gradeKey  = rawStudentKey.includes("_") ? rawStudentKey.split("_")[0] : "G1";
+  const studentId = rawStudentKey.includes("_") ? rawStudentKey.split("_")[1] : rawStudentKey;
+
+  // 3. 打包發送給 API 的 Payload (符合中介平台規範)
+  const payload = {
+    lessonId: "1140908_DAT",
+    data: {
+      grade: gradeKey,           // "G1"
+      caseId: studentId,         // "S01" (或直接傳入 rawStudentKey "G1_S01"，依據你的後端要求)
+      school: schoolKey,         // "KMU"
+      currentDay: currentDay,    // 1
+      startTime: startTimeMs,    // 開局時間戳 (毫秒)
+      endTime: endTimeMs,        // 結束時間戳 (毫秒)
+      mode: "double",            // 雙人版模式識別
+      pairId: getState().currentGamePairId, // 兩位學生共用的同一局 GUID
+      stats: [
+        { apiname: "DAT_correct",  value: score },
+        { apiname: "DAT_wrong",    value: wrong },
+        { apiname: "DAT_accuracy", value: accuracyValue },
+        { apiname: "DAT_duration", value: durationMs },
+        { apiname: "DAT_stage",    value: TOTAL_STAGES }
+      ]
+    }
+  };
     console.log(`[Player ${playerIndex + 1}] 正在存檔中...`, payload);
     await sendSessionToApi(payload);
   }
@@ -354,5 +430,5 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
   });
 
-  return { startPractice, startGame, tick, pauseGame: () => { paused = true; }, resumeGame: () => { paused = false; lastTime = undefined; } };
+  return { startPractice, startGame, tick, pauseGame: () => { paused = true; }, resumeGame: () => { paused = false; lastTime = undefined; },submitMidGameLeave };
 }

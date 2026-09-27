@@ -1,9 +1,13 @@
-// 1. 取得網址模式與設定
+//匯入題目生成與發送 API 功能
+import { generateRandomQuestions } from './single_questions.js';
+import { saveGameDataToBackend } from './single_api.js';
+
+// 取得網址模式與設定
 const urlParams = new URLSearchParams(window.location.search);
 const isPractice = urlParams.get('mode') === 'practice';
 
 // 全域時間與參數設定
-const ROUND_MS = 4000;        // 單題倒數
+const ROUND_MS = 4000;       
 const AIM_SPEED = 45;
 const ANIMAL_SPEED = 4;
 
@@ -55,85 +59,6 @@ function startGame() {
   updateProgress(); 
   renderPositions();
 }
-
-
-//隨機的題目生成
-// 色名與代表顏色的 Hex 碼對照
-const COLOR_OPTIONS = [
-  { name: '紅色', code: '#c52c35' },
-  { name: '藍色', code: '#1e88e5' },
-  { name: '綠色', code: '#168047' },
-  { name: '黃色', code: '#f5e500' },
-  { name: '黑色', code: '#212121' },
-  { name: '紫色', code: '#8e24aa' }
-];
-
-// 1. 生成隨機顏色題目
-function generateColorQuestion() {
-  const isTrue = Math.random() < 0.5; // 50% 機率正確、50% 機率錯誤
-  const textObj = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
-  let colorObj = textObj;
-
-  if (!isTrue) {
-    // 當答案為假時，從剩餘顏色中挑選一個不同的字色
-    const otherColors = COLOR_OPTIONS.filter(c => c.name !== textObj.name);
-    colorObj = otherColors[Math.floor(Math.random() * otherColors.length)];
-  }
-
-  return {
-    type: '顏色判斷：色名與字色是否相同？',
-    text: textObj.name,
-    color: colorObj.code,
-    answer: isTrue
-  };
-}
-
-// 2. 生成隨機數學算式題目
-function generateMathQuestion() {
-  const isTrue = Math.random() < 0.5;
-  const isAddition = Math.random() < 0.5; // 隨機加法或減法
-  let num1, num2, actualResult, displayResult;
-
-  if (isAddition) {
-    num1 = Math.floor(Math.random() * 10) + 1; // 1 ~ 10
-    num2 = Math.floor(Math.random() * 10) + 1;
-    actualResult = num1 + num2;
-  } else {
-    num1 = Math.floor(Math.random() * 15) + 5; // 5 ~ 19
-    num2 = Math.floor(Math.random() * num1) + 1; // 確保結果為正數
-    actualResult = num1 - num2;
-  }
-
-  if (isTrue) {
-    displayResult = actualResult;
-  } else {
-    // 答案錯誤時，隨機加減 1 或 2 作為干擾項
-    const offset = (Math.random() < 0.5 ? 1 : -1) * (Math.floor(Math.random() * 2) + 1);
-    displayResult = actualResult + offset;
-    if (displayResult <= 0) displayResult = actualResult + 3; // 避免出現小於等於 0 的不合理答案
-  }
-
-  const operator = isAddition ? '+' : '−';
-  return {
-    type: '數學判斷：算式答案是否正確？',
-    text: `${num1} ${operator} ${num2} = ${displayResult}`,
-    color: '#65462f', // 數學題統一字體顏色
-    answer: isTrue
-  };
-}
-
-// 3. 混合生成指定數量題目
-function generateRandomQuestions(count = 10) {
-  const list = [];
-  for (let i = 0; i < count; i++) {
-    // 50% 機率抽顏色題，50% 機率抽數學題
-    const q = Math.random() < 0.5 ? generateColorQuestion() : generateMathQuestion();
-    list.push(q);
-  }
-  return list;
-}
-
-
 
 function enableAnswers(enabled) {
   answerButtons.forEach((button) => { button.disabled = !enabled; });
@@ -267,58 +192,6 @@ function endQuestion() {
   }
 }
 
-function finishGame() {
-  phase = 'finished';
-  keys.clear(); pointerDirections.clear();
-  $('pause').disabled = true;
-  $('final-score').textContent = `${score} / ${questions.length} 分`;
-  $('summary').textContent = `誤按 ${wrong} 題・判斷正確但未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
-  $('accuracy').textContent = `得分率 ${Math.round(score / questions.length * 100)}%`;
-
-  const $startGameBtn =$('btn-start-game'); // 取得結束選單的第二個按鈕
-
-  if (isPractice) {
-    $('result-title').textContent = '練習結束';
-    
-    // 按鈕一：再練習一次
-    $('restart').textContent = '再練習一次';
-    $('restart').onclick = startGame;
-
-    // 按鈕二：進入正式遊戲
-    if ($startGameBtn) {$startGameBtn.hidden = false;
-      $startGameBtn.textContent = '進入正式遊戲';
-      $startGameBtn.onclick = () => {
-        window.location.href = 'index.html?mode=game';
-      };
-    }
-  } else {
-    $('result-title').textContent = '挑戰完成！';
-    
-    // 按鈕一：再玩一次
-    $('restart').textContent = '再玩一次';
-    $('restart').onclick = startGame;
-
-    // 按鈕二：返回遊戲大廳 (跳轉到 games.html)
-    if ($startGameBtn) {$startGameBtn.hidden = false;
-      $startGameBtn.textContent = '返回遊戲大廳';
-      $startGameBtn.onclick = () => {
-        window.location.href = '../../games.html';
-      };
-    }
-
-    // 呼叫 API 上傳資料庫 (僅正式模式)
-    saveGameDataToBackend({
-      score: score,
-      wrong: wrong,
-      offTarget: offTarget,
-      timedOut: timedOut,
-      accuracy: Math.round(score / questions.length * 100)
-    });
-  }
-
-  $('results').hidden = false; 
-}
-
 // 寫入後端 API (預留介面)
 // 寫入中介平台 / 資料庫 API
 function finishGame() {
@@ -339,7 +212,7 @@ function finishGame() {
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '進入正式遊戲';
       $startGameBtn.onclick = () => {
-        window.location.href = 'index.html?mode=game';
+        window.location.href = 'single.html?mode=game';
       };
     }
   } else {
@@ -350,74 +223,17 @@ function finishGame() {
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
       $startGameBtn.onclick = () => {
-        window.location.href = '../../games.html';
+        window.location.href = '../games.html';
       };
     }
 
-    // 呼叫 API 上傳資料庫 (補齊 duration 與 stage)
-    saveGameDataToBackend({
-      score: score,
-      wrong: wrong,
-      offTarget: offTarget,
-      timedOut: timedOut,
-      accuracy: Math.round(score / questions.length * 100),
-      duration: Date.now() - gameStartTime, // 補上毫秒數
-      stage: STAGE_COUNT                    // 補上總關卡數
-    });
+    sendApiData();// 呼叫 API 上傳資料庫 
   }
 
   $('results').hidden = false; 
 }
 
-async function saveGameDataToBackend(data) {
-  const url = "http://127.0.0.1:5002/api/sessions";//https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions
 
-
-  const grade = sessionStorage.getItem('grade') || 'G1';
-  const caseId = sessionStorage.getItem('caseId') || 'S03';
-  const school = sessionStorage.getItem('school') || 'KMU'; // ⚠️ 需嚴格符合 KMU 或 NTHU-01~07
-  const currentDay = parseInt(sessionStorage.getItem('currentDay') || '1', 10);
-
-  const payload = {
-    lessonId: "1140908_DAT",
-    data: {
-      grade: grade,
-      caseId: caseId,
-      school: school,
-      currentDay: currentDay,
-      startTime: gameStartTime,
-      endTime: Date.now(),
-      mode: "single",
-      stats: [
-        { apiname: "DAT_correct",  value: data.score },
-        { apiname: "DAT_wrong",    value: data.wrong },
-        { apiname: "DAT_accuracy", value: data.accuracy / 100 },
-        { apiname: "DAT_duration", value: data.duration }, // 正確對應傳入的 duration
-        { apiname: "DAT_stage",    value: data.stage }    // 正確對應傳入的 stage
-      ]
-    }
-  };
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.status === 201) {
-      const result = await res.json();
-      console.log('✅ [API 成功] 資料已成功寫入資料庫！Session ID:', result.sessionId);
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      console.error(`❌ [API 錯誤 ${res.status}]:`, errData.detail || '寫入失敗');
-    }
-  } catch (err) {
-    console.error('❌ [API 網路連線異常]:', err);
-  }
-}
 
 
 function move(delta) {
@@ -458,11 +274,71 @@ function tick(time) {
 $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', startGame);
 $('pause').addEventListener('click', () => {
-  paused = !paused; lastTime = undefined;
-  keys.clear(); pointerDirections.clear();
-  $('pause').textContent = paused ? '繼續' : '暫停';
-  enableAnswers(!paused && phase === 'answer' && !submitted);
+  if (phase === 'aiming' || phase === 'answer') {
+    // 1. 將單人遊戲狀態設為暫停
+    paused = true;
+    lastTime = undefined;
+    keys.clear();
+    pointerDirections.clear();
+    enableAnswers(false);
+
+    // 2. 顯示中途離開警告彈窗
+    const warningOverlay = document.getElementById('leave-warning-overlay');
+    if (warningOverlay) warningOverlay.hidden = false;
+  } else {
+    // 切換暫停 / 繼續
+    paused = !paused;
+    lastTime = undefined;
+    keys.clear(); 
+    pointerDirections.clear();
+    $('pause').textContent = paused ? '繼續' : '暫停';
+    enableAnswers(!paused && phase === 'answer' && !submitted);
+  }
 });
+
+//繼續遊玩
+// 點擊「繼續遊玩」按鈕時恢復遊戲
+const cancelLeaveBtn = document.getElementById('btn-cancel-leave');
+if (cancelLeaveBtn) {
+  cancelLeaveBtn.addEventListener('click', () => {
+    const warningOverlay = document.getElementById('leave-warning-overlay');
+    if (warningOverlay) warningOverlay.hidden = true;
+    
+    // 恢復遊戲
+    paused = false;
+    lastTime = undefined;
+    enableAnswers(phase === 'answer' && !submitted);
+  });
+}
+
+// 點擊「確定離開」按鈕時返回大廳/首頁
+const confirmLeaveBtn = document.getElementById('btn-confirm-leave');
+if (confirmLeaveBtn) {
+  confirmLeaveBtn.addEventListener('click', () => {
+    sendApiData();//中途離開也會上傳 db
+    window.location.href = '../games.html'; // 或您頁面的首頁路徑
+  });
+}
+
+//發送至 single_api.js 的 JSON 資料
+function sendApiData() {
+  // 正式模式且有開始遊戲才發送
+  if (isPractice || !gameStartTime) return;
+
+  const now = Date.now();
+  const calculatedDuration = now - gameStartTime;
+
+  saveGameDataToBackend({
+    score: score,
+    wrong: wrong,
+    offTarget: offTarget,
+    timedOut: timedOut,
+    accuracy: questions.length > 0 ? Math.round((score / questions.length) * 100) : 0,
+    duration: calculatedDuration, // 自動以實際遊玩毫秒數當作 duration
+    stage: STAGE_COUNT,
+    startTime: gameStartTime
+  });
+}
 
 function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
 window.addEventListener('blur', clearInput);
@@ -493,7 +369,7 @@ document.querySelectorAll('[data-move]').forEach((button) => {
   }
 });
 
-Promise.all(['assets/background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
+Promise.all(['assets/single_background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
   new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);

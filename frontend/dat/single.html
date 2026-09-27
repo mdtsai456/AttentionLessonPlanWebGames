@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DAT 動物追擊令・單人版</title>
-  <link rel="stylesheet" href="DAT_single.css">
+  <link rel="stylesheet" href="css/single.css">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
-  <script src="DAT_single.js" defer></script>
+  <script type="module" src="js/single.js"></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令單人遊戲">
@@ -48,18 +48,28 @@
         <strong id="final-score"></strong>
         <p id="summary"></p>
         <p id="accuracy"></p>
-        <button class="primary" id="restart" type="button">再玩一次</button>
+        <button class="primary_white" id="restart" type="button">再玩一次</button>
         <button class="primary" id="btn-start-game" hidden>進入正式遊戲</button>
       </section>
     </div>
     <!-- 換關卡的 overlay -->
-<!-- 換關卡彈窗面板 -->
+    <!-- 換關卡彈窗面板 -->
     <div id="stage-clear-modal" class="modal-overlay" hidden>
       <div class="stage-clear-card">
         <div class="stage-title-badge" id="stage-clear-title">第 1 關結束</div>
         <div class="stage-clear-text">準備開始下一關嘍！</div>
         <button id="btn-next-stage" class="btn-continue">繼續</button>
       </div>
+    </div>
+     <!-- 中途離開遊戲的警告彈窗 -->
+    <div class="overlay" id="leave-warning-overlay" hidden>
+      <section class="result-card leave-card">
+        <h2>⚠️ 確定要離開遊戲嗎？</h2>
+        <p class="warning-text">若沒有完整遊玩並通關，當前遊戲數據將不會儲存並直接遺失！</p>
+        <div class="warning-actions">
+          <button class="btn-continue" id="btn-cancel-leave" type="button">繼續遊玩</button>
+          <button class="btn-danger" id="btn-confirm-leave" type="button">確定離開 (數據不保存)</button>
+        </div>
     </div>
   </main>
 </body>

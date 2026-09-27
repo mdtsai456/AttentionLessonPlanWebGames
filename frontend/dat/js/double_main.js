@@ -1,6 +1,6 @@
 // js/main.js
-import { generateUUID } from './api.js';
-import { createPlayer } from './game.js';
+import { generateUUID } from './double_api.js';
+import { createPlayer } from './double_game.js';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -53,20 +53,26 @@ document.querySelectorAll('[data-ui="back-home"]').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    safeNavigateTo('../../games.html');
+    safeNavigateTo('../games.html');
   });
 });
 
 const btnConfirmLeave = document.getElementById('btn-confirm-leave');
 if (btnConfirmLeave) {
-  btnConfirmLeave.addEventListener('click', (e) => {
+  btnConfirmLeave.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    safeNavigateTo('../../games.html');
+    // 1. 讓兩位玩家 (Player 1 與 Player 2) 各自上傳中途離開的數據
+    if (players && players.length > 0) {
+      await Promise.all(players.map(p => p.submitMidGameLeave && p.submitMidGameLeave()));
+    }
+
+    // 2. 完成數據上傳後安全跳轉回大廳/首頁
+    safeNavigateTo('../games.html');
   });
 }
 
-Promise.all(['assets/background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
+Promise.all(['assets/double_background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
   new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
