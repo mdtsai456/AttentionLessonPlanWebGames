@@ -1,10 +1,11 @@
 import { sendSessionToApi } from './api.js';
 import { generateQuestionSet } from './questions.js';
 
-export const ROUND_MS = 4000;
+export const ROUND_MS = 10000;
 export const AIM_SPEED = 45;
 export const ANIMAL_SPEED = 4;
 export const TOTAL_STAGES = 6;
+const STAGE_MS = 60000;
 const PRACTICE_STAGES = 1;
 const PRACTICE_QUESTIONS = 2;
 const GAME_QUESTIONS = 3;
@@ -49,10 +50,16 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   let stageCount = TOTAL_STAGES;
   let questionsPerStage = GAME_QUESTIONS;
+  let stageHits = [];
+  let levelAccuracies = [];
+  let reactionSamples = [];
+  let activeMs = 0;
+  let focusMs = 0;
   let clearedMidBreak = false;
+  let stageDeadline = 0;
 
   function loadStageQuestions() {
-    questions = generateQuestionSet(questionsPerStage, isPractice);
+    questions = generateQuestionSet(isPractice ? questionsPerStage : 1, isPractice);
   }
 
   function startPractice() {
@@ -62,6 +69,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     currentStage = 1;
     getState().playerPracticeFinished[playerIndex] = false;
     questions = generateQuestionSet(questionsPerStage, true);
+    stageDeadline = 0;
 
     resetPlayerState(true);
     $('field').dataset.mode = 'practice';
@@ -85,9 +93,15 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     startTimeMs = Date.now();
     
     score = wrong = offTarget = timedOut = elapsed = 0;
-    
+    stageHits = [];
+    levelAccuracies = [];
+    reactionSamples = [];
+    activeMs = 0;
+    focusMs = 0;
+
     loadStageQuestions();
-    totalStageQuestionsCount = questionsPerStage * stageCount;
+    totalStageQuestionsCount = 0;
+    stageDeadline = 0;
     
     resetPlayerState(false);
     
@@ -121,15 +135,22 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   function updateProgress() {
     $('score').textContent = `${score} 分`;
-    $('round').textContent = isPractice
-      ? `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (練習關卡)`
-      : `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (第 ${currentStage} / ${stageCount} 關)`;
-
-    const currentTotalCompleted = (currentStage - 1) * questions.length + index;
-    const totalMax = totalStageQuestionsCount || (questions.length * stageCount);
-    $('progress').setAttribute('aria-valuemax', totalMax);
-    $('progress').setAttribute('aria-valuenow', currentTotalCompleted);
-    $('progress-fill').style.height = `${(currentTotalCompleted / totalMax) * 100}%`;
+    if (isPractice) {
+      $('round').textContent = `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (練習關卡)`;
+      $('progress').setAttribute('aria-valuemax', questions.length);
+      $('progress').setAttribute('aria-valuenow', index);
+      $('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
+      return;
+    }
+    const left = stageDeadline
+      ? Math.max(0, Math.ceil((stageDeadline - Date.now()) / 1000))
+      : STAGE_MS / 1000;
+    const used = stageDeadline ? Math.min(STAGE_MS, Date.now() - (stageDeadline - STAGE_MS)) : 0;
+    const ratio = ((currentStage - 1) + used / STAGE_MS) / stageCount;
+    $('round').textContent = `第 ${index + 1} 題・剩餘 ${left} 秒（第 ${currentStage} / ${stageCount} 關）`;
+    $('progress').setAttribute('aria-valuemax', 100);
+    $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));
+    $('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
   }
 
   function enableAnswers(enabled) {
@@ -156,7 +177,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     return animalPixels.rows[y][x] === '1';
   }
 
+  function answerLimitMs() {
+    if (isPractice || !stageDeadline) return ROUND_MS;
+    return Math.max(0, Math.min(ROUND_MS, stageDeadline - Date.now()));
+  }
+
   function showQuestion() {
+    if (!isPractice && !stageDeadline) stageDeadline = Date.now() + STAGE_MS;
     phase = 'answer'; elapsed = 0; submitted = false;
     const q = questions[index];
     $('question-type').textContent = q.type;
@@ -168,12 +195,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   function updateClock() {
-    $('time-text').textContent = `${((ROUND_MS - elapsed) / 1000).toFixed(1)} 秒`;
-    $('time-fill').style.width = `${(1 - elapsed / ROUND_MS) * 100}%`;
+    const limit = Math.max(answerLimitMs(), 1);
+    $('time-text').textContent = `${Math.max(0, (limit - elapsed) / 1000).toFixed(1)} 秒`;
+    $('time-fill').style.width = `${Math.max(0, (1 - elapsed / limit) * 100)}%`;
   }
 
   function answer() {
-    if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= ROUND_MS) return;
+    if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= answerLimitMs()) return;
     submitted = true;
     recordResult(true);
     enableAnswers(false);
@@ -183,8 +211,11 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     const correct = pressed === questions[index].answer;
     const onTarget = isOnAnimal();
     let message;
+    reactionSamples.push(elapsed);
     if (!pressed && !correct) {
-      timedOut++; message = `漏答：正確的題目要按 ${answerLabel}`;
+      timedOut++;
+      wrong++;
+      message = `漏答：正確的題目要按 ${answerLabel}`;
     } else if (!correct) {
       wrong++; message = '誤按：不正確的題目不需要按鍵';
     } else if (!onTarget) {
@@ -194,11 +225,57 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
     $('animal').dataset.result = correct && onTarget ? 'correct' : 'wrong';
     $('feedback').textContent = message;
+    stageHits.push(Boolean(correct && onTarget));
     updateProgress();
+  }
+
+  function commitStageAccuracy() {
+    if (isPractice || !stageHits.length) return;
+    const hits = stageHits.filter(Boolean).length;
+    levelAccuracies[currentStage - 1] = hits / stageHits.length;
+    stageHits = [];
+  }
+
+  function eftStats(stage, durationMs) {
+    const metrics = sessionMetrics();
+    return [
+      { apiname: 'EFT_correct', value: score },
+      { apiname: 'EFT_wrong', value: wrong },
+      { apiname: 'EFT_accuracy', value: metrics.accuracy },
+      { apiname: 'EFT_duration', value: durationMs },
+      { apiname: 'EFT_stage', value: stage },
+      { apiname: 'EFT_levelAccuracy', value: levelAccuracyText(stage) },
+      { apiname: 'EFT_avgReactionMs', value: metrics.avgReactionMs },
+      { apiname: 'EFT_questionCount', value: metrics.questionCount },
+      { apiname: 'EFT_aimRatio', value: metrics.aimRatio },
+      { apiname: 'EFT_focusMs', value: metrics.focusMs },
+    ];
+  }
+
+  function sessionMetrics() {
+    const questionCount = score + wrong + offTarget;
+    const avgReactionMs = reactionSamples.length
+      ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
+      : 0;
+    return {
+      questionCount,
+      avgReactionMs,
+      aimRatio: activeMs > 0 ? focusMs / activeMs : 0,
+      focusMs,
+      accuracy: questionCount ? score / questionCount : 0,
+    };
+  }
+
+  function levelAccuracyText(stage) {
+    return levelAccuracies
+      .slice(0, stage)
+      .map((value) => Number(value.toFixed(4)))
+      .join(',');
   }
 
   function beginNextStage() {
     currentStage++;
+    stageDeadline = 0;
     resetPlayerState(false);
     loadStageQuestions();
 
@@ -215,39 +292,47 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   function endQuestion() {
+    if (phase !== 'answer') return;
+    phase = 'resolving';
     if (!submitted) recordResult(false);
     const message = $('feedback').textContent;
     index++;
     updateProgress();
 
-    if (index < questions.length) {
-      showQuestion();
-      $('feedback').textContent = `上一題：${message}`;
-    } else {
-      if (isPractice) {
-        finishPractice();
-      } else {
-        if (currentStage < stageCount) {
-          if (currentStage === 3 && !clearedMidBreak) {
-            phase = 'mid_break';
-            enableAnswers(false);
-            $('feedback').textContent = '第 3 關已結束，等待另一位玩家';
-            getState().waitForMidBreak(playerIndex, () => {
-              clearedMidBreak = true;
-              beginNextStage();
-            });
-            return;
-          }
-          phase = 'stage_clear';
-          enableAnswers(false);
-          $('feedback').textContent = `第 ${currentStage} 關已結束，等待另一位玩家`;
-          getState().waitForStageClear(playerIndex, currentStage, () => {
-            beginNextStage();
-          });
-        } else {
-          finishGame();
-        }
+    const stageOver = !isPractice && stageDeadline && Date.now() >= stageDeadline - 20;
+    if (!stageOver && (isPractice ? index < questions.length : true)) {
+      if (!isPractice && index >= questions.length) {
+        questions.push(...generateQuestionSet(1, false));
       }
+      if (index < questions.length) {
+        showQuestion();
+        $('feedback').textContent = `上一題：${message}`;
+        return;
+      }
+    }
+
+    commitStageAccuracy();
+    if (isPractice) {
+      finishPractice();
+    } else if (currentStage < stageCount) {
+      if (currentStage === 3 && !clearedMidBreak) {
+        phase = 'mid_break';
+        enableAnswers(false);
+        $('feedback').textContent = '第 3 關已結束，等待另一位玩家';
+        getState().waitForMidBreak(playerIndex, () => {
+          clearedMidBreak = true;
+          beginNextStage();
+        });
+        return;
+      }
+      phase = 'stage_clear';
+      enableAnswers(false);
+      $('feedback').textContent = `第 ${currentStage} 關已結束，等待另一位玩家`;
+      getState().waitForStageClear(playerIndex, currentStage, () => {
+        beginNextStage();
+      });
+    } else {
+      finishGame();
     }
   }
 
@@ -265,12 +350,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     endTimeMs = Date.now();
     keys.clear(); pointerDirections.clear();
 
-    const totalQuestions = totalStageQuestionsCount || (questions.length * stageCount); 
-    const accuracyValue = parseFloat((score / Math.max(1, totalQuestions)).toFixed(2));
+    const answered = Math.max(score + wrong + offTarget, 1);
+    const accuracyValue = parseFloat((score / answered).toFixed(2));
     const durationMs = endTimeMs - startTimeMs;
 
     $('pause').disabled = true;
-    $('final-score').textContent = `${score} / ${totalQuestions} 分`;
+    $('final-score').textContent = `${score} / ${answered} 分`;
     $('summary').textContent = `累計誤按 ${wrong} 題・未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
@@ -296,13 +381,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         endTime: endTimeMs,
         mode: "double",
         pairId: getState().currentGamePairId,
-        stats: [
-          { apiname: "EFT_correct",  value: score },
-          { apiname: "EFT_wrong",    value: wrong },
-          { apiname: "EFT_accuracy", value: accuracyValue },
-          { apiname: "EFT_duration", value: durationMs },
-          { apiname: "EFT_stage",    value: stageCount }
-        ]
+        stats: eftStats(stageCount, durationMs)
       }
     };
 
@@ -332,15 +411,18 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     const delta = lastTime === undefined ? 0 : Math.max(0, time - lastTime);
     lastTime = time;
     if (!paused && !document.hidden && ['aiming', 'answer'].includes(phase)) {
+      activeMs += delta;
+      if (isOnAnimal()) focusMs += delta;
       let remaining = Math.min(delta, 5000);
       while (remaining > 0) { const step = Math.min(remaining, 20); move(step); remaining -= step; }
       if (phase === 'aiming') {
         if (isOnAnimal()) showQuestion();
       } else if (phase === 'answer') {
-        elapsed = Math.min(ROUND_MS, elapsed + delta);
+        elapsed = Math.min(answerLimitMs(), elapsed + delta);
         updateClock();
-        if (elapsed >= ROUND_MS) endQuestion();
+        if (elapsed >= answerLimitMs()) endQuestion();
       }
+      if (!isPractice && (phase === 'aiming' || phase === 'answer')) updateProgress();
     }
     requestAnimationFrame(tick);
   }
@@ -378,5 +460,46 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
   });
 
-  return { startPractice, startGame, tick, pauseGame: () => { paused = true; }, resumeGame: () => { paused = false; lastTime = undefined; } };
+  function completedStages() {
+    if (isPractice || phase === 'practice_done') return 0;
+    if (phase === 'finished') return stageCount;
+    if (phase === 'mid_break' || phase === 'stage_clear') return currentStage;
+    return Math.max(0, currentStage - 1);
+  }
+
+  async function saveRun(stage) {
+    const isP1 = playerIndex === 0;
+    const studentKey = sessionStorage.getItem(isP1 ? 'student1_key' : 'student2_key') || '';
+    const schoolKey = sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school') || 'KMU';
+    const gradeKey = sessionStorage.getItem(isP1 ? 'student1_grade' : 'student2_grade') || 'G1';
+    const caseId =
+      sessionStorage.getItem(isP1 ? 'student1_case' : 'student2_case') ||
+      (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
+      (isP1 ? 'S01' : 'S02');
+    const currentDay = parseInt(sessionStorage.getItem('current_day') || '1', 10);
+    await sendSessionToApi({
+      lessonId: '1140908_EFT',
+      data: {
+        grade: gradeKey,
+        caseId,
+        school: schoolKey,
+        currentDay,
+        startTime: startTimeMs || Date.now(),
+        endTime: Date.now(),
+        mode: 'double',
+        pairId: getState().currentGamePairId,
+        stats: eftStats(stage, Date.now() - (startTimeMs || Date.now())),
+      },
+    });
+  }
+
+  return {
+    startPractice,
+    startGame,
+    tick,
+    completedStages,
+    saveRun,
+    pauseGame: () => { paused = true; },
+    resumeGame: () => { paused = false; lastTime = undefined; },
+  };
 }

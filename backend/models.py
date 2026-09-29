@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +30,11 @@ class GameStats(BaseModel):
     accuracy: float
     duration: float  # 毫秒
     stage: int  # 本場實際作答題數／關卡數
+    levelAccuracy: list[float] | None = None  # 第 1 關起，每一關的正確率（0–1）
+    avgReactionMs: float | None = None
+    questionCount: int | None = None  # 指令出擊不送
+    aimRatio: float | None = None  # 瓢蟲：準心對準時間 ÷ 有效遊戲時間
+    focusMs: float | None = None  # 瓢蟲：準心疊在目標上的累積時間
 
 
 class PlayRecord(SessionItem):
@@ -143,6 +150,7 @@ class TeacherLoginResponse(BaseModel):
     teacherId: int
     teacherName: str
     school: str
+    expiresAt: datetime
 
 
 class StudentLoginResponse(BaseModel):
@@ -151,3 +159,4 @@ class StudentLoginResponse(BaseModel):
     grade: str
     caseId: str
     school: str
+    expiresAt: datetime

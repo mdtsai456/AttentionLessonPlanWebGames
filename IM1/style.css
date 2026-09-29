@@ -225,6 +225,14 @@ body {
   color: #3f6f48;
 }
 
+.btn-leave {
+  position: absolute;
+  left: 2vw;
+  bottom: 2.2vh;
+  z-index: 12;
+  min-width: 7.2rem;
+}
+
 .backpack {
   position: absolute;
   left: 50%;

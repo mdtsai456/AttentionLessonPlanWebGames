@@ -38,7 +38,7 @@ mockup 隱含的需求，所以改成另外發一組**全域唯一**的帳號。
    `studentKey`。老師姓名、學生 `studentKey`/`school` 是登入**成功後**回應裡的
    資訊，不是登入輸入。
 4. **登入發不透明 token**，存進新表 `login_session`（刻意不叫 `session`——這個
-   系統的 `session` 已經是「遊戲場次」的代稱），8 小時過期。前端後續呼叫帶
+   系統的 `session` 已經是「遊戲場次」的代稱），1 小時過期。前端後續呼叫帶
    `Authorization: Bearer <token>`。
 5. **每一支會回傳學生資料的端點都要驗 token**，且**後端強制場域隔離**，不是只在
    前端 UI 上藏起別的場域——老師 token 查別場域一律 403，學生 token 只能查自己。

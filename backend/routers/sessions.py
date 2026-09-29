@@ -101,6 +101,63 @@ def ms_to_datetime(ms: int) -> datetime:
         raise InvalidTimestampError("時間戳記無效") from exc
 
 
+def format_level_accuracy(value: Any) -> str | None:
+    """把每一關正確率收成逗號分隔的 0–1 字串，最多 6 關。"""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",")]
+    elif isinstance(value, (list, tuple)):
+        parts = [str(part).strip() for part in value]
+    else:
+        parts = [str(value).strip()]
+
+    numbers: list[str] = []
+    for part in parts:
+        if part == "":
+            continue
+        try:
+            number = float(part)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("levelAccuracy 必須是 0 到 1 的數字") from exc
+        if number != number or number < 0 or number > 1:
+            raise ValueError("levelAccuracy 必須是 0 到 1 的數字")
+        numbers.append(f"{round(number, 4):.4f}")
+    if not numbers:
+        return None
+    if len(numbers) > 6:
+        raise ValueError("levelAccuracy 最多 6 關")
+    return ",".join(numbers)
+
+
+def optional_float(value: Any, name: str) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} 必須是數字") from exc
+    if number != number or number < 0:
+        raise ValueError(f"{name} 必須是不小於 0 的數字")
+    return number
+
+
+def optional_ratio(value: Any) -> float | None:
+    number = optional_float(value, "aimRatio")
+    if number is not None and number > 1:
+        raise ValueError("aimRatio 必須是 0 到 1")
+    return number
+
+
+def optional_count(value: Any) -> int | None:
+    number = optional_float(value, "questionCount")
+    if number is None:
+        return None
+    if not number.is_integer():
+        raise ValueError("questionCount 必須是整數")
+    return int(number)
+
+
 def unity_core_stats(game_name: str, stats: list[UnityStat]) -> dict[str, Any]:
     by_name = {item.apiname: item.value for item in stats}
     result: dict[str, Any] = {}
@@ -109,6 +166,19 @@ def unity_core_stats(game_name: str, stats: list[UnityStat]) -> dict[str, Any]:
         if key not in by_name:
             raise ValueError(f"缺少必要統計：{key}")
         result[column] = cast(by_name[key])
+    level_key = f"{game_name}_levelAccuracy"
+    if level_key in by_name:
+        result["level_accuracy"] = format_level_accuracy(by_name[level_key])
+    optional_fields = (
+        ("avgReactionMs", "avg_reaction_ms", lambda value: optional_float(value, "avgReactionMs")),
+        ("questionCount", "question_count", optional_count),
+        ("aimRatio", "aim_ratio", optional_ratio),
+        ("focusMs", "focus_ms", lambda value: optional_float(value, "focusMs")),
+    )
+    for suffix, column, cast in optional_fields:
+        key = f"{game_name}_{suffix}"
+        if key in by_name:
+            result[column] = cast(by_name[key])
     return result
 
 

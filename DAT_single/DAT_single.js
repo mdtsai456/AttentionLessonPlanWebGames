@@ -3,7 +3,8 @@ const urlParams = new URLSearchParams(window.location.search);
 const isPractice = urlParams.get('mode') === 'practice';
 
 // 全域時間與參數設定
-const ROUND_MS = 4000;        // 單題倒數
+const ROUND_MS = 10000;       // 單題最多 10 秒，逾時算錯並換下一題
+const STAGE_MS = 60000;       // 正式遊戲每關 60 秒，時間內答完就繼續出題
 const AIM_SPEED = 45;
 const ANIMAL_SPEED = 4;
 
@@ -18,21 +19,33 @@ const bindings = {
 
 let phase = 'loading', paused = false, lastTime, elapsed = 0;
 let submitted = false;
-let questions = [], index = 0, score = 0, wrong = 0, offTarget = 0, timedOut = 0;
+let questions = [], index = 0, score = 0, wrong = 0, offTarget = 0, timedOut = 0, outcomes = [];
+let reactionSamples = [], activeMs = 0, focusMs = 0;
 let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
 const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
 let isFirstAim = true; //判斷瞄準動物之後開始計時
 const STAGE_COUNT = isPractice ? 1 : 6;
-const QUESTIONS_PER_STAGE = isPractice ? 2 : 3;
+const QUESTIONS_PER_STAGE = 2;
 const MID_STAGE = 3;
+let stage = 1;
+let stageDeadline = 0;
+let stageQuestionNo = 0;
+let levelOutcomes = [[]];
 function startGame() {
   gameStartTime = Date.now();
-  const totalQuestions = STAGE_COUNT * QUESTIONS_PER_STAGE;
-  questions = generateRandomQuestions(totalQuestions);
+  stage = 1;
+  stageDeadline = 0;
+  stageQuestionNo = 0;
+  levelOutcomes = [[]];
+  questions = isPractice ? generateRandomQuestions(QUESTIONS_PER_STAGE) : [];
 
   index = score = wrong = offTarget = timedOut = elapsed = 0;
+  outcomes = [];
+  reactionSamples = [];
+  activeMs = 0;
+  focusMs = 0;
   phase = 'aiming';
   submitted = false;
   paused = false;
@@ -44,8 +57,7 @@ function startGame() {
   $('results').hidden = true;
   $('stage-clear-modal').hidden = true;
   $('btn-lobby').hidden = true;
-  $('pause').disabled = false;
-  $('pause').textContent = '暫停';
+  $('leave-btn').disabled = false;
   $('question-type').textContent = isPractice ? '【練習模式】等待瞄準' : '等待瞄準';
   $('question-text').textContent = '—';
   $('time-text').textContent = '尚未開始';
@@ -144,24 +156,29 @@ function enableAnswers(enabled) {
 function updateProgress() {
   $('score').textContent = `${score} 分`;
 
-  // 防止超出陣列索引
-  const safeIndex = Math.min(index, questions.length - 1);
-  
-  // 計算當前關卡 (1-based) 與當前關卡內的題數 (1~12)
-  const currentStage = Math.floor(safeIndex / QUESTIONS_PER_STAGE) + 1;
-  const currentQuestionInStage = (safeIndex % QUESTIONS_PER_STAGE) + 1;
-
-  // 格式化顯示文字
   if (isPractice) {
-    $('round').textContent = `第 ${currentQuestionInStage} / ${QUESTIONS_PER_STAGE} 題 (練習關卡)`;
-  } else {
-    $('round').textContent = `第 ${currentQuestionInStage} / ${QUESTIONS_PER_STAGE} 題 (第 ${currentStage} / ${STAGE_COUNT} 關)`;
+    const shown = Math.min(index + 1, questions.length);
+    $('round').textContent = `第 ${shown} / ${questions.length} 題 (練習關卡)`;
+    $('progress').setAttribute('aria-valuemax', questions.length);
+    $('progress').setAttribute('aria-valuenow', index);
+    $('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
+    return;
   }
 
-  // 左側整體進度條更新 (按總進度 60 題比例計算)
-  $('progress').setAttribute('aria-valuemax', questions.length);
-  $('progress').setAttribute('aria-valuenow', index);
-  $('progress-fill').style.height = `${(index / questions.length) * 100}%`;
+  const left = stageDeadline
+    ? Math.max(0, Math.ceil((stageDeadline - Date.now()) / 1000))
+    : STAGE_MS / 1000;
+  const used = stageDeadline ? Math.min(STAGE_MS, Date.now() - (stageDeadline - STAGE_MS)) : 0;
+  const ratio = ((stage - 1) + used / STAGE_MS) / STAGE_COUNT;
+  $('round').textContent = `第 ${Math.max(stageQuestionNo, 1)} 題・剩餘 ${left} 秒（第 ${stage} / ${STAGE_COUNT} 關）`;
+  $('progress').setAttribute('aria-valuemax', 100);
+  $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));
+  $('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
+}
+
+function answerLimitMs() {
+  if (isPractice || !stageDeadline) return ROUND_MS;
+  return Math.max(0, Math.min(ROUND_MS, stageDeadline - Date.now()));
 }
 
 function renderPositions() {
@@ -185,6 +202,16 @@ function isOnAnimal() {
 }
 
 function showQuestion() {
+  if (!isPractice) {
+    if (!stageDeadline) {
+      stageDeadline = Date.now() + STAGE_MS;
+      stageQuestionNo = 0;
+    }
+    if (!questions[index]) {
+      questions[index] = Math.random() < 0.5 ? generateColorQuestion() : generateMathQuestion();
+    }
+    stageQuestionNo += 1;
+  }
   phase = 'answer'; elapsed = 0; submitted = false;
   const q = questions[index];
   $('question-type').textContent = q.type;
@@ -196,12 +223,13 @@ function showQuestion() {
 }
 
 function updateClock() {
-  $('time-text').textContent = `${((ROUND_MS - elapsed) / 1000).toFixed(1)} 秒`;
-  $('time-fill').style.width = `${(1 - elapsed / ROUND_MS) * 100}%`;
+  const limit = Math.max(answerLimitMs(), 1);
+  $('time-text').textContent = `${Math.max(0, (limit - elapsed) / 1000).toFixed(1)} 秒`;
+  $('time-fill').style.width = `${Math.max(0, (1 - elapsed / limit) * 100)}%`;
 }
 
 function answer() {
-  if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= ROUND_MS) return;
+  if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= answerLimitMs()) return;
   submitted = true;
   recordResult(true);
   enableAnswers(false);
@@ -211,8 +239,11 @@ function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
   let message;
+  reactionSamples.push(elapsed);
   if (!pressed && !correct) {
-    timedOut++; message = '漏答：正確的題目要按空白鍵';
+    timedOut++;
+    wrong++;
+    message = '漏答：正確的題目要按空白鍵';
   } else if (!correct) {
     wrong++; message = '誤按：不正確的題目不需要按鍵';
   } else if (!onTarget) {
@@ -222,7 +253,17 @@ function recordResult(pressed) {
   }
   $('animal').dataset.result = correct && onTarget ? 'correct' : 'wrong';
   $('feedback').textContent = message;
+  outcomes.push(Boolean(correct && onTarget));
   updateProgress();
+}
+
+function levelAccuracyText(stageCount) {
+  return levelOutcomes
+    .slice(0, stageCount)
+    .filter((slice) => slice && slice.length)
+    .map((slice) => slice.filter(Boolean).length / slice.length)
+    .map((value) => Number(value.toFixed(4)))
+    .join(',');
 }
 
 function showStageClearModal(completedStage) {
@@ -248,6 +289,9 @@ function continueNextStage() {
   $('btn-lobby').disabled = false;
   $('btn-next-stage').disabled = false;
 
+  stage += 1;
+  stageDeadline = 0;
+  levelOutcomes[stage - 1] = [];
   phase = 'aiming';
   aim = { x: 25, y: 50 };
   animal = { x: 55, y: 50, vx: 1, vy: .7 };
@@ -269,53 +313,82 @@ $('btn-lobby').addEventListener('click', async () => {
 });
 
 function endQuestion() {
+  if (phase !== 'answer') return;
+  phase = 'resolving';
   if (!submitted) recordResult(false);
+  if (!isPractice) {
+    if (!levelOutcomes[stage - 1]) levelOutcomes[stage - 1] = [];
+    levelOutcomes[stage - 1].push(Boolean(outcomes[outcomes.length - 1]));
+  }
   index++;
 
-  if (index < questions.length) {
-    // 當剛好做完一關時
-    if (!isPractice && index % QUESTIONS_PER_STAGE === 0) {
-      const completedStage = index / QUESTIONS_PER_STAGE;
-      showStageClearModal(completedStage); 
-    } else {
-      updateProgress();
-      showQuestion();
-    }
-  } else {
-    updateProgress();
-    finishGame();
+  if (isPractice) {
+    if (index < questions.length) showQuestion();
+    else finishGame();
+    return;
   }
+
+  if (Date.now() >= stageDeadline - 20) {
+    if (stage >= STAGE_COUNT) finishGame();
+    else showStageClearModal(stage);
+    return;
+  }
+  showQuestion();
 }
 
 function answeredCount() {
   return Math.max(index, 1);
 }
 
+let savedStage = 0;
+
+function sessionMetrics() {
+  const questionCount = score + wrong + offTarget;
+  const avgReactionMs = reactionSamples.length
+    ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
+    : 0;
+  return {
+    questionCount,
+    avgReactionMs,
+    aimRatio: activeMs > 0 ? focusMs / activeMs : 0,
+    focusMs,
+    accuracy: questionCount ? score / questionCount : 0,
+  };
+}
+
 function saveCurrentRun(stage) {
-  const total = answeredCount();
+  savedStage = stage;
+  const metrics = sessionMetrics();
   return saveGameDataToBackend({
     score: score,
     wrong: wrong,
     offTarget: offTarget,
     timedOut: timedOut,
-    accuracy: Math.round(score / total * 100),
+    accuracy: metrics.accuracy,
     duration: Date.now() - gameStartTime,
     stage: stage,
+    levelAccuracy: levelAccuracyText(stage),
+    avgReactionMs: metrics.avgReactionMs,
+    questionCount: metrics.questionCount,
+    aimRatio: metrics.aimRatio,
+    focusMs: metrics.focusMs,
   });
 }
 
 function returnToLobby() {
+  window.removeEventListener('beforeunload', blockUnload);
   window.location.href = '../Select/index.html';
 }
 
 function finishGame() {
   phase = 'finished';
   keys.clear(); pointerDirections.clear();
-  $('pause').disabled = true;
+  $('leave-btn').disabled = false;
   $('stage-clear-modal').hidden = true;
-  $('final-score').textContent = `${score} / ${questions.length} 分`;
+  const answered = Math.max(index, 1);
+  $('final-score').textContent = `${score} / ${index} 分`;
   $('summary').textContent = `誤按 ${wrong} 題・判斷正確但未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
-  $('accuracy').textContent = `得分率 ${Math.round(score / questions.length * 100)}%`;
+  $('accuracy').textContent = `得分率 ${Math.round(score / answered * 100)}%`;
 
   const $startGameBtn = $('btn-start-game');
 
@@ -376,9 +449,14 @@ async function saveGameDataToBackend(data) {
       stats: [
         { apiname: "EFT_correct",  value: data.score },
         { apiname: "EFT_wrong",    value: data.wrong },
-        { apiname: "EFT_accuracy", value: data.accuracy / 100 },
+        { apiname: "EFT_accuracy", value: data.accuracy },
         { apiname: "EFT_duration", value: data.duration },
-        { apiname: "EFT_stage",    value: data.stage }
+        { apiname: "EFT_stage",    value: data.stage },
+        { apiname: "EFT_levelAccuracy", value: data.levelAccuracy },
+        { apiname: "EFT_avgReactionMs", value: data.avgReactionMs },
+        { apiname: "EFT_questionCount", value: data.questionCount },
+        { apiname: "EFT_aimRatio", value: data.aimRatio },
+        { apiname: "EFT_focusMs", value: data.focusMs },
       ]
     }
   };
@@ -427,27 +505,39 @@ function tick(time) {
   const delta = lastTime === undefined ? 0 : Math.max(0, time - lastTime);
   lastTime = time;
   if (!paused && !document.hidden && ['aiming', 'answer'].includes(phase)) {
+    activeMs += delta;
+    if (isOnAnimal()) focusMs += delta;
     let remaining = Math.min(delta, 5000);
     while (remaining > 0) { const step = Math.min(remaining, 20); move(step); remaining -= step; }
     if (phase === 'aiming') {
       if (isOnAnimal()) showQuestion();
     } else if (phase === 'answer') {
-      elapsed = Math.min(ROUND_MS, elapsed + delta);
+      elapsed = Math.min(answerLimitMs(), elapsed + delta);
       updateClock();
-      if (elapsed >= ROUND_MS) endQuestion();
+      if (elapsed >= answerLimitMs()) endQuestion();
     }
+    if (!isPractice && (phase === 'aiming' || phase === 'answer')) updateProgress();
   }
   requestAnimationFrame(tick);
 }
 
 $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', startGame);
-$('pause').addEventListener('click', () => {
-  paused = !paused; lastTime = undefined;
-  keys.clear(); pointerDirections.clear();
-  $('pause').textContent = paused ? '繼續' : '暫停';
-  enableAnswers(!paused && phase === 'answer' && !submitted);
-});
+$('leave-btn').addEventListener('click', leaveGame);
+
+async function leaveGame() {
+  $('leave-btn').disabled = true;
+  try {
+    if (!isPractice) {
+      const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
+      const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      if (checkpoint && checkpoint !== savedStage) await saveCurrentRun(checkpoint);
+    }
+  } finally {
+    window.removeEventListener('beforeunload', blockUnload);
+    window.askLeave('../Select/index.html');
+  }
+}
 
 function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
 window.addEventListener('blur', clearInput);
@@ -457,7 +547,7 @@ document.addEventListener('keydown', (event) => {
   if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
     event.preventDefault(); keys.add(event.code);
   }
-  if (event.code === 'Space' && phase === 'answer' && !paused && event.target !== $('pause')) {
+  if (event.code === 'Space' && phase === 'answer' && !paused && event.target !== $('leave-btn')) {
     event.preventDefault();
     if (!event.repeat) answer();
   }
@@ -492,9 +582,10 @@ requestAnimationFrame(tick);
 
 
 // 攔截瀏覽器關閉/重新整理事件
-window.addEventListener('beforeunload', (event) => {
-  // 只有在遊戲進行中 (aiming 或 answer 階段) 才觸發警告
+function blockUnload(event) {
   if (['aiming', 'answer'].includes(phase)) {
     event.preventDefault();
+    event.returnValue = '';
   }
-});
+}
+window.addEventListener('beforeunload', blockUnload);

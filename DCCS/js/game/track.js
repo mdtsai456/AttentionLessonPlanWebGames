@@ -347,6 +347,7 @@ export class Track {
       elapsed: this._elapsed,
       total: this.sessionSeconds,
       level: this.currentLevelNo,
+      remaining: Math.max(0, this._levelSeconds - this._levelElapsed),
       showTick: this._showTick,
     });
   }

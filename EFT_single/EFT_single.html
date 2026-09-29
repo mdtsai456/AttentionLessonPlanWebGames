@@ -11,6 +11,8 @@
     rel="stylesheet"
   />
   <link rel="stylesheet" href="EFT_single.css?v=3">
+  <script src="../shared/session-timeout.js"></script>
+  <script src="../shared/leave-confirm.js"></script>
   <script src="../shared/stage-clear.js" defer></script>
   <script src="EFT_single.js" defer></script>
 </head>
@@ -21,7 +23,8 @@
       <div class="progress-track" role="progressbar" aria-label="完成題數" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div id="progress-fill"></div></div>
     </aside>
     <header class="score"><span>得分</span><strong id="score">0 分</strong></header>
-    <div class="round" id="round">第 1 / 6 題（第 1 / 6 關）</div>
+    <div class="round" id="round">第 1 題・剩餘 60 秒（第 1 / 6 關）</div>
+    <button class="btn-leave" id="leave-btn" type="button">離開</button>
     <div class="bubble-field" id="bubble-field" aria-label="請觀察黃色亮起的目標泡泡"></div>
     <section class="answer-panel" aria-label="作答區">
       <h1>作答</h1>

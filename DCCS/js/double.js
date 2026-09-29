@@ -652,6 +652,25 @@ async function startSession(player1, player2) {
         ...sessionSecondsOption,
       });
 
+    document.getElementById('leave-btn').addEventListener('click', async () => {
+      const completed = Math.min(
+        player1Handle.completedLevel,
+        player2Handle.completedLevel
+      );
+      const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+      if (stage) {
+        const payloads = [player1Handle, player2Handle]
+          .map((handle) => handle.buildLeavePayload(stage))
+          .filter(Boolean);
+        await Promise.all(payloads.map((payload) =>
+          submitPlayerResult(makeDoublePayload({ payload }, pairId)).catch((error) => {
+            console.error(error);
+          })
+        ));
+      }
+      window.askLeave('../Select/index.html');
+    });
+
     const player2Handle =
       mountDCCS({
         container:

@@ -80,7 +80,7 @@ function selectMode(mode) {
 }
 
 /**
- * 依人數畫出欄位。學生會多年級／場域／第幾天；老師只有帳密。
+ * 依人數畫出欄位。學生只多填第幾天；年級／場域由登入後端回傳。老師只有帳密。
  */
 function renderCredentialSlots(count, titles, includeSession) {
   credentialSlots.innerHTML = titles
@@ -88,14 +88,6 @@ function renderCredentialSlots(count, titles, includeSession) {
     .map((title, index) => {
       const sessionFields = includeSession
         ? `
-          <label class="field">
-            <span class="field-label">年級</span>
-            <input type="text" name="grade-${index}" placeholder="登入後自動帶入" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span class="field-label">場域</span>
-            <input type="text" name="school-${index}" placeholder="登入後自動帶入" autocomplete="off" />
-          </label>
           <label class="field">
             <span class="field-label">第幾天</span>
             <input type="number" name="day-${index}" min="1" step="1" placeholder="例如 1" required />
@@ -136,14 +128,12 @@ function fieldValue(slot, name) {
   return input ? input.value.trim() : "";
 }
 
-/** 從畫面上的欄位收集帳密與場次；帳號會去掉前後空白。 */
+/** 從畫面上的欄位收集帳密與第幾天；帳號會去掉前後空白。 */
 function collectAccounts() {
   const slots = [...credentialSlots.querySelectorAll(".slot")];
   return slots.map((slot, index) => ({
     username: fieldValue(slot, `username-${index}`),
     password: fieldValue(slot, `password-${index}`),
-    grade: fieldValue(slot, `grade-${index}`),
-    school: fieldValue(slot, `school-${index}`),
     currentDay: fieldValue(slot, `day-${index}`),
   }));
 }
@@ -189,6 +179,7 @@ function storeTeacherSession(result) {
   sessionStorage.setItem("teacher_id", String(result.teacherId));
   sessionStorage.setItem("teacher_name", result.teacherName);
   sessionStorage.setItem("teacher_school", result.school);
+  window.WedGameSession?.stampLoginExpiry(result.expiresAt);
 }
 
 function storeStudentSlot(slot, result, day) {
@@ -214,6 +205,7 @@ function storeStudentSession(mode, results, days) {
   sessionStorage.setItem("school", results[0].school);
   sessionStorage.setItem("current_day", String(days[0]));
   sessionStorage.setItem("currentDay", String(days[0]));
+  window.WedGameSession?.stampLoginExpiry(results.map((item) => item.expiresAt));
 }
 
 async function submitLogin() {

@@ -32,9 +32,13 @@
   }
 
   async function authGet(path, token) {
-    return fetch(`${resolveApiBase()}${path}`, {
+    const res = await fetch(`${resolveApiBase()}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
+    if (res.status === 401 && global.WedGameSession) {
+      global.WedGameSession.expireSession(true);
+    }
+    return res;
   }
 
   async function logout(token) {
@@ -63,12 +67,11 @@
     return gameType;
   }
 
-  /** 中場返回：DCCS／EFT／TGame／指令出擊前 3 關、DAT 前 10 題為 50%；其他有場次即 100%。 */
+  /** 中場返回：六個遊戲都是打完前 3 關為 50%，打完 6 關為 100%。 */
   function progressFromRecord(gameId, record) {
     const stage = record && record.stats ? Number(record.stats.stage) : NaN;
     if (!Number.isFinite(stage)) return 100;
-    if ((gameId === "DCCS" || gameId === "EFT" || gameId === "TGame" || gameId === "InstructionGame") && stage <= 3) return 50;
-    if (gameId === "DAT" && stage <= 10) return 50;
+    if (stage <= 3) return 50;
     return 100;
   }
 

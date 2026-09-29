@@ -70,6 +70,26 @@ def session_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def stored_level_accuracy(value: Any) -> list[float] | None:
+    """資料庫裡的逗號字串還原成每一關正確率。舊場次沒有這個欄位。"""
+    if value is None or value == "":
+        return None
+    levels = [float(part) for part in str(value).split(",") if part.strip() != ""]
+    return levels or None
+
+
+def optional_stored_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
+def optional_stored_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    return int(value)
+
+
 def build_game_stats(row: dict[str, Any] | None) -> GameStats | None:
     """從遊戲細部表列取出遊戲統計欄位。"""
     if row is None:
@@ -80,6 +100,11 @@ def build_game_stats(row: dict[str, Any] | None) -> GameStats | None:
         accuracy=to_float(row["accuracy"]),
         duration=to_float(row["duration"]),
         stage=to_int(row["stage"]),
+        levelAccuracy=stored_level_accuracy(row.get("level_accuracy")),
+        avgReactionMs=optional_stored_float(row.get("avg_reaction_ms")),
+        questionCount=optional_stored_int(row.get("question_count")),
+        aimRatio=optional_stored_float(row.get("aim_ratio")),
+        focusMs=optional_stored_float(row.get("focus_ms")),
     )
 
 

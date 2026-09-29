@@ -60,6 +60,15 @@ let playMode = new URLSearchParams(window.location.search).get('mode') === 'game
   ? 'game'
   : 'practice';
 
+document.getElementById('leave-btn').addEventListener('click', async () => {
+  const completed = Math.min(...players.map((player) => player.completedStages()));
+  const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+  if (playMode === 'game' && stage) {
+    await Promise.all(players.map((player) => player.saveRun(stage)));
+  }
+  window.askLeave('../Select/index.html');
+});
+
 function beginSession() {
   clearMidBreak();
   currentGamePairId = generateUUID();

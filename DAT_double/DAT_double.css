@@ -157,6 +157,31 @@ button:focus-visible {
   right: 15%;
 }
 
+.btn-leave {
+  position: absolute;
+  right: 2%;
+  bottom: 3%;
+  z-index: 8;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.2rem;
+  min-width: 6.4rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+}
+
+.btn-leave:active {
+  transform: translateY(6px);
+  background: linear-gradient(#3aa3d0, #2b86b4);
+  box-shadow: none;
+}
+
 .pause {
   right: 3%;
 }

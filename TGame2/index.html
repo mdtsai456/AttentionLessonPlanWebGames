@@ -87,10 +87,14 @@
       </div>
 
       <div class="divider" aria-hidden="true"></div>
+      <button type="button" class="btn btn-sky btn-leave" id="leave-btn">離開</button>
 
-      <div class="hud-timer" aria-live="polite">
-        <span class="hud-chip hud-chip-sky">剩餘</span>
-        <span class="hud-box" id="timer-box">60 秒</span>
+      <div class="hud-center">
+        <p class="hud-level" id="level-box">第 1 / 6 關</p>
+        <div class="hud-timer" aria-live="polite">
+          <span class="hud-chip hud-chip-sky">剩餘</span>
+          <span class="hud-box" id="timer-box">60 秒</span>
+        </div>
       </div>
 
       <section class="result is-hidden" id="mid-break" aria-label="第 3 關結束">
@@ -104,8 +108,8 @@
 
       <section class="result is-hidden" id="result" aria-label="結算">
         <h1 class="title" id="result-title">闖關結束</h1>
-        <p class="result-score" id="result-score-p1">P1：0 / 8 分</p>
-        <p class="result-score" id="result-score-p2">P2：0 / 8 分</p>
+        <p class="result-score" id="result-score-p1">P1：0 分</p>
+        <p class="result-score" id="result-score-p2">P2：0 分</p>
         <p class="label" id="result-hint">P1 用 A / D，P2 用左右鍵</p>
         <div class="btn-row">
           <button type="button" class="btn btn-green" id="replay-btn">
@@ -117,7 +121,9 @@
         </div>
       </section>
     </main>
+    <script src="../shared/session-timeout.js"></script>
     <script src="../shared/stage-clear.js"></script>
+    <script src="../shared/leave-confirm.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

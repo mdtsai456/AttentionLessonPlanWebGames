@@ -62,8 +62,27 @@ export function createStats() {
     const denom = correct_count + wrong_count;
     const accuracy = denom === 0 ? 0 : correct_count / denom;
     const levels = Array.from(levelsSeen).sort((a, b) => a - b);
+    const byLevel = new Map();
+    for (const row of rows) {
+      const bucket = byLevel.get(row.level) || { correct: 0, total: 0 };
+      bucket.total += 1;
+      if (row.correct) bucket.correct += 1;
+      byLevel.set(row.level, bucket);
+    }
+    const levelAccuracy = [];
+    for (let level = 1; level <= 6; level += 1) {
+      const bucket = byLevel.get(level);
+      if (!bucket || bucket.total === 0) break;
+      levelAccuracy.push(bucket.correct / bucket.total);
+    }
     const stage = levels.length === 0 ? 0 : levels[levels.length - 1];
     const levelsPlayed = levels.join(',');
+    const reactionSamples = rows
+      .map((row) => row.firstInputMs)
+      .filter((value) => Number.isFinite(value));
+    const avgReactionMs = reactionSamples.length
+      ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
+      : null;
 
     return {
       frameCorrectCount,
@@ -78,6 +97,9 @@ export function createStats() {
       duration: durationMs,
       stage,
       levelsPlayed,
+      levelAccuracy,
+      avgReactionMs,
+      questionCount: denom,
     };
   }
 

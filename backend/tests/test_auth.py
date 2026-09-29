@@ -118,6 +118,44 @@ def test_student_login_succeeds_with_correct_password(client, db):
     assert body["school"] == "A"
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def test_teacher_and_student_login_expire_after_one_hour(client, db):
+    """登入憑證 1 小時後失效。回應的 expiresAt 與 login_session 一致。"""
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+
+    before = datetime.now(timezone.utc)
+    teacher = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T0001", "password": "right-password"},
+    )
+    student = client.post(
+        "/api/auth/student/login",
+        json={"account": "S0001", "password": "right-password"},
+    )
+    after = datetime.now(timezone.utc)
+
+    assert teacher.status_code == 200
+    assert student.status_code == 200
+
+    for body in (teacher.json(), student.json()):
+        expires_at = _as_utc(datetime.fromisoformat(body["expiresAt"]))
+        assert before + timedelta(hours=1) - timedelta(seconds=5) <= expires_at
+        assert expires_at <= after + timedelta(hours=1) + timedelta(seconds=5)
+        rows = db.query(
+            "SELECT expires_at FROM login_session WHERE token = %s",
+            [body["token"]],
+        )
+        stored = _as_utc(rows[0]["expires_at"])
+        assert abs((stored - expires_at).total_seconds()) < 2
+
+
 def test_student_login_rejects_wrong_password(client, db):
     db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
 

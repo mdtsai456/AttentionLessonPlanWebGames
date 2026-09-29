@@ -179,8 +179,12 @@ body {
 }
 
 .game-item {
+  display: block;
+}
+
+.game-item-row {
   display: grid;
-  grid-template-columns: 7.6rem minmax(0, 1fr) 3.1rem;
+  grid-template-columns: 7.6rem minmax(0, 1fr) 3.1rem 1.8rem;
   align-items: center;
   gap: 0.55rem;
   text-align: left;
@@ -208,7 +212,12 @@ body {
 }
 
 .progress-row {
+  position: relative;
   margin: 0;
+}
+
+.progress-row.has-times {
+  margin-bottom: 0.85rem;
 }
 
 .progress-track {
@@ -261,8 +270,31 @@ body {
   transform: translateY(-50%);
 }
 
-.progress-track[data-progress="100"] .mark-mid {
-  display: none;
+.progress-times {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.15rem;
+  pointer-events: none;
+}
+
+.progress-time {
+  position: absolute;
+  top: 0;
+  color: #8d8d8d;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.time-mid {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.time-end {
+  right: 0;
 }
 
 .progress-mark.is-reached {
@@ -271,6 +303,89 @@ body {
   border-radius: 7px;
   background: linear-gradient(#b39bff, #7b5ce8);
   box-shadow: 0 1px 0 #5a3cc4;
+}
+
+.info-btn {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 3px 0 #3494c4;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.info-btn[aria-expanded="true"] {
+  background: linear-gradient(#3aa3d0, #2b86b4);
+  box-shadow: none;
+}
+
+.level-detail {
+  margin: 0.45rem 0 0.2rem 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #3f6f48;
+}
+
+.level-accuracy {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.level-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.8rem;
+}
+
+.level-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.level-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6a9a72;
+}
+
+.metric-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 0.8rem;
+  margin: 0 0 0.7rem;
+}
+
+.metric-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.metric-list dt,
+.metric-list dd {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.metric-list dd {
+  color: #1e3a8a;
 }
 
 .hint {
@@ -291,8 +406,8 @@ body {
 }
 
 @media (max-width: 520px) {
-  .game-item {
-    grid-template-columns: 6.6rem minmax(0, 1fr) 2.8rem;
+  .game-item-row {
+    grid-template-columns: 6.6rem minmax(0, 1fr) 2.8rem 1.6rem;
     gap: 0.4rem;
   }
 

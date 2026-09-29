@@ -61,6 +61,7 @@ const stageClearTitle = document.getElementById("stage-clear-title");
 const stageClearText = document.getElementById("stage-clear-text");
 const nextStageBtn = document.getElementById("btn-next-stage");
 const lobbyBtn = document.getElementById("btn-lobby");
+const leaveBtn = document.getElementById("leave-btn");
 
 const ALL_ITEMS = [
   "apple", "banana", "carrot", "fish",
@@ -87,6 +88,8 @@ const state = {
   busy: false,
   playing: false,
   answers: [],
+  reactionSamples: [],
+  questionShownAt: 0,
   startedAt: 0,
   timerId: null,
   walkTimer: null,
@@ -102,6 +105,7 @@ replayBtn.addEventListener("click", () => {
 });
 
 backBtn.addEventListener("click", returnToLobby);
+leaveBtn.addEventListener("click", leaveGame);
 
 nextStageBtn.addEventListener("click", continueNextStage);
 
@@ -136,6 +140,7 @@ function startGame() {
   state.score = 0;
   state.wrong = 0;
   state.answers = [];
+  state.reactionSamples = [];
   state.startedAt = Date.now();
   state.endReason = "";
   nextStageBtn.disabled = false;
@@ -159,6 +164,7 @@ function startLevel(level) {
   itemRight.classList.remove("is-fading");
   hideFeedback();
   renderQuestion();
+  state.questionShownAt = Date.now();
   renderHud();
   state.timerId = setInterval(tick, 1000);
 }
@@ -216,6 +222,7 @@ async function chooseDirection(choice) {
   if (!question) return;
 
   state.busy = true;
+  state.reactionSamples.push(Math.max(0, Date.now() - state.questionShownAt));
   const isCorrect = choice === question.correct;
   if (isCorrect) state.score += 1;
   else state.wrong += 1;
@@ -224,6 +231,7 @@ async function chooseDirection(choice) {
     questionId: question.id,
     choice,
     correct: isCorrect,
+    level: state.level,
   });
 
   player.classList.remove("is-arrive", "is-snap");
@@ -239,6 +247,14 @@ async function chooseDirection(choice) {
 
   await wait(NEAR_MS);
   if (!state.playing) {
+    state.busy = false;
+    return;
+  }
+
+  if (!isCorrect) {
+    hideFeedback();
+    resetSceneAndPlayer();
+    state.questionShownAt = Date.now();
     state.busy = false;
     return;
   }
@@ -259,6 +275,7 @@ async function chooseDirection(choice) {
   itemLeft.classList.add("is-fading");
   itemRight.classList.add("is-fading");
   renderQuestion();
+  state.questionShownAt = Date.now();
   hideFeedback();
   resetSceneAndPlayer(true);
   await wait(40);
@@ -285,14 +302,15 @@ function pausePlay() {
 
 function endLevel() {
   if (!state.playing) return;
+  const finishedLevel = state.level;
   pausePlay();
 
-  if (state.level === MID_STAGE) {
+  if (finishedLevel === MID_STAGE) {
     showStageClear(true);
     return;
   }
-  if (state.level < STAGE_COUNT) {
-    window.showStageClear(state.level).then(continueNextStage);
+  if (finishedLevel < STAGE_COUNT) {
+    window.showStageClear(finishedLevel).then(() => startLevel(finishedLevel + 1));
     return;
   }
   finishGame("complete");
@@ -328,7 +346,28 @@ function finishGame(reason) {
   void saveCurrentRun(STAGE_COUNT);
 }
 
+let savedStage = 0;
+
+function completedStage() {
+  const midOpen = !stageClearModal.classList.contains("is-hidden");
+  const shared = document.querySelector(".shared-stage-clear");
+  const sharedOpen = shared && !shared.hidden;
+  if (state.endReason === "complete") return STAGE_COUNT;
+  if (midOpen || sharedOpen) return state.level;
+  return Math.max(0, state.level - 1);
+}
+
+async function leaveGame() {
+  leaveBtn.disabled = true;
+  const completed = completedStage();
+  const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+  if (stage && stage !== savedStage) await saveCurrentRun(stage);
+  window.askLeave('../Select/index.html');
+  leaveBtn.disabled = false;
+}
+
 function saveCurrentRun(stage) {
+  savedStage = stage;
   const total = Math.max(state.score + state.wrong, 1);
   return submitResult({
     score: state.score,
@@ -336,7 +375,27 @@ function saveCurrentRun(stage) {
     accuracy: Math.round(state.score / total * 100),
     duration: Date.now() - state.startedAt,
     stage,
+    levelAccuracy: levelAccuracyText(stage),
+    avgReactionMs: average(state.reactionSamples),
+    questionCount: state.answers.length,
   });
+}
+
+function average(values) {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function levelAccuracyText(stageCount) {
+  const values = [];
+  for (let level = 1; level <= stageCount; level += 1) {
+    const mine = state.answers.filter((answer) => answer.level === level);
+    const ratio = mine.length
+      ? mine.filter((answer) => answer.correct).length / mine.length
+      : 0;
+    values.push(Number(ratio.toFixed(4)));
+  }
+  return values.join(",");
 }
 
 function showFeedback(isCorrect) {
@@ -467,6 +526,9 @@ async function submitResult(data) {
         { apiname: "TGame_accuracy", value: data.accuracy / 100 },
         { apiname: "TGame_duration", value: data.duration },
         { apiname: "TGame_stage", value: data.stage },
+        { apiname: "TGame_levelAccuracy", value: data.levelAccuracy },
+        { apiname: "TGame_avgReactionMs", value: data.avgReactionMs },
+        { apiname: "TGame_questionCount", value: data.questionCount },
       ],
     },
   };

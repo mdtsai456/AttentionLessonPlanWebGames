@@ -29,6 +29,7 @@ const state = {
   selectedStudentId: "",
   selectedDay: null, // 尚未選天時為 null
   progressByGame: {}, // { [gameId]: 0 | 50 | 100 }
+  detailByGame: {}, // { [gameId]: { reached, accuracy, levelAccuracy, ...metrics } }
 };
 
 init();
@@ -75,7 +76,8 @@ async function selectStudent(studentId) {
   state.selectedStudentId = studentId;
   state.selectedDay = null;
   state.progressByGame = {};
-  state.sessions = studentId ? await fetchStudentSessions(studentId) : [];
+  state.detailByGame = {};
+  state.sessions = studentId ? await fetchStudentReport(studentId) : [];
   state.days = daysFromSessions(state.sessions);
   renderDays();
   renderProgress();
@@ -86,6 +88,7 @@ function selectDay(day) {
   if (!state.selectedStudentId) return;
   state.selectedDay = day;
   state.progressByGame = progressFromSessions(state.sessions, day);
+  state.detailByGame = detailFromSessions(state.sessions, day);
   markSelectedDay(day);
   renderProgress();
 }
@@ -157,20 +160,121 @@ function renderProgress() {
   emptyHint.classList.add("is-hidden");
   gameList.innerHTML = GAMES.map((game) => {
     const percent = normalizeProgress(state.progressByGame[game.id]);
+    const detail = state.detailByGame[game.id] || { reached: null, accuracy: null };
+    const times = checkpointTimes(game.id);
+    const timeRow = times.mid || times.end
+      ? `<div class="progress-times">
+          ${times.mid ? `<span class="progress-time time-mid">${times.mid}</span>` : ""}
+          ${times.end ? `<span class="progress-time time-end">${times.end}</span>` : ""}
+        </div>`
+      : "";
     return `
       <article class="game-item" data-game-id="${game.id}">
-        <span class="game-chip">${game.name}</span>
-        <div class="progress-row" aria-label="${game.name}進度 ${percent}%">
-          <div class="progress-track" data-progress="${percent}">
-            <div class="progress-fill"></div>
-            <span class="progress-mark mark-mid${percent === 50 ? " is-reached" : ""}">✓</span>
-            <span class="progress-mark mark-end${percent === 100 ? " is-reached" : ""}">✓</span>
+        <div class="game-item-row">
+          <span class="game-chip">${game.name}</span>
+          <div class="progress-row${timeRow ? " has-times" : ""}" aria-label="${game.name}進度 ${percent}%">
+            <div class="progress-track" data-progress="${percent}">
+              <div class="progress-fill"></div>
+              <span class="progress-mark mark-mid${percent >= 50 ? " is-reached" : ""}">✓</span>
+              <span class="progress-mark mark-end${percent === 100 ? " is-reached" : ""}">✓</span>
+            </div>
+            ${timeRow}
           </div>
+          <span class="game-percent">${percent}%</span>
+          <button
+            type="button"
+            class="info-btn"
+            data-info="${game.id}"
+            aria-expanded="false"
+            aria-label="${game.name}各關正確率"
+          >i</button>
         </div>
-        <span class="game-percent">${percent}%</span>
+        <div class="level-detail" hidden>
+          ${renderLevelDetail(detail, game.id)}
+        </div>
       </article>
     `;
   }).join("");
+}
+
+gameList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-info]");
+  if (!button) return;
+  const item = button.closest(".game-item");
+  const panel = item.querySelector(".level-detail");
+  const open = panel.hidden;
+  gameList.querySelectorAll(".level-detail").forEach((node) => {
+    node.hidden = true;
+  });
+  gameList.querySelectorAll("[data-info]").forEach((node) => {
+    node.setAttribute("aria-expanded", "false");
+  });
+  panel.hidden = !open;
+  button.setAttribute("aria-expanded", open ? "true" : "false");
+});
+
+function renderLevelDetail(detail, gameId) {
+  const accuracy = formatAccuracy(detail.accuracy);
+  const levels = Array.isArray(detail.levelAccuracy) ? detail.levelAccuracy : null;
+  const reached = detail.reached;
+  const rows = Array.from({ length: 6 }, (_, index) => {
+    const level = index + 1;
+    const value = levels && index < levels.length ? Number(levels[index]) : NaN;
+    let text = "尚未遊玩";
+    if (Number.isFinite(value)) text = formatAccuracy(value);
+    else if (reached != null && level <= reached) text = "尚無各關紀錄";
+    return `<li><span>第 ${level} 關</span><strong>${text}</strong></li>`;
+  }).join("");
+  const note = reached == null
+    ? "這天沒有這一款的成績。"
+    : levels && levels.length
+      ? ""
+      : "這筆是較早的成績，只有整場正確率。";
+  return `
+    <dl class="metric-list">${renderMetrics(detail, gameId)}</dl>
+    <p class="level-accuracy">各關正確率</p>
+    <ol class="level-list">${rows}</ol>
+    ${note ? `<p class="level-note">${note}</p>` : ""}
+  `;
+}
+
+function renderMetrics(detail, gameId) {
+  const total = finiteOrNull(detail.questionCount);
+  const wrong = finiteOrNull(detail.wrongCount);
+  const correct = finiteOrNull(detail.correctCount);
+  const denom = total != null && total > 0
+    ? total
+    : (correct != null && wrong != null ? correct + wrong : NaN);
+  const error = wrong != null && Number.isFinite(denom) && denom > 0 ? wrong / denom : NaN;
+  const rows = [
+    ["遊玩時間", formatDuration(detail.duration)],
+    ["平均反應時間", formatDuration(detail.avgReactionMs)],
+    ["正確率", formatAccuracy(detail.accuracy)],
+    ["錯誤率", formatAccuracy(error)],
+  ];
+  if (gameId !== "InstructionGame") {
+    rows.push(["總題數", total == null ? "—" : String(total)]);
+  }
+  if (gameId === "EFT") {
+    rows.push(["準心對準時長比", formatAccuracy(detail.aimRatio)]);
+    rows.push(["專心時間", formatDuration(detail.focusMs)]);
+  }
+  return rows
+    .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
+    .join("");
+}
+
+function formatDuration(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+  return `${(number / 1000).toFixed(1)} 秒`;
+}
+
+function formatAccuracy(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+  const percent = number <= 1 ? Math.round(number * 100) : Math.round(number);
+  return `${percent}%`;
 }
 
 function teacherToken() {
@@ -181,7 +285,13 @@ function teacherSchool() {
   return sessionStorage.getItem("teacher_school") || "";
 }
 
-async function fetchStudentSessions(studentKey) {
+function finiteOrNull(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+async function fetchStudentReport(studentKey) {
   const token = teacherToken();
   const school = teacherSchool();
   if (!token || !studentKey || !school) return [];
@@ -224,6 +334,112 @@ function daysFromSessions(sessions) {
     ),
   ].sort((a, b) => a - b);
   return days.length ? days : [1, 2, 3, 4, 5];
+}
+
+function detailFromSessions(sessions, day) {
+  const detail = {};
+  sessions.forEach((session) => {
+    if (Number(session.currentDay) !== Number(day)) return;
+    const gameId = WedGameApi.mapGameId(session.gameType);
+    if (!GAMES.some((game) => game.id === gameId)) return;
+    const stage = session.stats ? Number(session.stats.stage) : NaN;
+    const accuracy = session.stats ? Number(session.stats.accuracy) : NaN;
+    const reached = levelsReached(gameId, stage);
+    const levelAccuracy = parseLevelAccuracy(session.stats);
+    const stats = session.stats || {};
+    const next = {
+      reached,
+      accuracy: Number.isFinite(accuracy) ? accuracy : null,
+      levelAccuracy,
+      duration: finiteOrNull(stats.duration),
+      avgReactionMs: finiteOrNull(stats.avgReactionMs),
+      questionCount: finiteOrNull(stats.questionCount),
+      aimRatio: finiteOrNull(stats.aimRatio),
+      focusMs: finiteOrNull(stats.focusMs),
+      correctCount: finiteOrNull(stats.correctCount),
+      wrongCount: finiteOrNull(stats.wrongCount),
+    };
+    const current = detail[gameId];
+    const further = !current || (reached || 0) > (current.reached || 0);
+    const sameReach = current && (reached || 0) === (current.reached || 0);
+    if (further || (sameReach && levelAccuracy && !current.levelAccuracy)) {
+      detail[gameId] = next;
+    }
+  });
+  return detail;
+}
+
+function parseLevelAccuracy(stats) {
+  const value = stats && stats.levelAccuracy;
+  if (Array.isArray(value)) {
+    const numbers = value.map(Number).filter((number) => Number.isFinite(number));
+    return numbers.length ? numbers : null;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const numbers = value.split(",").map(Number).filter((number) => Number.isFinite(number));
+    return numbers.length ? numbers : null;
+  }
+  return null;
+}
+
+function levelsReached(gameId, stage) {
+  if (!Number.isFinite(stage) || stage <= 0) return null;
+  if (stage <= 6) return stage;
+  const percent = WedGameApi.progressFromRecord(gameId, { stats: { stage } });
+  return percent >= 100 ? 6 : 3;
+}
+
+function checkpointOf(gameId, session) {
+  const stage = session.stats ? Number(session.stats.stage) : NaN;
+  if (!Number.isFinite(stage) || stage <= 0) return null;
+  if (stage <= 6) {
+    if (stage >= 6) return "end";
+    if (stage >= 3) return "mid";
+    return null;
+  }
+  const percent = WedGameApi.progressFromRecord(gameId, session);
+  if (percent >= 100) return "end";
+  if (percent >= 50) return "mid";
+  return null;
+}
+
+function checkpointTimes(gameId) {
+  let midAt = null;
+  let endAt = null;
+  state.sessions.forEach((session) => {
+    if (Number(session.currentDay) !== Number(state.selectedDay)) return;
+    if (WedGameApi.mapGameId(session.gameType) !== gameId) return;
+    const sentAt = parseUtcNaive(session.endTime);
+    if (!sentAt) return;
+    const checkpoint = checkpointOf(gameId, session);
+    if (checkpoint === "mid" && (!midAt || sentAt > midAt)) midAt = sentAt;
+    if (checkpoint === "end" && (!endAt || sentAt > endAt)) endAt = sentAt;
+  });
+  return {
+    mid: midAt ? formatTaiwanTime(midAt) : "",
+    end: endAt ? formatTaiwanTime(endAt) : "",
+  };
+}
+
+function parseUtcNaive(value) {
+  if (!value) return null;
+  const text = String(value).trim().replace(" ", "T");
+  const date = new Date(text.endsWith("Z") ? text : `${text}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatTaiwanTime(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const pick = (type) => parts.find((part) => part.type === type).value;
+  return `${pick("year")}-${pick("month")}-${pick("day")} ${pick("hour")}:${pick("minute")}`;
 }
 
 function progressFromSessions(sessions, day) {

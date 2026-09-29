@@ -22,6 +22,11 @@ CORE_STAT_COLUMNS = (
     "accuracy",
     "duration",
     "stage",
+    "level_accuracy",
+    "avg_reaction_ms",
+    "question_count",
+    "aim_ratio",
+    "focus_ms",
 )
 
 

@@ -1,16 +1,17 @@
 // =============================================================================
 // TGame2 / 勇闖迷宮（雙人）
 // 左右各一組獨立 T 型迷宮與角色。P1 用 A / D，P2 用左右鍵。
-// 進度與分數分開計算，倒數 60 秒共用。
+// 每一關倒數 60 秒共用；時間內兩人各自連續作答，互不等待。
 // =============================================================================
 
 const TIME_LIMIT_SEC = 60;
+const STAGE_COUNT = 6;
+const MID_STAGE = 3;
 const WALK_FRAME_MS = 90;
 const TURN_WALK_FRAME_MS = 130;
 const NEAR_MS = 1080;
 const TURN_MS = 650;
 const ARRIVE_MS = 320;
-const PROGRESS_STEPS = [0, 50, 100];
 const SCENE_TURN = {
   left: "turn-left",
   right: "turn-right",
@@ -21,63 +22,19 @@ const PLAYER_BASE = {
   p2: "img/player2",
 };
 
-const LOCAL_QUESTIONS = [
-  {
-    id: "q1",
-    prompt: "請選擇符合「可以吃的食物」的方向",
-    leftItem: "apple",
-    rightItem: "boot",
-    correct: "left",
-  },
-  {
-    id: "q2",
-    prompt: "請選擇符合「可以吃的食物」的方向",
-    leftItem: "book",
-    rightItem: "banana",
-    correct: "right",
-  },
-  {
-    id: "q3",
-    prompt: "請選擇符合「可以坐的家具」的方向",
-    leftItem: "chair",
-    rightItem: "fish",
-    correct: "left",
-  },
-  {
-    id: "q4",
-    prompt: "請選擇符合「可以吃的食物」的方向",
-    leftItem: "hammer",
-    rightItem: "carrot",
-    correct: "right",
-  },
-  {
-    id: "q5",
-    prompt: "請選擇符合「可以戴在頭上」的方向",
-    leftItem: "hat",
-    rightItem: "key",
-    correct: "left",
-  },
-  {
-    id: "q6",
-    prompt: "請選擇符合「下雨時用的」的方向",
-    leftItem: "soccer",
-    rightItem: "umbrella",
-    correct: "right",
-  },
-  {
-    id: "q7",
-    prompt: "請選擇符合「水裡游的動物」的方向",
-    leftItem: "fish",
-    rightItem: "boot",
-    correct: "left",
-  },
-  {
-    id: "q8",
-    prompt: "請選擇符合「用來閱讀的」的方向",
-    leftItem: "book",
-    rightItem: "hammer",
-    correct: "left",
-  },
+const ALL_ITEMS = [
+  "apple", "banana", "carrot", "fish",
+  "boot", "book", "chair", "hammer",
+  "hat", "key", "soccer", "umbrella",
+];
+
+const STAGE_RULES = [
+  { prompt: "請選擇符合「可以吃的食物」的方向", correct: ["apple", "banana", "carrot"] },
+  { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
+  { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
+  { prompt: "請選擇符合「下雨時用的」的方向", correct: ["umbrella"] },
+  { prompt: "請選擇符合「水裡游的動物」的方向", correct: ["fish"] },
+  { prompt: "請選擇符合「用來閱讀的」的方向", correct: ["book"] },
 ];
 
 const timerBox = document.getElementById("timer-box");
@@ -89,14 +46,17 @@ const resultHint = document.getElementById("result-hint");
 const replayBtn = document.getElementById("replay-btn");
 const backBtn = document.getElementById("back-btn");
 
+const levelBox = document.getElementById("level-box");
+const midBreakEl = document.getElementById("mid-break");
+
 const session = {
-  questions: [],
+  level: 1,
+  roundToken: 0,
   remaining: TIME_LIMIT_SEC,
   playing: false,
   startedAt: 0,
   timerId: null,
   endReason: "",
-  pastMid: false,
 };
 
 const players = {
@@ -112,19 +72,99 @@ backBtn.addEventListener("click", () => {
   location.href = "../Select/index.html";
 });
 
-const midBreakEl = document.getElementById("mid-break");
 document.getElementById("mid-continue").addEventListener("click", () => {
-  session.pastMid = true;
-  session.playing = true;
-  players.p1.midReady = false;
-  players.p2.midReady = false;
-  midBreakEl.classList.add("is-hidden");
-  clearInterval(session.timerId);
-  session.timerId = setInterval(tick, 1000);
-  presentNextQuestion(players.p1);
-  presentNextQuestion(players.p2);
+  startLevel(session.level + 1);
 });
-document.getElementById("mid-lobby").addEventListener("click", () => {
+document.getElementById("leave-btn").addEventListener("click", leaveGame);
+
+let savedStage = 0;
+
+function completedStage() {
+  const midOpen = !midBreakEl.classList.contains("is-hidden");
+  const shared = document.querySelector(".shared-stage-clear");
+  const sharedOpen = shared && !shared.hidden;
+  if (session.endReason === "complete") return STAGE_COUNT;
+  if (midOpen || sharedOpen) return session.level;
+  return Math.max(0, session.level - 1);
+}
+
+async function leaveGame() {
+  const leaveBtn = document.getElementById("leave-btn");
+  leaveBtn.disabled = true;
+  const completed = completedStage();
+  const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+  if (stage) await saveBoth(stage);
+  window.askLeave("../Select/index.html");
+  leaveBtn.disabled = false;
+}
+
+async function saveBoth(stage) {
+  if (!stage || stage === savedStage) return;
+  savedStage = stage;
+  await Promise.all([players.p1, players.p2].map((player, index) => savePlayer(player, index, stage)));
+}
+
+function levelAccuracyText(player, stageCount) {
+  const values = [];
+  for (let level = 1; level <= stageCount; level += 1) {
+    const mine = player.answers.filter((answer) => answer.level === level);
+    const ratio = mine.length
+      ? mine.filter((answer) => answer.correct).length / mine.length
+      : 0;
+    values.push(Number(ratio.toFixed(4)));
+  }
+  return values.join(",");
+}
+
+async function savePlayer(player, index, stage) {
+  const isP1 = index === 0;
+  const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || "";
+  const grade = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
+  const school = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
+  const caseId =
+    sessionStorage.getItem(isP1 ? "student1_case" : "student2_case") ||
+    (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey) ||
+    (isP1 ? "S01" : "S02");
+  const currentDay = parseInt(sessionStorage.getItem("current_day") || sessionStorage.getItem("currentDay") || "1", 10);
+  const answered = Math.max(player.answers.length, 1);
+  const wrong = Math.max(player.answers.length - player.score, 0);
+  await fetch("http://127.0.0.1:5001/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lessonId: "1140908_TGame",
+      data: {
+        grade,
+        caseId,
+        school,
+        currentDay,
+        startTime: session.startedAt || Date.now(),
+        endTime: Date.now(),
+        mode: "double",
+        stats: [
+          { apiname: "TGame_correct", value: player.score },
+          { apiname: "TGame_wrong", value: wrong },
+          { apiname: "TGame_accuracy", value: player.score / answered },
+          { apiname: "TGame_duration", value: Date.now() - (session.startedAt || Date.now()) },
+          { apiname: "TGame_stage", value: stage },
+          { apiname: "TGame_levelAccuracy", value: levelAccuracyText(player, stage) },
+          {
+            apiname: "TGame_avgReactionMs",
+            value: player.reactionSamples.length
+              ? player.reactionSamples.reduce((sum, value) => sum + value, 0) / player.reactionSamples.length
+              : 0,
+          },
+          { apiname: "TGame_questionCount", value: player.answers.length },
+        ],
+      },
+    }),
+  }).catch((error) => console.error(error));
+}
+
+document.getElementById("mid-lobby").addEventListener("click", async () => {
+  document.getElementById("mid-continue").disabled = true;
+  document.getElementById("mid-lobby").disabled = true;
+  await saveBoth(MID_STAGE);
   location.href = "../Select/index.html";
 });
 
@@ -148,11 +188,9 @@ document.addEventListener("keydown", (event) => {
 
 init();
 
-async function init() {
+function init() {
   preloadSceneImages();
-  const data = await fetchQuestions();
-  session.questions = data.questions;
-  startGame(data.timeLimitSec);
+  startGame();
 }
 
 function createPlayer(id) {
@@ -174,10 +212,12 @@ function createPlayer(id) {
     promptEl: root.querySelector(".prompt"),
     feedbackEl: root.querySelector(".feedback"),
     assets: makePlayerAssets(PLAYER_BASE[id]),
-    index: 0,
+    questionSeq: 0,
+    currentQuestion: null,
+    reactionSamples: [],
+    questionShownAt: 0,
     score: 0,
     busy: false,
-    finished: false,
     answers: [],
     walkTimer: null,
     walkFrame: 0,
@@ -215,54 +255,103 @@ function makePlayerAssets(base) {
   };
 }
 
-function startGame(timeLimitSec) {
+function startGame() {
   clearInterval(session.timerId);
-  session.remaining = timeLimitSec || TIME_LIMIT_SEC;
-  session.playing = true;
+  savedStage = 0;
   session.startedAt = Date.now();
   session.endReason = "";
-  session.pastMid = false;
   resultEl.classList.add("is-hidden");
-  document.getElementById("mid-break").classList.add("is-hidden");
+  midBreakEl.classList.add("is-hidden");
+  document.getElementById("mid-continue").disabled = false;
+  document.getElementById("mid-lobby").disabled = false;
 
   [players.p1, players.p2].forEach((player) => {
-    player.index = 0;
     player.score = 0;
-    player.busy = false;
-    player.finished = false;
-    player.midReady = false;
-    player.stageReady = 0;
     player.answers = [];
+    player.reactionSamples = [];
+    player.promptEl.classList.remove("is-hidden");
+  });
+
+  startLevel(1);
+}
+
+function startLevel(level) {
+  clearInterval(session.timerId);
+  session.roundToken += 1;
+  session.level = level;
+  session.remaining = TIME_LIMIT_SEC;
+  session.playing = true;
+  resultEl.classList.add("is-hidden");
+  midBreakEl.classList.add("is-hidden");
+
+  [players.p1, players.p2].forEach((player) => {
+    player.busy = false;
+    player.questionSeq = 0;
+    player.currentQuestion = makeQuestion(level, 0);
     player.promptEl.classList.remove("is-hidden");
     player.itemLeft.classList.remove("is-fading");
     player.itemRight.classList.remove("is-fading");
     resetSceneAndPlayer(player);
     hideFeedback(player);
     renderQuestion(player);
+    player.questionShownAt = Date.now();
     renderPlayerHud(player);
   });
 
+  renderLevel();
   renderTimer();
   session.timerId = setInterval(tick, 1000);
-}
-
-function showMidBreak() {
-  session.playing = false;
-  clearInterval(session.timerId);
-  document.getElementById("mid-break").classList.remove("is-hidden");
 }
 
 function tick() {
   if (!session.playing) return;
   session.remaining -= 1;
   renderTimer();
-  if (session.remaining <= 0) {
-    finishGame("timeup");
+  if (session.remaining <= 0) endLevel();
+}
+
+function endLevel() {
+  if (!session.playing) return;
+  const finishedLevel = session.level;
+  session.playing = false;
+  session.roundToken += 1;
+  clearInterval(session.timerId);
+  settlePlayers();
+
+  if (finishedLevel === MID_STAGE) {
+    document.getElementById("mid-continue").disabled = false;
+    document.getElementById("mid-lobby").disabled = false;
+    midBreakEl.classList.remove("is-hidden");
+    return;
   }
+  if (finishedLevel < STAGE_COUNT) {
+    window.showStageClear(finishedLevel).then(() => startLevel(finishedLevel + 1));
+    return;
+  }
+  finishGame();
+}
+
+function pick(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function makeQuestion(level, seq) {
+  const rule = STAGE_RULES[level - 1];
+  const wrongItems = ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  const correctItem = pick(rule.correct);
+  const wrongItem = pick(wrongItems);
+  const correctSide = Math.random() < 0.5 ? "left" : "right";
+  return {
+    id: `s${level}-${seq}`,
+    prompt: rule.prompt,
+    leftItem: correctSide === "left" ? correctItem : wrongItem,
+    rightItem: correctSide === "right" ? correctItem : wrongItem,
+    correct: correctSide,
+  };
 }
 
 function currentQuestion(player) {
-  return session.questions[player.index];
+  return player.currentQuestion;
 }
 
 function renderQuestion(player) {
@@ -283,13 +372,19 @@ function renderTimer() {
   timerBox.textContent = `${Math.max(0, session.remaining)} 秒`;
 }
 
+function renderLevel() {
+  levelBox.textContent = `第 ${session.level} / ${STAGE_COUNT} 關`;
+}
+
 async function chooseDirection(player, choice) {
-  if (!session.playing || player.busy || player.finished) return;
+  if (!session.playing || player.busy) return;
 
   const question = currentQuestion(player);
   if (!question) return;
 
+  const token = session.roundToken;
   player.busy = true;
+  player.reactionSamples.push(Math.max(0, Date.now() - player.questionShownAt));
   const isCorrect = choice === question.correct;
   if (isCorrect) player.score += 1;
 
@@ -297,6 +392,7 @@ async function chooseDirection(player, choice) {
     questionId: question.id,
     choice,
     correct: isCorrect,
+    level: session.level,
   });
 
   player.playerEl.classList.remove("is-arrive", "is-snap");
@@ -311,7 +407,15 @@ async function chooseDirection(player, choice) {
   renderPlayerHud(player);
 
   await wait(NEAR_MS);
-  if (!session.playing) {
+  if (!sameRound(token)) {
+    player.busy = false;
+    return;
+  }
+
+  if (!isCorrect) {
+    hideFeedback(player);
+    resetSceneAndPlayer(player);
+    player.questionShownAt = Date.now();
     player.busy = false;
     return;
   }
@@ -322,52 +426,21 @@ async function chooseDirection(player, choice) {
   setSceneBg(player, SCENE_TURN[choice]);
   await wait(TURN_MS);
 
-  if (!session.playing) {
+  if (!sameRound(token)) {
     player.busy = false;
     return;
   }
 
-  const hasNext = player.index + 1 < session.questions.length;
-  if (!hasNext) {
-    completePlayer(player);
-    return;
-  }
-
-  if (!session.pastMid && player.index === 2) {
-    player.midReady = true;
-    player.busy = true;
-    player.promptEl.textContent = "等待對方完成第 3 關";
-    if (players.p1.midReady && players.p2.midReady) showMidBreak();
-    return;
-  }
-
-  const finishedLevel = player.index + 1;
-  player.stageReady = finishedLevel;
-  player.busy = true;
-  player.promptEl.textContent = `等待對方完成第 ${finishedLevel} 關`;
-  if (players.p1.stageReady === finishedLevel && players.p2.stageReady === finishedLevel) {
-    session.playing = false;
-    clearInterval(session.timerId);
-    window.showStageClear(finishedLevel).then(() => {
-      players.p1.stageReady = 0;
-      players.p2.stageReady = 0;
-      session.playing = true;
-      session.timerId = setInterval(tick, 1000);
-      presentNextQuestion(players.p1);
-      presentNextQuestion(players.p2);
-    });
-  }
-}
-
-async function presentNextQuestion(player) {
-  player.index += 1;
+  player.questionSeq += 1;
+  player.currentQuestion = makeQuestion(session.level, player.questionSeq);
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");
   renderQuestion(player);
+  player.questionShownAt = Date.now();
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
   await wait(40);
-  if (!session.playing) {
+  if (!sameRound(token)) {
     player.busy = false;
     return;
   }
@@ -383,63 +456,38 @@ async function presentNextQuestion(player) {
   player.busy = false;
 }
 
-function completePlayer(player) {
-  player.finished = true;
-  player.busy = false;
-  hideFeedback(player);
-  resetSceneAndPlayer(player);
-  player.itemLeft.classList.remove("is-fading");
-  player.itemRight.classList.remove("is-fading");
-  player.promptEl.textContent = "等待對方...";
-
-  if (players.p1.finished && players.p2.finished) {
-    finishGame("complete");
-  }
+function sameRound(token) {
+  return token === session.roundToken && session.playing;
 }
 
-function finishGame(reason) {
-  if (!session.playing) return;
-  session.playing = false;
-  session.endReason = reason;
-  clearInterval(session.timerId);
-
+function settlePlayers() {
   [players.p1, players.p2].forEach((player) => {
     player.busy = false;
     hideFeedback(player);
     resetSceneAndPlayer(player);
     player.itemLeft.classList.remove("is-fading");
     player.itemRight.classList.remove("is-fading");
-    player.promptEl.classList.add("is-hidden");
-  });
-
-  const total = session.questions.length;
-  resultTitle.textContent = reason === "timeup" ? "時間到" : "闖關結束";
-  resultScoreP1.textContent = `P1：${players.p1.score} / ${total} 分`;
-  resultScoreP2.textContent = `P2：${players.p2.score} / ${total} 分`;
-  resultHint.textContent =
-    reason === "timeup" ? "倒數結束，看看這次的得分" : "兩位都走完所有路口了";
-  resultEl.classList.remove("is-hidden");
-
-  submitResult({
-    gameId: "TGame",
-    mode: "dual",
-    reason,
-    durationSec: Math.round((Date.now() - session.startedAt) / 1000),
-    players: [
-      playerResult(players.p1, total),
-      playerResult(players.p2, total),
-    ],
   });
 }
 
-function playerResult(player, total) {
-  return {
-    id: player.id,
-    score: player.score,
-    total,
-    answers: player.answers,
-    progress: toProgress(player.score, total),
-  };
+function finishGame() {
+  if (session.endReason === "complete") return;
+  session.playing = false;
+  session.endReason = "complete";
+  session.roundToken += 1;
+  clearInterval(session.timerId);
+  midBreakEl.classList.add("is-hidden");
+  settlePlayers();
+  [players.p1, players.p2].forEach((player) => {
+    player.promptEl.classList.add("is-hidden");
+  });
+
+  resultTitle.textContent = "挑戰完成！";
+  resultScoreP1.textContent = `P1：${players.p1.score} / ${Math.max(players.p1.answers.length, 1)} 分`;
+  resultScoreP2.textContent = `P2：${players.p2.score} / ${Math.max(players.p2.answers.length, 1)} 分`;
+  resultHint.textContent = "六關都結束了，看看這次的得分";
+  resultEl.classList.remove("is-hidden");
+  void saveBoth(STAGE_COUNT);
 }
 
 function showFeedback(player, isCorrect) {
@@ -550,50 +598,3 @@ function wait(ms) {
   });
 }
 
-function toProgress(score, total) {
-  if (!total) return 0;
-  const percent = Math.round((score / total) * 100);
-  return PROGRESS_STEPS.reduce((closest, step) =>
-    Math.abs(step - percent) < Math.abs(closest - percent) ? step : closest
-  );
-}
-
-/**
- * 讀取本題遊戲的題目。目前回傳本地假資料。
- */
-async function fetchQuestions() {
-  // -------------------------------------------------------------------------
-  // 後端接點：拉題（之後接 API 時改這裡即可）
-  //
-  // 建議：GET /api/games/TGame/questions
-  // -------------------------------------------------------------------------
-
-  return {
-    timeLimitSec: TIME_LIMIT_SEC,
-    questions: LOCAL_QUESTIONS,
-  };
-}
-
-/**
- * 把本局結果交給後端。目前只 log。
- */
-async function submitResult(payload) {
-  // -------------------------------------------------------------------------
-  // 後端接點：交卷（之後接 API 時改這裡即可）
-  //
-  // 建議：POST /api/games/TGame/result
-  // payload 範例：
-  // {
-  //   gameId: "TGame",
-  //   mode: "dual",
-  //   reason: "complete",
-  //   durationSec: 42,
-  //   players: [
-  //     { id: "p1", score: 6, total: 8, answers: [], progress: 100 },
-  //     { id: "p2", score: 4, total: 8, answers: [], progress: 50 }
-  //   ]
-  // }
-  // -------------------------------------------------------------------------
-
-  console.log("[TGame dual result payload 待接後端]", payload);
-}

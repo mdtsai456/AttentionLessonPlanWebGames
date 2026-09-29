@@ -38,7 +38,7 @@
 
       <div class="hud-timer" aria-live="polite">
         <span class="hud-chip hud-chip-sky">剩餘</span>
-        <span class="hud-box" id="timer-box">45 秒</span>
+        <span class="hud-box" id="timer-box">60 秒</span>
       </div>
 
       <section class="backpack" aria-label="背包">
@@ -51,6 +51,7 @@
         <div class="minimap" id="minimap" aria-label="房間小地圖"></div>
       </div>
       <p class="feedback" id="feedback" aria-live="assertive"></p>
+      <button type="button" class="btn btn-sky btn-leave" id="leave-btn">離開</button>
       <div class="fade" id="fade"></div>
 
       <section class="panel is-hidden" id="problem-panel" aria-label="本關題目">
@@ -94,7 +95,9 @@
         </div>
       </section>
     </main>
+    <script src="../shared/session-timeout.js"></script>
     <script src="../shared/stage-clear.js"></script>
+    <script src="../shared/leave-confirm.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

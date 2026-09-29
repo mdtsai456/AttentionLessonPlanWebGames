@@ -160,6 +160,11 @@ def test_report_includes_stats_and_summary(client, db, login_as_teacher):
         "accuracy": 0.8,
         "duration": 12000.0,
         "stage": 10,
+        "levelAccuracy": None,
+        "avgReactionMs": None,
+        "questionCount": None,
+        "aimRatio": None,
+        "focusMs": None,
     }
     assert body["summaryByGame"] == [
         {

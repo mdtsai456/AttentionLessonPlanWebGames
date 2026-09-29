@@ -16,6 +16,7 @@ export function drawHud(ctx, viewport, state) {
   ctx.save();
 
   drawScorePill(ctx, vx, vy, w, h, score, level);
+  drawRemaining(ctx, vx, vy, w, h, state.remaining);
   drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total);
   if (showTick) {
     drawTick(ctx, vx, vy, w, h);
@@ -27,7 +28,7 @@ export function drawHud(ctx, viewport, state) {
 function drawScorePill(ctx, vx, vy, w, h, score, level) {
   const pillX = vx + 0.08 * w;
   const pillY = vy + 0.02 * h;
-  const pillW = 0.42 * w;
+  const pillW = 0.26 * w;
   const pillH = 0.07 * h;
   const radius = pillH / 2;
 
@@ -73,6 +74,32 @@ function drawScorePill(ctx, vx, vy, w, h, score, level) {
     ctx.fillText(`第 ${level} 關`, pillX + pillW - barMargin, pillY + pillH * 0.38);
     ctx.restore();
   }
+}
+
+function drawRemaining(ctx, vx, vy, w, h, remaining) {
+  const seconds = Math.max(0, Math.ceil(Number(remaining) || 0));
+  const label = `剩餘 ${seconds} 秒`;
+  const fontSize = Math.round(h * 0.038);
+
+  ctx.save();
+  ctx.font = `bold ${fontSize}px ${FONT_STACK}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const textW = ctx.measureText(label).width;
+  const padX = fontSize * 0.55;
+  const boxW = textW + padX * 2;
+  const boxH = fontSize * 1.7;
+  const boxX = vx + (w - boxW) / 2;
+  const boxY = vy + h * 0.02;
+
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = '#111111';
+  roundRect(ctx, boxX, boxY, boxW, boxH, boxH / 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, vx + w / 2, boxY + boxH / 2);
+  ctx.restore();
 }
 
 function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {

@@ -57,6 +57,10 @@ async function main() {
     ...(sessionSeconds !== null ? { sessionSeconds } : {}),
   });
 
+  document.getElementById('leave-btn').addEventListener('click', () => {
+    handle.leave();
+  });
+
   await handle.done;
   returnToLobby();
 }

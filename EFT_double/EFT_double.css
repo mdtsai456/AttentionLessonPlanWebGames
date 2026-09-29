@@ -84,7 +84,8 @@ button:focus-visible {
 
 /* 題數往內移，避開右側進度條。 */
 .player-2 .round {
-  right: 8%;
+  right: auto;
+  width: max-content;
 }
 
 .progress-label {
@@ -146,10 +147,37 @@ button:focus-visible {
   text-align: center;
 }
 
+.btn-leave {
+  position: absolute;
+  top: 2%;
+  right: 2%;
+  z-index: 8;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.2rem;
+  min-width: 6.4rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
+}
+
+.btn-leave:active {
+  transform: translateY(6px);
+  background: linear-gradient(#3aa3d0, #2b86b4);
+  box-shadow: none;
+}
+
 .round {
   position: absolute;
-  right: 3%;
-  top: 2.4%;
+  left: 7%;
+  top: 10%;
+  right: auto;
+  width: max-content;
   font-size: 1.85cqw;
   font-weight: bold;
   background: #ffffffd9;
@@ -161,7 +189,7 @@ button:focus-visible {
 .bubble-field {
   position: absolute;
   left: 12%;
-  top: 12%;
+  top: 16%;
   width: 78%;
   height: 48%;
 }

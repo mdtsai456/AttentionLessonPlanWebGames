@@ -251,33 +251,28 @@ body {
   background: linear-gradient(#4a5568, #334155);
 }
 
-.hud-score,
-.hud-timer {
+.hud-bar {
   position: absolute;
   top: 2.2vh;
-  z-index: 8;
-  display: flex;
-  align-items: stretch;
-  filter: drop-shadow(0 8px 14px rgba(40, 80, 50, 0.18));
-}
-
-.hud-score {
   left: 2vw;
-}
-
-.hud-timer {
   right: 2vw;
-}
-
-.hud-level {
-  position: absolute;
-  top: 2.2vh;
-  left: 50%;
   z-index: 8;
   display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.hud-score,
+.hud-timer,
+.hud-level {
+  display: flex;
   align-items: stretch;
-  transform: translateX(-50%);
   filter: drop-shadow(0 8px 14px rgba(40, 80, 50, 0.18));
+}
+
+.btn-leave {
+  margin-left: auto;
+  min-width: 7.2rem;
 }
 
 .hud-chip {

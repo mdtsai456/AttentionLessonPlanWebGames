@@ -57,6 +57,24 @@ export function buildPayload({ lessonId, student, summary }) {
     { apiname: `${STATS_PREFIX}levelsPlayed`, value: summary.levelsPlayed },
   ];
 
+  const played = Array.isArray(summary.levelAccuracy) ? summary.levelAccuracy : [];
+  const stageCount = Number(summary.stage);
+  const kept = Number.isFinite(stageCount) && stageCount > 0
+    ? played.slice(0, stageCount)
+    : played;
+  if (kept.length) {
+    stats.push({
+      apiname: `${STATS_PREFIX}levelAccuracy`,
+      value: kept.map((value) => Number(value.toFixed(4))).join(','),
+    });
+  }
+  if (Number.isFinite(summary.avgReactionMs)) {
+    stats.push({ apiname: `${STATS_PREFIX}avgReactionMs`, value: summary.avgReactionMs });
+  }
+  if (Number.isFinite(summary.questionCount)) {
+    stats.push({ apiname: `${STATS_PREFIX}questionCount`, value: summary.questionCount });
+  }
+
   return {
     lessonId,
     data: {

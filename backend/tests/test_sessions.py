@@ -116,6 +116,20 @@ def test_post_session_maps_each_unity_game_to_db_type(
     assert write_calls[0]["game_type"] == db_game_type
 
 
+def test_post_session_stores_per_level_accuracy(write_calls):
+    payload = dccs_payload()
+    payload["data"]["stats"].append(
+        {"apiname": "DCCS_levelAccuracy", "value": "1,0.5,0"}
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 201
+    assert write_calls[0]["stats"]["level_accuracy"] == "1.0000,0.5000,0.0000"
+    assert write_calls[0]["stats"]["accuracy"] == 0.83
+
+
 def test_post_session_applies_reference_conversion_rules(write_calls):
     payload = dccs_payload()
     payload["lessonId"] = "DCCS"

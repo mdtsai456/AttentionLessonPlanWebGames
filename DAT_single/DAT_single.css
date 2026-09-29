@@ -120,10 +120,10 @@ button:focus-visible {
   text-align: center;
 }
 
-.round,
-.pause {
+.round {
   position: absolute;
   top: 4%;
+  right: 16%;
   padding: .5em 1em;
   border: 0;
   border-radius: 2em;
@@ -132,12 +132,29 @@ button:focus-visible {
   color: #65462f;
 }
 
-.round {
-  right: 15%;
+.btn-leave {
+  position: absolute;
+  top: 3%;
+  right: 2%;
+  z-index: 6;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.72rem 1.4rem;
+  min-width: 7.2rem;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(#8ed8f6, #57b8e8);
+  box-shadow: 0 6px 0 #3494c4, 0 10px 14px rgba(60, 140, 180, 0.28);
 }
 
-.pause {
-  right: 4%;
+.btn-leave:active {
+  transform: translateY(6px);
+  background: linear-gradient(#3aa3d0, #2b86b4);
+  box-shadow: none;
 }
 
 /* 題目卡：色名字色與算式並排 */

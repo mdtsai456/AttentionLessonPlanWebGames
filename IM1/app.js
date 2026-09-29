@@ -20,7 +20,7 @@
 
 /** 第幾關結束後跳出中場休息（0-based：index 即將變成 3，也就是打完前 3 關）。 */
 const MIDWAY_STAGE = 3;
-const TIME_LIMIT_SEC = 45;
+const TIME_LIMIT_SEC = 60;
 /** 背包格數上限。 */
 const BAG_SIZE = 4;
 /** 左右移動速度（畫面寬度百分比 / 秒）。 */
@@ -112,7 +112,7 @@ const LOCAL_QUESTIONS = [
     problemType: "Take",
     targetItems: ["apple"],
     targetRoom: "None",
-    timeLimit: 45,
+    timeLimit: 60,
   },
   {
     id: "P002",
@@ -120,7 +120,7 @@ const LOCAL_QUESTIONS = [
     problemType: "GoTo",
     targetItems: [],
     targetRoom: "Bathroom",
-    timeLimit: 45,
+    timeLimit: 60,
   },
   {
     id: "P003",
@@ -128,7 +128,7 @@ const LOCAL_QUESTIONS = [
     problemType: "Place",
     targetItems: ["book"],
     targetRoom: "Study",
-    timeLimit: 45,
+    timeLimit: 60,
   },
   {
     id: "P004",
@@ -136,7 +136,7 @@ const LOCAL_QUESTIONS = [
     problemType: "Take",
     targetItems: ["banana", "hat"],
     targetRoom: "None",
-    timeLimit: 45,
+    timeLimit: 60,
   },
   {
     id: "P005",
@@ -144,7 +144,7 @@ const LOCAL_QUESTIONS = [
     problemType: "GoTo",
     targetItems: [],
     targetRoom: "Kitchen",
-    timeLimit: 45,
+    timeLimit: 60,
   },
   {
     id: "P006",
@@ -152,7 +152,7 @@ const LOCAL_QUESTIONS = [
     problemType: "Place",
     targetItems: ["soccer"],
     targetRoom: "LivingRoom",
-    timeLimit: 45,
+    timeLimit: 60,
   },
 ];
 
@@ -194,9 +194,16 @@ const keys = { left: false, right: false };
 
 const state = {
   questions: [], // 本題題庫（後端或本地）
-  index: 0, // 目前關卡（0-based）
+  index: 0, // 保留給地圖尺寸；正式關卡用 stage
+  stage: 1, // 目前關卡（1-based，共 6 關）
+  task: null, // 這一關目前這題
+  taskCursor: 0,
+  stageTasks: [], // 本關已結束的題
+  levelAccuracies: [],
+  finishedStages: 0,
+  endingStage: false,
   score: 0, // 過關數
-  remaining: 45, // 本關剩餘秒數
+  remaining: 60, // 本關剩餘秒數
   playing: false, // 整局是否進行中（結算後為 false）
   stageLive: false, // 本關是否已按「開始」、可移動倒數
   busy: false, // 進房淡出、過場時鎖操作
@@ -250,6 +257,7 @@ function bindEvents() {
   backBtn.addEventListener("click", () => {
     location.href = "../Select/index.html";
   });
+  document.getElementById("leave-btn").addEventListener("click", leaveGame);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
@@ -293,11 +301,11 @@ function bindEvents() {
 // 關卡生命週期
 // -----------------------------------------------------------------------------
 
-/** 重開一局：清分數、背包、關卡紀錄，從第 1 題開始。 */
+/** 重開一局：清分數，從第 1 關開始。每關 60 秒、一題，做完或逾時就進下一關。 */
 function startGame() {
   clearInterval(state.timerId);
+  state.timerId = null;
   stopWalkCycle();
-  state.index = 0;
   state.score = 0;
   state.playing = true;
   state.stageLive = false;
@@ -306,6 +314,10 @@ function startGame() {
   state.bag = [];
   state.completedItems = [];
   state.stageResults = [];
+  state.levelAccuracies = [];
+  state.finishedStages = 0;
+  state.taskCursor = 0;
+  state.endingStage = false;
   resultEl.classList.add("is-hidden");
   midwayPanel.classList.add("is-hidden");
   continueBtn.disabled = false;
@@ -313,65 +325,74 @@ function startGame() {
   hideFeedback();
   renderHud();
   renderBackpack();
-  prepareStage();
+  startStage(1);
 }
 
-/**
- * 準備目前這關：生地圖、放物品、把玩家放回中央，並跳出題目卡。
- * 此時還不能移動，要等玩家按「開始」。
- */
-function prepareStage() {
-  const problem = currentProblem();
-  if (!problem) {
+function startStage(stageNumber) {
+  state.stage = stageNumber;
+  state.index = stageNumber - 1;
+  state.remaining = TIME_LIMIT_SEC;
+  state.stageTasks = [];
+  state.endingStage = false;
+  clearInterval(state.timerId);
+  state.timerId = null;
+  prepareTask();
+}
+
+/** 這一關的那一題：生地圖、放物品，並跳出題目卡。倒數要等玩家按「開始」。 */
+function prepareTask() {
+  const list = state.questions;
+  if (!list.length) {
     finishGame("complete");
     return;
   }
+  state.task = list[state.taskCursor % list.length];
+  state.taskCursor += 1;
 
   state.stageLive = false;
   state.busy = true;
   state.completedItems = [];
   state.bag = [];
-  state.remaining = TIME_LIMIT_SEC;
   state.playerX = 50;
   state.facing = "right";
   state.walkTarget = null;
   keys.left = false;
   keys.right = false;
 
-  const specs = generateLevelSpecs(state.index);
+  const specs = generateLevelSpecs(state.stage - 1);
   state.rows = specs.rows;
   state.cols = specs.cols;
   state.rooms = generateMap(specs.rows, specs.cols);
-  assignRoomTypes(state.rooms, problem);
-  placeItems(state.rooms, problem);
+  assignRoomTypes(state.rooms, state.task);
+  placeItems(state.rooms, state.task);
   state.row = 0;
   state.col = 0;
 
-  clearInterval(state.timerId);
   renderHud();
   renderBackpack();
   renderRoom();
-  showProblemPanel(problem);
+  showProblemPanel(state.task);
 }
 
-/** 關掉題目卡，開始倒數與移動。 */
+/** 關掉題目卡，開始這一關的 60 秒倒數與移動。 */
 function beginCurrentStage() {
   problemPanel.classList.add("is-hidden");
   state.stageLive = true;
   state.busy = false;
   state.stageStartedAt = Date.now();
-  clearInterval(state.timerId);
-  state.timerId = setInterval(tickTimer, 1000);
+  if (!state.timerId) {
+    state.timerId = setInterval(tickTimer, 1000);
+  }
 }
 
-/** 中場按「繼續挑戰」後，準備下一關（此時 index 已在 finishOrAdvance 加過）。 */
+/** 中場按「繼續挑戰」後，進入下一關。 */
 function continueAfterMidway() {
   midwayPanel.classList.add("is-hidden");
-  prepareStage();
+  startStage(state.stage + 1);
 }
 
 function currentProblem() {
-  return state.questions[state.index];
+  return state.task;
 }
 
 function currentRoom() {
@@ -640,7 +661,7 @@ function renderBackpack() {
 
 /** 關卡開始前的題目卡：指令文字、目標物品圖、操作提示。 */
 function showProblemPanel(problem) {
-  problemTitle.textContent = `第 ${state.index + 1} 關`;
+  problemTitle.textContent = `第 ${state.stage} 關`;
   problemText.textContent = problem.displayText;
   problemItems.innerHTML = problem.targetItems
     .map((item) => `<img src="${objectSrc(item)}" alt="${OBJECT_LABEL[item]}" />`)
@@ -888,63 +909,64 @@ function completedItemTask() {
 }
 
 function passStage() {
-  if (!state.stageLive) return;
+  if (!state.stageLive || state.endingStage) return;
   state.stageLive = false;
   state.busy = true;
   commitStage(true);
   state.score += 1;
   renderHud();
   showFeedback("完成！", true);
-  finishOrAdvance();
+  endStage();
 }
 
-/** 本關時間到：記失敗，不扣整局，直接進入下一關或結算。 */
+/** 本關 60 秒到：這一題算沒完成，進入下一關或結算。 */
 function timeOut() {
-  if (!state.stageLive) return;
+  if (!state.stageLive || state.endingStage) return;
   state.stageLive = false;
   commitStage(false);
   showFeedback("時間到", false);
-  finishOrAdvance();
+  endStage();
 }
 
-/** 把這一關的對錯與耗時推進 stageResults，之後交卷會整包送出。 */
+/** 把這一關（一題）的對錯推進紀錄。 */
 function commitStage(passed) {
   const problem = currentProblem();
-  state.stageResults.push({
+  const record = {
     problemID: problem.id,
     type: problem.problemType,
     timeLimit: TIME_LIMIT_SEC,
     targetItemCount: problem.targetItems.length,
     passed,
     timeUsage: (Date.now() - state.stageStartedAt) / 1000,
-  });
+  };
+  state.stageResults.push(record);
+  state.stageTasks.push(record);
 }
 
-/**
- * 過關或逾時後的分流：最後一關結束整局；
- * 打完第 3 關（nextIndex === MIDWAY_STAGE）先中場；否則準備下一關。
- */
-async function finishOrAdvance() {
+/** 做完或 60 秒到就換下一關。第 3 關先中場，第 6 關結算。 */
+async function endStage() {
+  if (state.endingStage) return;
+  state.endingStage = true;
   state.busy = true;
+  state.stageLive = false;
   clearInterval(state.timerId);
+  state.timerId = null;
+  const tasks = state.stageTasks;
+  const rate = tasks.length ? tasks.filter((item) => item.passed).length / tasks.length : 0;
+  state.levelAccuracies.push(Number(rate.toFixed(4)));
+  state.finishedStages = state.stage;
   await wait(700);
   hideFeedback();
-  const nextIndex = state.index + 1;
-  const isLast = nextIndex >= state.questions.length;
-  const hitMidway = nextIndex === MIDWAY_STAGE;
-
-  if (isLast) {
+  if (state.stage >= 6) {
     finishGame("complete");
     return;
   }
-
-  state.index = nextIndex;
-  if (hitMidway) {
+  if (state.stage === MIDWAY_STAGE) {
     showMidway();
     return;
   }
-  await window.showStageClear(nextIndex);
-  prepareStage();
+  await window.showStageClear(state.stage);
+  startStage(state.stage + 1);
 }
 
 /** 中場畫面，並先送一次 progress = 50 的結果（對齊 Unity 中場交卷）。 */
@@ -965,24 +987,46 @@ function finishGame(reason) {
   problemPanel.classList.add("is-hidden");
   midwayPanel.classList.add("is-hidden");
 
-  const total = state.questions.length;
+  const answered = Math.max(state.stageResults.length, 1);
   resultTitle.textContent = "挑戰完成！";
-  resultScore.textContent = `${state.score} / ${total} 分`;
-  resultHint.textContent = "所有指令都完成了";
+  resultScore.textContent = `${state.score} / ${answered} 分`;
+  resultHint.textContent = "六關都結束了";
   resultEl.classList.remove("is-hidden");
 
-  void saveCurrentRun(state.questions.length);
+  void saveCurrentRun(6);
+}
+
+let savedStage = 0;
+
+async function leaveGame() {
+  const leaveBtn = document.getElementById("leave-btn");
+  leaveBtn.disabled = true;
+  const completed = state.finishedStages;
+  const stage = completed >= 6 ? 6 : completed >= MIDWAY_STAGE ? MIDWAY_STAGE : 0;
+  if (stage && stage !== savedStage) await saveCurrentRun(stage);
+  window.askLeave("../Select/index.html");
+  leaveBtn.disabled = false;
 }
 
 function saveCurrentRun(stage) {
-  const total = Math.max(state.stageResults.length, 1);
+  savedStage = stage;
+  const answered = Math.max(state.stageResults.length, 1);
+  const failed = state.stageResults.filter((item) => !item.passed).length;
   return submitResult({
     score: state.score,
-    wrong: Math.max(total - state.score, 0),
-    accuracy: Math.round((state.score / total) * 100),
+    wrong: failed,
+    accuracy: Math.round((state.score / answered) * 100),
     duration: Date.now() - state.startedAt,
     stage,
+    levelAccuracy: state.levelAccuracies.slice(0, stage).join(","),
+    avgReactionMs: averageReaction(state.stageResults),
   });
+}
+
+function averageReaction(stages) {
+  if (!stages.length) return 0;
+  const total = stages.reduce((sum, item) => sum + Number(item.timeUsage || 0), 0);
+  return (total / stages.length) * 1000;
 }
 
 // -----------------------------------------------------------------------------
@@ -1202,6 +1246,8 @@ async function submitResult(data) {
         { apiname: "IM_accuracy", value: data.accuracy / 100 },
         { apiname: "IM_duration", value: data.duration },
         { apiname: "IM_stage", value: data.stage },
+        { apiname: "IM_levelAccuracy", value: data.levelAccuracy },
+        { apiname: "IM_avgReactionMs", value: data.avgReactionMs },
       ],
     },
   };

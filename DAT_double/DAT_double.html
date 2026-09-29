@@ -9,11 +9,14 @@
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
 <!-- <script type="module" src="DAT_double.js" defer></script> -->
+<script src="../shared/session-timeout.js"></script>
+<script src="../shared/leave-confirm.js"></script>
 <script src="../shared/stage-clear.js" defer></script>
 <script type="module" src="js/main.js" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
+    <button type="button" class="btn-leave" id="leave-btn">離開</button>
     <button type="button" id="enter-formal-btn" class="enter-formal" hidden>進入正式遊戲</button>
     <section class="player player-1" aria-label="玩家一">
     <!--      -->
@@ -25,7 +28,7 @@
     </aside>
     <header class="score"><span>玩家一</span><strong data-ui="score">0 分</strong></header>
 
-    <div class="round" data-ui="round">第 1 / 12 題</div>
+    <div class="round" data-ui="round">第 1 題・剩餘 60 秒（第 1 / 6 關）</div>
     <button class="pause" data-ui="pause" type="button" disabled>暫停</button>
     <section class="question-panel" aria-label="判斷題目">
       <div class="question"><span class="caption" data-ui="question-type">等待瞄準</span><strong data-ui="question-text">—</strong></div>
@@ -71,7 +74,7 @@
       </aside>
       
     <header class="score"><span>玩家二</span><strong data-ui="score">0 分</strong></header>
-    <div class="round" data-ui="round">第 1 / 12 題</div>
+    <div class="round" data-ui="round">第 1 題・剩餘 60 秒（第 1 / 6 關）</div>
     <button class="pause" data-ui="pause" type="button" disabled>暫停</button>
     <section class="question-panel" aria-label="判斷題目">
       <div class="question"><span class="caption" data-ui="question-type">等待瞄準</span><strong data-ui="question-text">—</strong></div>

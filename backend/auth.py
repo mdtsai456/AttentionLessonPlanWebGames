@@ -14,7 +14,8 @@ _ALGORITHM = "pbkdf2_sha256"
 _ITERATIONS = 260_000
 _SALT_BYTES = 16
 
-TOKEN_TTL = timedelta(hours=8)
+# 學生與老師都是登入後 1 小時失效；前端依登入回應的 expiresAt 自動登出。
+TOKEN_TTL = timedelta(hours=1)
 
 
 def hash_password(password: str) -> str:

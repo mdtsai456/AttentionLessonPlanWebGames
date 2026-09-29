@@ -137,7 +137,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | `subject_type` | enum('teacher','student') | |
 | `teacher_id` FK→`teacher` | int NULL | 老師登入才填 |
 | `grade`,`case_id`,`school` FK→`student` | varchar NULL | 學生登入才填 |
-| `created_at`／`expires_at` | datetime | 8 小時後過期 |
+| `created_at`／`expires_at` | datetime | 1 小時後過期 |
 
 ### 2.3 遊戲資料
 

@@ -57,6 +57,7 @@ def teacher_login(payload: TeacherLoginRequest) -> TeacherLoginResponse:
         teacherId=teacher["teacher_id"],
         teacherName=teacher["name"],
         school=teacher["school"],
+        expiresAt=expires_at,
     )
 
 
@@ -86,6 +87,7 @@ def student_login(payload: StudentLoginRequest) -> StudentLoginResponse:
         grade=grade,
         caseId=case_id,
         school=school,
+        expiresAt=expires_at,
     )
 
 

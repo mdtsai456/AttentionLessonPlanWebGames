@@ -354,6 +354,7 @@ export function mountDCCS(options) {
   let input = null;
   let loop = null;
   let statsInstance = null;
+  const progressApi = { completedLevel: 0 };
   let manifestRef = null;
   let sessionId = '';
   let startedAtMs = null;
@@ -551,6 +552,25 @@ export function mountDCCS(options) {
       }
 
       let levelPromptActive = false;
+      let completedLevel = 0;
+      let ended = false;
+
+      function leave() {
+        if (destroyed) return;
+        const stage = completedLevel >= 6 ? 6 : completedLevel >= 3 ? 3 : 0;
+        if (!stage || ended) {
+          window.askLeave('../Select/index.html');
+          return;
+        }
+        ended = true;
+        void finish({ skipResult: true, stage })
+          .catch(fail)
+          .then(() => {
+            window.askLeave('../Select/index.html');
+          });
+      }
+
+      exitApi.leave = leave;
 
       async function waitForContinueOrLobby() {
         levelPromptActive = true;
@@ -645,9 +665,11 @@ export function mountDCCS(options) {
 
       startedAtMs = Date.now();
 
-      let ended = false;
+      let finishStarted = false;
 
       async function finish(options) {
+        if (finishStarted) return;
+        finishStarted = true;
         const skipResult = !!(options && options.skipResult);
 
         if (loop) {
@@ -671,6 +693,10 @@ export function mountDCCS(options) {
 
         const summary =
           statsInstance.summary();
+
+        if (options && Number.isFinite(options.stage)) {
+          summary.stage = options.stage;
+        }
 
         const rows =
           statsInstance.rows();
@@ -802,6 +828,9 @@ export function mountDCCS(options) {
             currentLevel !== previousLevel
           ) {
             void (async () => {
+              completedLevel = Math.max(completedLevel, previousLevel);
+              progressApi.completedLevel = completedLevel;
+
               if (previousLevel === 3 && currentLevel === 4) {
                 const choice = await waitForContinueOrLobby();
                 if (!choice || destroyed) return;
@@ -856,11 +885,33 @@ export function mountDCCS(options) {
     }
   }
 
+  const exitApi = {
+    leave() {
+      window.askLeave('../Select/index.html');
+    },
+  };
+
   void run();
 
   return {
     done,
     destroy,
+    leave() {
+      exitApi.leave();
+    },
+    get completedLevel() {
+      return progressApi.completedLevel;
+    },
+    buildLeavePayload(stage) {
+      if (!statsInstance) return null;
+      const elapsedSeconds = track ? track.elapsed : 0;
+      statsInstance.setDuration(
+        Math.round(Math.min(elapsedSeconds, sessionSeconds) * 1000)
+      );
+      const summary = statsInstance.summary();
+      summary.stage = stage;
+      return buildResultPayload(summary, Date.now());
+    },
 
     get elapsed() {
       return track
