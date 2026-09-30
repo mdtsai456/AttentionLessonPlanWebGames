@@ -154,8 +154,8 @@ if (btnConfirmLeave) {
   });
 }
 
-// ==================== 雙人版動態素材與彩蛋清單載入流程 ====================
 
+// 雙人版動態素材與彩蛋清單載入流程
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 
@@ -228,13 +228,28 @@ function downloadImage(src) {
 async function initDoubleGameWorkflow() {
   console.log('🎮 雙人遊戲開始，獨立載入 P1/P2 素材與彩蛋清單...');
 
-  // A. 並行抓取 P1 與 P2 的素材清單
+  const p1Elem = document.querySelector('.player-1');
+  const p2Elem = document.querySelector('.player-2');
+
+  // A. 載入前先隱藏 P1 與 P2 的動物與準心，避免畫面預設殘影
+  const togglePlayerVisibility = (pElem, visible) => {
+    if (!pElem) return;
+    const animal = pElem.querySelector('#animal, [data-ui="animal"]');
+    const crosshair = pElem.querySelector('#crosshair, [data-ui="crosshair"]');
+    if (animal) animal.style.visibility = visible ? 'visible' : 'hidden';
+    if (crosshair) crosshair.style.visibility = visible ? 'visible' : 'hidden';
+  };
+
+  togglePlayerVisibility(p1Elem, false);
+  togglePlayerVisibility(p2Elem, false);
+
+  // B. 並行抓取 P1 與 P2 的素材清單
   const [p1List, p2List] = await Promise.all([
     fetchStudentAssetList(0),
     fetchStudentAssetList(1)
   ]);
 
-  // B. 預載通用與玩家首張圖片
+  // C. 預載通用與玩家首張圖片
   await Promise.all([
     downloadImage('assets/background.png'),
     downloadImage('assets/crosshair.png'),
@@ -242,12 +257,16 @@ async function initDoubleGameWorkflow() {
     downloadImage(p2List[0])
   ]);
 
-  // C. 將素材清單傳送給兩位 Player 實體
+  // D. 將素材清單傳送給兩位 Player 實體
   players[0].setAnimalAssets(p1List);
   players[1].setAnimalAssets(p2List);
 
-  // D. 啟動遊戲 Session
+  // E. 啟動遊戲 Session
   beginSession();
+
+  // F. 載入完成並算好位置後，重新顯示兩位玩家的動物與準心
+  togglePlayerVisibility(p1Elem, true);
+  togglePlayerVisibility(p2Elem, true);
 }
 
 // 執行初始化並啟動動畫 Loop

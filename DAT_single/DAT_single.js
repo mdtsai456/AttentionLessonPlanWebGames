@@ -16,6 +16,7 @@ const bindings = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right'
 };
+const answerLabel = '空白鍵';
 
 let phase = 'loading', paused = false, lastTime, elapsed = 0;
 let submitted = false;
@@ -25,7 +26,7 @@ let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
 const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
-// ==================== 彩蛋機制全域變數 ====================
+// 彩蛋機制全域變數
 let animalAssetList = [];       // 儲存該學生所有可用的動物圖片 URL
 let currentAssetIndex = 0;     // 目前顯示的圖片索引
 let consecutiveCorrect = 0;    // 連續答對且瞄準成功計數器
@@ -176,8 +177,12 @@ function updateProgress() {
 }
 
 function answerLimitMs() {
+  return ROUND_MS;
+  /*
+  //修改會在最後一秒跑很多題目的 bug
   if (isPractice || !stageDeadline) return ROUND_MS;
   return Math.max(0, Math.min(ROUND_MS, stageDeadline - Date.now()));
+  */
 }
 
 function renderPositions() {
@@ -233,45 +238,56 @@ function answer() {
   enableAnswers(false);
 }
 
-// 🎨 切換到下一張動物圖片 (彩蛋觸發)
-function switchToNextAnimal() {
-  // 防呆機制：如果素材小於或等於 1 張，直接跳過不換圖
-  if (!animalAssetList || animalAssetList.length <= 1) {
-    console.log(`ℹ️ 目前素材數量為 ${animalAssetList ? animalAssetList.length : 0} 張，不執行換圖彩蛋。`);
-    return;
-  }
+// 彩蛋動物切換邏輯 (level up and down) 
+// 🎨 統一切換圖片與動畫處理
+function updateAnimalImage(newIndex, isUpgrade = true) {
+  if (!animalAssetList || animalAssetList.length <= 1) return;
+  if (newIndex === currentAssetIndex) return; // 索引未改變則不更新
 
-  // 計算下一張圖片索引 (循環輪播)
-  currentAssetIndex = (currentAssetIndex + 1) % animalAssetList.length;
-  const nextAssetUrl = animalAssetList[currentAssetIndex];
+  currentAssetIndex = newIndex;
+  const targetAssetUrl = animalAssetList[currentAssetIndex];
 
-  console.log(`🎉 [彩蛋觸發] 連續答對 ${consecutiveCorrect} 題！切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${nextAssetUrl}`);
+  console.log(`${isUpgrade ? '🎉 [彩蛋升級]' : '💔 [彩蛋降級]'} 切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${targetAssetUrl}`);
 
-  const animalImgElem = $('animal-image');
+  const animalImgElem = document.getElementById('animal-image') || $('animal-image');
   if (animalImgElem) {
-    // 1. 加上縮放動畫，視覺上提示變身效果
     animalImgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
     animalImgElem.style.opacity = '0.2';
-    animalImgElem.style.transform = 'scale(0.6)';
+    // 升級時縮放、降級時微放大的視覺效果區隔
+    animalImgElem.style.transform = isUpgrade ? 'scale(0.6)' : 'scale(1.2)';
 
-    // 2. 直接更新 DOM 元素的 src，不等待外部 Promise，確保瀏覽器立即載入
     setTimeout(() => {
-      animalImgElem.src = nextAssetUrl;
+      animalImgElem.src = targetAssetUrl;
 
-      // 載入失敗容錯機制 (例如 404 時退回預設圖)
+      // 載入失敗容錯
       animalImgElem.onerror = () => {
-        console.warn(`⚠️ 圖片切換失敗，退回預設圖檔: ${nextAssetUrl}`);
+        console.warn(`⚠️ 圖片載入失敗，退回預設圖檔`);
         animalImgElem.src = DEFAULT_ANIMAL_PATH;
       };
 
-      // 3. 圖片換好後恢復大小與透明度
       animalImgElem.style.opacity = '1';
       animalImgElem.style.transform = 'scale(1)';
     }, 150);
   }
 }
 
-// 紀錄答題結果與彩蛋觸發
+// 🎉 連續答對 5 題：升級 (最大封頂，不循環回 0)
+function switchToNextAnimal() {
+  if (currentAssetIndex < animalAssetList.length - 1) {
+    updateAnimalImage(currentAssetIndex + 1, true);
+  } else {
+    console.log(`ℹ️ 已達最大素材頁面 (${currentAssetIndex + 1}/${animalAssetList.length})，保持最高級狀態。`);
+  }
+}
+
+// 💔 答錯 / 未瞄準 / 漏答：降級 (最低退回 0)
+function switchToPrevAnimal() {
+  if (currentAssetIndex > 0) {
+    updateAnimalImage(currentAssetIndex - 1, false);
+  }
+}
+
+// 紀錄答題結果
 function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
@@ -284,29 +300,39 @@ function recordResult(pressed) {
     score++;
     message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
 
-    // 🔥 連續答對 5 題：觸發彩蛋換圖
+    // 連續答對 5 題：觸發升級彩蛋
     if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
-      message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
-      switchToNextAnimal();
+      if (currentAssetIndex < animalAssetList.length - 1) {
+        message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
+        switchToNextAnimal();
+      } else {
+        message += ` 🎉 連續答對 ${consecutiveCorrect} 題！維持最高級動物狀態！`;
+      }
     }
   } else {
-    // 答錯、漏答或沒瞄準到 -> 連擊中斷歸零
-    consecutiveCorrect = 0;
+    consecutiveCorrect = 0; // 重置連擊
+
+    // 💔 答錯、未瞄準或漏答：觸發降級退回上一張
+    if (currentAssetIndex > 0) {
+      switchToPrevAnimal();
+    }
 
     if (!pressed && !correct) {
       timedOut++;
       wrong++;
-      message = '漏答：正確的題目要按空白鍵';
+      message = `漏答：正確的題目要按 ${answerLabel}`;
     } else if (!correct) {
-      wrong++; message = '誤按：不正確的題目不需要按鍵';
+      wrong++;
+      message = '誤按：不正確的題目不需要按鍵';
     } else if (!onTarget) {
-      offTarget++; message = '判斷正確，但準心未對到動物，不計分';
+      offTarget++;
+      message = '判斷正確，但準心未對到動物，不計分';
     }
   }
 
   $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
   $('feedback').textContent = message;
-  outcomes.push(Boolean(isSuccess));
+
   updateProgress();
 }
 
@@ -380,7 +406,8 @@ function endQuestion() {
     return;
   }
 
-  if (Date.now() >= stageDeadline - 20) {
+  // 修改會在最後一秒跑很多題目的 bug
+  if (stageDeadline && Date.now() >= stageDeadline - 20) {
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;
@@ -562,7 +589,12 @@ function tick(time) {
     } else if (phase === 'answer') {
       elapsed = Math.min(answerLimitMs(), elapsed + delta);
       updateClock();
-      if (elapsed >= answerLimitMs()) endQuestion();
+
+      //修改會在最後一秒跑很多題目的 bug
+      const isStageTimeout = !isPractice && stageDeadline && Date.now() >= stageDeadline;
+      if (elapsed >= answerLimitMs() || isStageTimeout) {
+        endQuestion();
+      }
     }
     if (!isPractice && (phase === 'aiming' || phase === 'answer')) updateProgress();
   }
@@ -615,10 +647,15 @@ document.querySelectorAll('[data-move]').forEach((button) => {
   }
 });
 
-// ==================== 依據流程圖實作：動態載入學生素材與彩蛋清單 ====================
-
+// 動態載入學生素材與彩蛋清單
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+const DEFAULT_ANIMAL_POOL = [
+  'assets/animals/rabbit.png',
+  'assets/animals/cat.png',
+  'assets/animals/dog.png',
+  'assets/animals/bird.png',
+];
 
 async function fetchStudentAssets() {
   const rawId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S001';
@@ -636,28 +673,31 @@ async function fetchStudentAssets() {
       const files = data?.DAT?.assets?.files;
 
       if (Array.isArray(files) && files.length > 0) {
-        // 將 API 回傳的所有素材轉為完整可存取的 URL，並存入全域陣列
         animalAssetList = files.map((relativePath) =>
           relativePath.startsWith('http')
             ? relativePath
             : `${ASSET_SERVER_HOST}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
         );
-
-        currentAssetIndex = 0;
-        console.log(`[素材載入] 成功載入 ${animalAssetList.length} 張素材:`, animalAssetList);
-        return animalAssetList[0];
       }
     }
   } catch (err) {
     console.warn('⚠️ API 請求異常，開啟預設素材容錯:', err);
   }
 
-  console.warn('⚠️ 未找到專屬素材，退回使用預設圖檔');
-  animalAssetList = [DEFAULT_ANIMAL_PATH];
+  // 自動補齊 4 種動物：若沒有素材或只有 1 張素材，自動加入預設圖庫
+  if (!animalAssetList || animalAssetList.length === 0) {
+    animalAssetList = [...DEFAULT_ANIMAL_POOL];
+  } else if (animalAssetList.length === 1) {
+    const remainingDefaults = DEFAULT_ANIMAL_POOL.filter(p => p !== animalAssetList[0]);
+    animalAssetList = [...animalAssetList, ...remainingDefaults];
+  }
+
   currentAssetIndex = 0;
-  return DEFAULT_ANIMAL_PATH;
+  console.log(`[素材載入完成] 最終素材清單共有 ${animalAssetList.length} 張圖:`, animalAssetList);
+  return animalAssetList[0];
 }
 
+//下載圖片並檢查是否存在，若不存在則回傳預設素材
 function downloadImage(src) {
   return new Promise((resolve) => {
     console.log(`[下載圖片] 開始下載: ${src}`);
@@ -668,7 +708,7 @@ function downloadImage(src) {
     };
 
     img.onerror = () => {
-      console.warn(`⚠️ 圖片下載失敗 (404/壞聯)，切換為預設素材: ${src}`);
+      console.warn(`⚠️ 圖片下載失敗 (404)，切換為預設素材: ${src}`);
       resolve(DEFAULT_ANIMAL_PATH);
     };
 
@@ -679,8 +719,15 @@ function downloadImage(src) {
 async function initGameWorkflow() {
   console.log('🎮 遊戲開始，執行素材載入流程...');
 
+  // 1. 載入前先隱藏動物與準心，避免畫面出現預設預載殘影
+  const animalElem = $('animal');
+  const crosshairElem = $('crosshair');
+  if (animalElem) animalElem.style.visibility = 'hidden';
+  if (crosshairElem) crosshairElem.style.visibility = 'hidden';
+
   const animalAssetUrl = await fetchStudentAssets();
 
+  // 2. 並行預載背景圖、準心圖與動物圖
   const [bgSrc, crosshairSrc, finalAnimalSrc] = await Promise.all([
     downloadImage('assets/background.png'),
     downloadImage('assets/crosshair.png'),
@@ -693,7 +740,12 @@ async function initGameWorkflow() {
     console.log(`[DOM 更新] 套用初始動物素材: ${finalAnimalSrc}`);
   }
 
+  // 3. 啟動遊戲並計算初始化位置
   startGame();
+
+  // 4. 全部圖片下載並渲染完成後，再顯示動物與準心
+  if (animalElem) animalElem.style.visibility = 'visible';
+  if (crosshairElem) crosshairElem.style.visibility = 'visible';
 }
 
 initGameWorkflow();

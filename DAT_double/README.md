@@ -1,3 +1,31 @@
+# 09.28 ~ 10.04 (README 更新時間: 9/30)
+##  更新彩蛋與素材 api 
+- 測試以 s070 做為有素材的範例（原本的圖片加上一些藍色標記）
+### 修改動物圖片路徑
+- 159~168 行
+const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+
+// 預設彩蛋備用圖清單（無素材時輪播用）
+const DEFAULT_ANIMAL_POOL = [
+  'assets/animals/rabbit.png',
+  'assets/animals/cat.png',
+  'assets/animals/dog.png',
+  'assets/animals/bird.png',
+];
+### 更改 DAT_double/js/main.js
+- 158 行之後(function fetchStudentAssetList 附近)： assets 的 API 串接
+### 更改 DAT_double/js/game.js
+-  62~110 行(function setAnimalAssets 附近)：連續答對的彩蛋
+### 修改一些 bug
+- 修改會在每關最後一秒跑很多題目的問題
+- 動物角色圖片完全載入才會顯示
+- 改成換下一關不會重置動物圖片
+
+
+
+
+# 之前版本的執行方式(現在用不到了)
 ## 目前寫在本地SQL lite 之後將api.js中
 const API_BASE_URL = "http://127.0.0.1:5002";
 改為 const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
