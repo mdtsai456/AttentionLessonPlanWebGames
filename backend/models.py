@@ -160,3 +160,10 @@ class StudentLoginResponse(BaseModel):
     caseId: str
     school: str
     expiresAt: datetime
+
+
+class AttentionResponse(BaseModel):
+    result: int  # 1 = 專心；0 = 不專心／資料過期／找不到
+    subject: str | None = None  # 送給手錶平台的受試者編號，例如 S001
+    reason: str | None = None
+    source: str | None = None  # "mock" 表示 WATCH_PREDICT_MOCK 假資料

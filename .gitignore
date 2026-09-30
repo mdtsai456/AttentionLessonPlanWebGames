@@ -9,3 +9,4 @@ __pycache__/
 .uv/
 student_login.json
 *.db
+.vscode/

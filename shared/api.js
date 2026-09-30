@@ -60,6 +60,19 @@
     await Promise.all(tokens.map((token) => logout(token)));
   }
 
+  /** 手錶專心判定：回傳 1（專心）或 0。任何失敗都當 0，不擋畫面。 */
+  async function fetchAttention(token) {
+    if (!token) return 0;
+    try {
+      const res = await authGet("/attention/me", token);
+      if (!res.ok) return 0;
+      const body = await res.json();
+      return body && body.result === 1 ? 1 : 0;
+    } catch (_err) {
+      return 0;
+    }
+  }
+
   function mapGameId(gameType) {
     if (gameType === "IM" || gameType === "InstructionGame") {
       return "InstructionGame";
@@ -82,6 +95,7 @@
     authGet,
     logout,
     logoutAll,
+    fetchAttention,
     mapGameId,
     progressFromRecord,
   };

@@ -18,6 +18,7 @@
     GET /api/students/{studentKey}/report?school=…    ← 須帶 token
     GET /api/teachers/{teacherId}/students            ← 須帶 token（老師本人）
     GET /api/games                                   ← 公開，靜態遊戲清單
+    GET /api/attention/me                            ← 學生專用，轉發手錶專心判定
     GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端，帳密登入後會壞掉）
 
 靜態前端：正式前端（登入頁、DMS、遊戲大廳與網頁版遊戲）掛在 /app，由本服務
@@ -42,7 +43,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import validate_db_settings
-from routers import auth, directory, sessions, students
+from routers import attention, auth, directory, sessions, students
 
 load_dotenv()
 
@@ -97,6 +98,7 @@ app.include_router(sessions.router)
 app.include_router(students.router)
 app.include_router(directory.router)
 app.include_router(auth.router)
+app.include_router(attention.router)
 
 
 @app.get("/")
