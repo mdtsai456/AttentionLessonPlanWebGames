@@ -1,6 +1,6 @@
 // 本機打 127.0.0.1:5001；上線打 Zeabur。可在載入前以 API_BASE_URL 或 DCCS_SUBMIT_URL 覆寫。
 
-const PROD_API_BASE_URL = 'https://attention-lesson-plan-transfer-data.zeabur.app/api';
+const PROD_API_BASE_URL = 'https://attention-lesson-plan-data.zeabur.app/api';
 
 export function resolveApiBase() {
   const override =
