@@ -62,10 +62,6 @@ const stageClearText = document.getElementById("stage-clear-text");
 const nextStageBtn = document.getElementById("btn-next-stage");
 const lobbyBtn = document.getElementById("btn-lobby");
 const leaveBtn = document.getElementById("leave-btn");
-// For CSV import and reset
-const importBtn = document.getElementById("import-csv-btn");
-const resetBtn = document.getElementById("reset-themes-btn");
-const csvInput = document.getElementById("csv-input");
 const toastEl = document.getElementById("toast");
 
 const ALL_ITEMS = [
@@ -83,10 +79,8 @@ const DEFAULT_STAGE_RULES  = [
   { prompt: "請選擇符合「用來閱讀的」的方向", correct: ["book"] },
 ];
 
-// Key for storing custom themes in localStorage
-const CUSTOM_THEME_KEY = "tgame1.customThemes";
 let stageRules = DEFAULT_STAGE_RULES;
-let customThemes = loadCustomThemes();
+let customThemes = null; // 由 CSV 自動載入；失敗時維持 null 使用預設題目
 
 
 const state = {
@@ -117,12 +111,6 @@ replayBtn.addEventListener("click", () => {
 
 backBtn.addEventListener("click", returnToLobby);
 leaveBtn.addEventListener("click", leaveGame);
-// Event listeners for CSV import and reset
-importBtn.addEventListener("click", onImportClick);
-csvInput.addEventListener("change", onCsvSelected);
-resetBtn.addEventListener("click", onResetThemes);
-
-
 nextStageBtn.addEventListener("click", continueNextStage);
 
 lobbyBtn.addEventListener("click", async () => {
@@ -146,9 +134,8 @@ document.addEventListener("keydown", (event) => {
 
 async function init() {
   preloadSceneImages();
-  await loadCsvFromUrl(CSV_URL);  
-  // Load custom themes from localStorage
-  updateResetButton();
+  const ok = await loadCsvFromUrl(CSV_URL);
+  if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
   startGame();
 }
 
@@ -681,16 +668,6 @@ function buildThemesFromRows(rows) {
   };
 }
 
-async function readCsvText(file) {
-  const buffer = await file.arrayBuffer();
-  try {
-    // Excel 另存的「CSV UTF-8」
-    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-  } catch (err) {
-    // Excel 另存的一般「CSV (逗號分隔)」在繁中 Windows 是 Big5
-    return new TextDecoder("big5").decode(buffer);
-  }
-}
 // 相對於 index.html:上一層資料夾的 主題資料.csv
 const CSV_URL = "../主題資料.csv";
 
@@ -738,120 +715,6 @@ function buildStageRules() {
     correct: theme.correct,
     wrong: theme.wrong,
   }));
-}
-
-function loadCustomThemes() {
-  try {
-    const raw = localStorage.getItem(CUSTOM_THEME_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    const themes = ((data && data.themes) || []).filter(
-      (theme) =>
-        theme &&
-        theme.prompt &&
-        Array.isArray(theme.correct) &&
-        Array.isArray(theme.wrong) &&
-        theme.correct.length &&
-        theme.wrong.length
-    );
-    return themes.length ? themes : null;
-  } catch (err) {
-    return null;
-  }
-}
-// Save custom themes to localStorage
-function saveCustomThemes(name, themes) {
-  try {
-    localStorage.setItem(CUSTOM_THEME_KEY, JSON.stringify({ name, themes }));
-  } catch (err) {
-    console.warn("無法儲存自訂題目：", err);
-  }
-}
-
-function clearCustomThemes() {
-  try {
-    localStorage.removeItem(CUSTOM_THEME_KEY);
-  } catch (err) {
-    // ignore
-  }
-}
-
-function updateResetButton() {
-  resetBtn.classList.toggle("is-hidden", !customThemes);
-}
-
-function isOverlayOpen() {
-  const shared = document.querySelector(".shared-stage-clear");
-  return (
-    !stageClearModal.classList.contains("is-hidden") ||
-    Boolean(shared && !shared.hidden)
-  );
-}
-
-// function onImportClick() {
-//   if (isOverlayOpen()) {
-//     showToast("請先關閉關卡結算畫面，再匯入題目", true);
-//     return;
-//   }
-//   csvInput.click();
-// }
-async function onImportClick() {
-  if (isOverlayOpen()) {
-    showToast("請先關閉關卡結算畫面，再重新載入題目", true);
-    return;
-  }
-  while (state.busy) await wait(100);
-  const ok = await loadCsvFromUrl(CSV_URL);
-  if (!ok) {
-    showToast("讀取不到 主題資料.csv，請確認檔案位置", true);
-    return;
-  }
-  updateResetButton();
-  startGame();
-  showToast(`已重新載入題目：${customThemes.length} 個主題`, false);
-}
-async function onCsvSelected(event) {
-  const file = event.target.files && event.target.files[0];
-  csvInput.value = "";
-  if (!file) return;
-
-  try {
-    const text = await readCsvText(file);
-    const { themes, warnings } = buildThemesFromRows(parseCSV(text));
-
-    while (state.busy) await wait(100);
-    customThemes = themes;
-    saveCustomThemes(file.name, themes);
-    updateResetButton();
-    startGame();
-
-    const lines = [`已匯入「${file.name}」：${themes.length} 個主題`];
-    if (themes.length > STAGE_COUNT) {
-      lines.push(`每次遊戲會隨機抽 ${STAGE_COUNT} 個主題`);
-    } else if (themes.length < STAGE_COUNT) {
-      lines.push(`主題不足 ${STAGE_COUNT} 個，部分關卡會重複`);
-    }
-    if (warnings.length) {
-      console.warn("CSV 匯入提醒：\n" + warnings.join("\n"));
-      lines.push(`另有 ${warnings.length} 則提醒（詳見 Console）`);
-    }
-    showToast(lines.join("\n"), false);
-  } catch (err) {
-    showToast(`匯入失敗：${err.message}`, true);
-  }
-}
-
-async function onResetThemes() {
-  if (isOverlayOpen()) {
-    showToast("請先關閉關卡結算畫面，再還原題目", true);
-    return;
-  }
-  while (state.busy) await wait(100);
-  customThemes = null;
-  clearCustomThemes();
-  updateResetButton();
-  startGame();
-  showToast("已還原為預設題目", false);
 }
 
 let toastTimer = null;

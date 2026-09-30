@@ -324,40 +324,10 @@ body {
   min-width: 6rem;
 }
 
-.btn-reload {
-  position: absolute;
-  left: calc(2vw + 7.5rem); /* 微調間距 */
-  bottom: 2.2vh;
-  z-index: 20; /* 提高 z-index 確保在最上層 */
-}
-
-/* 針對小螢幕（手機/平板）進行按鈕位置防重疊處理 */
+/* 小螢幕：離開按鈕縮小 */
 @media (max-width: 720px) {
   .btn-leave {
     left: 1.5vw;
-    bottom: 1.5vh;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-  }
-
-  .btn-reload {
-    left: calc(1.5vw + 5.5rem);
-    bottom: 1.5vh;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-  }
-}
-/* 針對小螢幕（手機/平板）進行按鈕位置防重疊處理 */
-@media (max-width: 720px) {
-  .btn-leave {
-    left: 1.5vw;
-    bottom: 1.5vh;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-  }
-
-  .btn-reload {
-    left: calc(1.5vw + 5.5rem);
     bottom: 1.5vh;
     padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
@@ -627,8 +597,7 @@ body {
     width: 100%;
   }
 
-  .btn-leave,
-  .btn-reload {
+  .btn-leave {
     width: auto;
   }
 }

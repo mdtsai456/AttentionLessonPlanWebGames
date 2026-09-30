@@ -52,7 +52,6 @@ const backBtn = document.getElementById("back-btn");
 
 const levelBox = document.getElementById("level-box");
 const midBreakEl = document.getElementById("mid-break");
-const reloadBtn = document.getElementById("reload-btn");
 const toastEl = document.getElementById("toast");
 
 const session = {
@@ -85,7 +84,6 @@ document.getElementById("mid-continue").addEventListener("click", () => {
 });
 document.getElementById("leave-btn").addEventListener("click", leaveGame);
 //設定重新載入題目按鈕事件
-reloadBtn.addEventListener("click", onReloadClick);
 
 let savedStage = 0;
 
@@ -198,7 +196,8 @@ document.addEventListener("keydown", (event) => {
 
 async function init() {
   preloadSceneImages();
-  await loadCsvFromUrl(CSV_URL); // 先嘗試讀取 CSV，若失敗就沿用預設題目
+  const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV，失敗就用預設題目
+  if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
   startGame();
 }
 
@@ -802,37 +801,6 @@ async function loadCsvFromUrl(url) {
     console.warn("讀取 CSV 失敗，沿用目前的題目：", err);
     return { ok: false, error: err };
   }
-}
-
-function isOverlayOpen() {
-  const shared = document.querySelector(".shared-stage-clear");
-  return (
-    !midBreakEl.classList.contains("is-hidden") ||
-    Boolean(shared && !shared.hidden)
-  );
-}
-
-async function onReloadClick() {
-  if (isOverlayOpen()) {
-    showToast("請先關閉關卡結算畫面，再重新載入題目", true);
-    return;
-  }
-  reloadBtn.disabled = true;
-  const result = await loadCsvFromUrl(CSV_URL);
-  reloadBtn.disabled = false;
-  if (!result.ok) {
-    showToast("讀取不到 主題資料.csv，請確認檔案位置", true);
-    return;
-  }
-  startGame();
-  const lines = [`已重新載入題目：${result.count} 個主題`];
-  if (result.count > STAGE_COUNT) {
-    lines.push(`每次遊戲會隨機抽 ${STAGE_COUNT} 個主題`);
-  } else if (result.count < STAGE_COUNT) {
-    lines.push(`主題不足 ${STAGE_COUNT} 個，部分關卡會重複`);
-  }
-  if (result.warnings) lines.push(`另有 ${result.warnings} 則提醒（詳見 Console）`);
-  showToast(lines.join("\n"), false);
 }
 
 function shuffled(list) {
