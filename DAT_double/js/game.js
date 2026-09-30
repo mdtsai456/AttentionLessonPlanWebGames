@@ -9,6 +9,7 @@ const STAGE_MS = 60000;
 const PRACTICE_STAGES = 1;
 const PRACTICE_QUESTIONS = 2;
 const GAME_QUESTIONS = 3;
+
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
 
@@ -58,6 +59,42 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let clearedMidBreak = false;
   let stageDeadline = 0;
 
+  // ==================== 雙人彩蛋機制變數 ====================
+  let animalAssetList = [];
+  let currentAssetIndex = 0;
+  let consecutiveCorrect = 0;
+
+  function setAnimalAssets(list) {
+    animalAssetList = list;
+    currentAssetIndex = 0;
+    const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
+    if (imgElem && animalAssetList.length > 0) {
+      imgElem.src = animalAssetList[0];
+    }
+  }
+
+  function switchToNextAnimal() {
+    if (!animalAssetList || animalAssetList.length <= 1) return;
+
+    currentAssetIndex = (currentAssetIndex + 1) % animalAssetList.length;
+    const nextAssetUrl = animalAssetList[currentAssetIndex];
+
+    console.log(`🎉 [P${playerIndex + 1} 彩蛋] 連續答對 ${consecutiveCorrect} 題！切換至素材 (${currentAssetIndex + 1}/${animalAssetList.length}): ${nextAssetUrl}`);
+
+    const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
+    if (imgElem) {
+      imgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
+      imgElem.style.opacity = '0.2';
+      imgElem.style.transform = 'scale(0.6)';
+
+      setTimeout(() => {
+        imgElem.src = nextAssetUrl;
+        imgElem.style.opacity = '1';
+        imgElem.style.transform = 'scale(1)';
+      }, 150);
+    }
+  }
+
   function loadStageQuestions() {
     questions = generateQuestionSet(isPractice ? questionsPerStage : 1, isPractice);
   }
@@ -72,13 +109,10 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     stageDeadline = 0;
 
     resetPlayerState(true);
-    $('field').dataset.mode = 'practice';
-    $('results').hidden = true;
+    $('field').dataset.mode = 'practice';$('results').hidden = true;
     $('question-type').textContent = '等待瞄準';
-    $('question-text').textContent = '—';
-    $('time-text').textContent = '尚未開始';
-    $('time-fill').style.width = '100%';
-    $('feedback').textContent = `請先移動準心重疊動物；重疊後按 ${answerLabel} 作答`;
+    $('question-text').textContent = '—';$('time-text').textContent = '尚未開始';
+    $('time-fill').style.width = '100\%';$('feedback').textContent = `請先移動準心重疊動物；重疊後按 ${answerLabel} 作答`;
     $('animal').dataset.result = '';
     enableAnswers(false);
     updateProgress(); renderPositions();
@@ -105,15 +139,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     
     resetPlayerState(false);
     
-    $('field').dataset.mode = 'game';
-    $('results').hidden = true;
+    $('field').dataset.mode = 'game';$('results').hidden = true;
     $('pause').disabled = false;
     $('pause').textContent = '暫停';
     $('question-type').textContent = '等待瞄準';
-    $('question-text').textContent = '—';
-    $('time-text').textContent = '尚未開始';
-    $('time-fill').style.width = '100%';
-    $('feedback').textContent = '將準心移到動物身上，開始遊戲';
+    $('question-text').textContent = '—';$('time-text').textContent = '尚未開始';
+    $('time-fill').style.width = '100\%';$('feedback').textContent = '將準心移到動物身上，開始遊戲';
     $('animal').dataset.result = '';
     enableAnswers(false);
     updateProgress(); renderPositions();
@@ -124,6 +155,15 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       score = wrong = offTarget = timedOut = 0;
     }
     index = 0;
+    consecutiveCorrect = 0; // 重置連擊計數器
+    currentAssetIndex = 0;
+    
+    // 恢復第一張圖片
+    if (animalAssetList.length > 0) {
+      const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
+      if (imgElem) imgElem.src = animalAssetList[0];
+    }
+
     submitted = false;
     paused = false;
     phase = 'aiming';
@@ -138,8 +178,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     if (isPractice) {
       $('round').textContent = `第 ${Math.min(index + 1, questions.length)} / ${questions.length} 題 (練習關卡)`;
       $('progress').setAttribute('aria-valuemax', questions.length);
-      $('progress').setAttribute('aria-valuenow', index);
-      $('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
+      $('progress').setAttribute('aria-valuenow', index);$('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
       return;
     }
     const left = stageDeadline
@@ -149,8 +188,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     const ratio = ((currentStage - 1) + used / STAGE_MS) / stageCount;
     $('round').textContent = `第 ${index + 1} 題・剩餘 ${left} 秒（第 ${currentStage} / ${stageCount} 關）`;
     $('progress').setAttribute('aria-valuemax', 100);
-    $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));
-    $('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
+    $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));$('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
   }
 
   function enableAnswers(enabled) {
@@ -166,7 +204,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   function isOnAnimal() {
     if (!animalPixels) return false;
-    const rect = $('animal-image').getBoundingClientRect();
+    const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image') || $('animal-image');
+    const rect = imgElem.getBoundingClientRect();
     const field = $('field').getBoundingClientRect();
     const size = Math.min(rect.width, rect.height);
     const left = rect.left + (rect.width - size) / 2;
@@ -189,8 +228,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('question-type').textContent = q.type;
     $('question-text').textContent = q.text;
     $('question-text').style.color = q.color;
-    $('animal').dataset.result = '';
-    $('feedback').textContent = `題目正確按 ${answerLabel}；不正確則不按`;
+    $('animal').dataset.result = '';$('feedback').textContent = `題目正確按 ${answerLabel}；不正確則不按`;
     enableAnswers(true); updateClock(); updateProgress();
   }
 
@@ -210,22 +248,37 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   function recordResult(pressed) {
     const correct = pressed === questions[index].answer;
     const onTarget = isOnAnimal();
+    const isSuccess = correct && onTarget;
     let message;
     reactionSamples.push(elapsed);
-    if (!pressed && !correct) {
-      timedOut++;
-      wrong++;
-      message = `漏答：正確的題目要按 ${answerLabel}`;
-    } else if (!correct) {
-      wrong++; message = '誤按：不正確的題目不需要按鍵';
-    } else if (!onTarget) {
-      offTarget++; message = '判斷正確，但準心未對到動物，不計分';
+
+    if (isSuccess) {
+      consecutiveCorrect++;
+      score++;
+      message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
+
+      // 🔥 連續答對 5 題：觸發彩蛋換圖
+      if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
+        message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
+        switchToNextAnimal();
+      }
     } else {
-      score++; message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
+      consecutiveCorrect = 0; // 答錯、沒瞄準或漏答重置連擊
+
+      if (!pressed && !correct) {
+        timedOut++;
+        wrong++;
+        message = `漏答：正確的題目要按 ${answerLabel}`;
+      } else if (!correct) {
+        wrong++; message = '誤按：不正確的題目不需要按鍵';
+      } else if (!onTarget) {
+        offTarget++; message = '判斷正確，但準心未對到動物，不計分';
+      }
     }
-    $('animal').dataset.result = correct && onTarget ? 'correct' : 'wrong';
+
+    $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
     $('feedback').textContent = message;
-    stageHits.push(Boolean(correct && onTarget));
+    stageHits.push(Boolean(isSuccess));
     updateProgress();
   }
 
@@ -283,8 +336,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('question-text').textContent = '🎯 請移動準心重新瞄準動物';
     $('question-text').style.color = '#a253d5';
     $('time-text').textContent = '尚未開始';
-    $('time-fill').style.width = '100%';
-    $('feedback').textContent = `恭喜通過第 ${currentStage - 1} 關！請重新瞄準動物`;
+    $('time-fill').style.width = '100\%';$('feedback').textContent = `恭喜通過第 ${currentStage - 1} 關！請重新瞄準動物`;
     $('animal').dataset.result = '';
     enableAnswers(false);
     updateProgress();
@@ -427,8 +479,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     requestAnimationFrame(tick);
   }
 
-  $('answer-true').addEventListener('click', answer);
-  $('restart').addEventListener('click', startGame);
+  $('answer-true').addEventListener('click', answer);$('restart').addEventListener('click', startGame);
 
   function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
   window.addEventListener('blur', clearInput);
@@ -499,6 +550,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
+    setAnimalAssets,
     pauseGame: () => { paused = true; },
     resumeGame: () => { paused = false; lastTime = undefined; },
   };

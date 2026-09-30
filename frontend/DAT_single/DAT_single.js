@@ -419,6 +419,38 @@ async function saveGameDataToBackend(data) {
   }
 }
 
+// assets api
+// 新增 API 抓取學生自訂素材函式
+async function fetchStudentAssets() {
+  // 從 sessionStorage 取得學生 ID（與 saveGameDataToBackend 的邏輯保持一致）
+  const studentId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S001';
+  const apiUrl = `https://attention-lesson-plan-assets.zeabur.app/api/students/${studentId}/assets`;
+
+  try {
+    const res = await fetch(apiUrl);
+    if (res.ok) {
+      const data = await res.json();
+      
+      // 依據 API 實際回傳格式進行調整：
+      // 假設回傳物件格式如 { animalUrl: "https://..." }
+      if (data && data.animalUrl) {
+        return data.animalUrl;
+      }
+      
+      // 假設回傳陣列格式如 [{ type: "animal", url: "https://..." }]
+      if (Array.isArray(data) && data.length > 0) {
+        const animalAsset = data.find(item => item.type === 'animal' || item.category === 'animal');
+        if (animalAsset && animalAsset.url) return animalAsset.url;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ 抓取學生自訂素材失敗，將套用預設素材：', err);
+  }
+
+  // 發生錯誤或無設定時的預設圖片
+  return 'assets/animals/rabbit.png';
+}
+
 
 function move(delta) {
   const directions = new Set([...keys].map((key) => bindings[key]).concat([...pointerDirections.values()]));
@@ -493,16 +525,94 @@ document.querySelectorAll('[data-move]').forEach((button) => {
   }
 });
 
-Promise.all(['assets/background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  })
-)).then(startGame).catch(() => {
-  $('feedback').textContent = '圖片載入失敗，請重新整理';
-});
+// ==================== 依據流程圖實作：動態載入學生素材 ====================
+
+const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+
+// 【流程步驟 1 & 2】：遊戲 Call API 取得素材網址
+async function fetchStudentAssets() {
+  // 1. 取得 Student ID（相容 "S001" 或 "G1_S070" 格式）
+  const rawId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S001';
+  const studentId = rawId.includes('_') ? rawId.split('_').pop() : rawId;
+
+  const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
+  console.log(`[流程 1] 遊戲 Call API: GET ${apiUrl}`);
+
+  try {
+    const res = await fetch(apiUrl);
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[流程 2] API 回傳結構:', data);
+
+      // 【流程步驟 3】：拿到圖片 relative URL (例如 /uploads/S001/DAT/xxxxx.png)
+      const relativeUrl = data?.DAT?.assets?.files?.[0];
+
+      if (relativeUrl) {
+        // 組合完整可下載的網址
+        const fullUrl = relativeUrl.startsWith('http') 
+          ? relativeUrl 
+          : `${ASSET_SERVER_HOST}${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
+
+        console.log(`[流程 3] 成功拿到圖片完整 URL: ${fullUrl}`);
+        return fullUrl;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ API 請求異常，開啟預設素材容錯:', err);
+  }
+
+  console.warn('⚠️ 未找到專屬素材，退回使用預設圖檔');
+  return DEFAULT_ANIMAL_PATH;
+}
+
+// 【流程步驟 4】：下載圖片（包含圖片 404/壞聯 的防護機制）
+function downloadImage(src) {
+  return new Promise((resolve) => {
+    console.log(`[流程 4] 開始下載圖片: ${src}`);
+    const img = new Image();
+
+    img.onload = () => {
+      console.log(`[流程 4] 圖片下載成功: ${src}`);
+      resolve(src);
+    };
+
+    img.onerror = () => {
+      console.warn(`⚠️ 圖片下載失敗 (404/壞聯)，切換為預設素材: ${src}`);
+      resolve(DEFAULT_ANIMAL_PATH);
+    };
+
+    img.src = src;
+  });
+}
+
+// 【流程步驟 5】：取代遊戲原本的固定素材並開始遊戲
+async function initGameWorkflow() {
+  console.log('🎮 遊戲開始，執行素材載入流程...');
+
+  // A. Call API 拿到網址
+  const animalAssetUrl = await fetchStudentAssets();
+
+  // B. 下載背景、準心與動物素材
+  const [bgSrc, crosshairSrc, finalAnimalSrc] = await Promise.all([
+    downloadImage('assets/background.png'),
+    downloadImage('assets/crosshair.png'),
+    downloadImage(animalAssetUrl)
+  ]);
+
+  // C. 取代 DOM 元素原本的圖片素材 (#animal-image)
+  const animalImgElem = $('animal-image');
+  if (animalImgElem) {
+    animalImgElem.src = finalAnimalSrc;
+    console.log(`[流程 5] 成功取代遊戲原本的固定素材，目前套用: ${finalAnimalSrc}`);
+  }
+
+  // D. 啟動遊戲
+  startGame();
+}
+
+// 執行主流程並啟動遊戲渲染
+initGameWorkflow();
 requestAnimationFrame(tick);
 
 

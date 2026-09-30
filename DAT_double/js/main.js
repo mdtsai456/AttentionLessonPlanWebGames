@@ -154,19 +154,103 @@ if (btnConfirmLeave) {
   });
 }
 
-Promise.all(['assets/background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  })
-)).then(() => {
-  beginSession();
-}).catch(() => {
-  document.querySelectorAll('[data-ui="feedback"]').forEach((feedback) => {
-    feedback.textContent = '圖片載入失敗，請重新整理';
+// ==================== 雙人版動態素材與彩蛋清單載入流程 ====================
+
+const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+
+// 預設彩蛋備用圖清單（無素材時輪播用）
+const DEFAULT_ANIMAL_POOL = [
+  'assets/animals/rabbit.png',
+  'assets/animals/cat.png',
+  'assets/animals/dog.png',
+  'assets/animals/bird.png',
+];
+
+// 1. 抓取玩家 (P1/P2) 素材清單，自動補充不足部分以觸發彩蛋
+async function fetchStudentAssetList(playerIndex) {
+  const isP1 = (playerIndex === 0);
+  
+  const studentKey = sessionStorage.getItem(isP1 ? 'student1_key' : 'student2_key') || '';
+  const rawId = sessionStorage.getItem(isP1 ? 'student1_case' : 'student2_case') ||
+                (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
+                (isP1 ? 'S01' : 'S02');
+
+  const studentId = rawId.includes('_') ? rawId.split('_').pop() : rawId;
+  const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
+
+  let assetList = [];
+
+  try {
+    const res = await fetch(apiUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const files = data?.DAT?.assets?.files;
+
+      if (Array.isArray(files) && files.length > 0) {
+        assetList = files.map((relativePath) =>
+          relativePath.startsWith('http')
+            ? relativePath
+            : `${ASSET_SERVER_HOST}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
+        );
+        console.log(`[P${playerIndex + 1} 素材] 成功從伺服器抓取 ${assetList.length} 張圖:`, assetList);
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [P${playerIndex + 1} 素材] API 請求異常:`, err);
+  }
+
+  // 自動補充機制：確保每個玩家都有至少 2 張圖以上的輪播清單可觸發彩蛋
+  if (assetList.length === 0) {
+    assetList = [...DEFAULT_ANIMAL_POOL];
+  } else if (assetList.length === 1) {
+    // 只有 1 張素材時，將預設清單拼在後面作為彩蛋輪播圖
+    assetList = [...assetList, ...DEFAULT_ANIMAL_POOL.filter(p => p !== assetList[0])];
+  }
+
+  return assetList;
+}
+
+// 2. 下載單張圖片（404 時降級容錯）
+function downloadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(src);
+    img.onerror = () => {
+      console.warn(`⚠️ 圖片載入失敗，使用預設圖: ${src}`);
+      resolve(DEFAULT_ANIMAL_PATH);
+    };
+    img.src = src;
   });
-});
+}
+
+// 3. 初始化雙人素材與啟動流程
+async function initDoubleGameWorkflow() {
+  console.log('🎮 雙人遊戲開始，獨立載入 P1/P2 素材與彩蛋清單...');
+
+  // A. 並行抓取 P1 與 P2 的素材清單
+  const [p1List, p2List] = await Promise.all([
+    fetchStudentAssetList(0),
+    fetchStudentAssetList(1)
+  ]);
+
+  // B. 預載通用與玩家首張圖片
+  await Promise.all([
+    downloadImage('assets/background.png'),
+    downloadImage('assets/crosshair.png'),
+    downloadImage(p1List[0]),
+    downloadImage(p2List[0])
+  ]);
+
+  // C. 將素材清單傳送給兩位 Player 實體
+  players[0].setAnimalAssets(p1List);
+  players[1].setAnimalAssets(p2List);
+
+  // D. 啟動遊戲 Session
+  beginSession();
+}
+
+// 執行初始化並啟動動畫 Loop
+initDoubleGameWorkflow();
 
 players.forEach((player) => requestAnimationFrame(player.tick));

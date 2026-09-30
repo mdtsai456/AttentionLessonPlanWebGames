@@ -25,7 +25,11 @@ let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
 const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
-let isFirstAim = true; //判斷瞄準動物之後開始計時
+// ==================== 彩蛋機制全域變數 ====================
+let animalAssetList = [];       // 儲存該學生所有可用的動物圖片 URL
+let currentAssetIndex = 0;     // 目前顯示的圖片索引
+let consecutiveCorrect = 0;    // 連續答對且瞄準成功計數器
+
 const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
 const MID_STAGE = 3;
@@ -33,6 +37,7 @@ let stage = 1;
 let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
+
 function startGame() {
   gameStartTime = Date.now();
   stage = 1;
@@ -42,6 +47,7 @@ function startGame() {
   questions = isPractice ? generateRandomQuestions(QUESTIONS_PER_STAGE) : [];
 
   index = score = wrong = offTarget = timedOut = elapsed = 0;
+  consecutiveCorrect = 0; // 重置彩蛋連擊計數器
   outcomes = [];
   reactionSamples = [];
   activeMs = 0;
@@ -54,15 +60,20 @@ function startGame() {
   aim = { x: 25, y: 50 };
   animal = { x: 55, y: 50, vx: 1, vy: .7 };
 
+  // 重置為第 1 張圖片
+  if (animalAssetList.length > 0) {
+    currentAssetIndex = 0;
+    const animalImgElem = $('animal-image');
+    if (animalImgElem) animalImgElem.src = animalAssetList[0];
+  }
+
   $('results').hidden = true;
   $('stage-clear-modal').hidden = true;
   $('btn-lobby').hidden = true;
   $('leave-btn').disabled = false;
   $('question-type').textContent = isPractice ? '【練習模式】等待瞄準' : '等待瞄準';
-  $('question-text').textContent = '—';
-  $('time-text').textContent = '尚未開始';
-  $('time-fill').style.width = '100%';
-  $('feedback').textContent = isPractice ? '練習中：將準心移到動物身上開始' : '將準心移到動物身上，開始遊戲';
+  $('question-text').textContent = '—';$('time-text').textContent = '尚未開始';
+  $('time-fill').style.width = '100\%';$('feedback').textContent = isPractice ? '練習中：將準心移到動物身上開始' : '將準心移到動物身上，開始遊戲';
   $('animal').dataset.result = '';
   
   enableAnswers(false);
@@ -70,9 +81,7 @@ function startGame() {
   renderPositions();
 }
 
-
-//隨機的題目生成
-// 色名與代表顏色的 Hex 碼對照
+// 顏色與數學題目產生器
 const COLOR_OPTIONS = [
   { name: '紅色', code: '#c52c35' },
   { name: '藍色', code: '#1e88e5' },
@@ -82,14 +91,12 @@ const COLOR_OPTIONS = [
   { name: '紫色', code: '#8e24aa' }
 ];
 
-// 1. 生成隨機顏色題目
 function generateColorQuestion() {
-  const isTrue = Math.random() < 0.5; // 50% 機率正確、50% 機率錯誤
+  const isTrue = Math.random() < 0.5;
   const textObj = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
   let colorObj = textObj;
 
   if (!isTrue) {
-    // 當答案為假時，從剩餘顏色中挑選一個不同的字色
     const otherColors = COLOR_OPTIONS.filter(c => c.name !== textObj.name);
     colorObj = otherColors[Math.floor(Math.random() * otherColors.length)];
   }
@@ -102,52 +109,46 @@ function generateColorQuestion() {
   };
 }
 
-// 2. 生成隨機數學算式題目
 function generateMathQuestion() {
   const isTrue = Math.random() < 0.5;
-  const isAddition = Math.random() < 0.5; // 隨機加法或減法
+  const isAddition = Math.random() < 0.5;
   let num1, num2, actualResult, displayResult;
 
   if (isAddition) {
-    num1 = Math.floor(Math.random() * 10) + 1; // 1 ~ 10
+    num1 = Math.floor(Math.random() * 10) + 1;
     num2 = Math.floor(Math.random() * 10) + 1;
     actualResult = num1 + num2;
   } else {
-    num1 = Math.floor(Math.random() * 15) + 5; // 5 ~ 19
-    num2 = Math.floor(Math.random() * num1) + 1; // 確保結果為正數
+    num1 = Math.floor(Math.random() * 15) + 5;
+    num2 = Math.floor(Math.random() * num1) + 1;
     actualResult = num1 - num2;
   }
 
   if (isTrue) {
     displayResult = actualResult;
   } else {
-    // 答案錯誤時，隨機加減 1 或 2 作為干擾項
     const offset = (Math.random() < 0.5 ? 1 : -1) * (Math.floor(Math.random() * 2) + 1);
     displayResult = actualResult + offset;
-    if (displayResult <= 0) displayResult = actualResult + 3; // 避免出現小於等於 0 的不合理答案
+    if (displayResult <= 0) displayResult = actualResult + 3;
   }
 
   const operator = isAddition ? '+' : '−';
   return {
     type: '數學判斷：算式答案是否正確？',
     text: `${num1} ${operator} ${num2} = ${displayResult}`,
-    color: '#65462f', // 數學題統一字體顏色
+    color: '#65462f',
     answer: isTrue
   };
 }
 
-// 3. 混合生成指定數量題目
 function generateRandomQuestions(count = 10) {
   const list = [];
   for (let i = 0; i < count; i++) {
-    // 50% 機率抽顏色題，50% 機率抽數學題
     const q = Math.random() < 0.5 ? generateColorQuestion() : generateMathQuestion();
     list.push(q);
   }
   return list;
 }
-
-
 
 function enableAnswers(enabled) {
   answerButtons.forEach((button) => { button.disabled = !enabled; });
@@ -160,8 +161,7 @@ function updateProgress() {
     const shown = Math.min(index + 1, questions.length);
     $('round').textContent = `第 ${shown} / ${questions.length} 題 (練習關卡)`;
     $('progress').setAttribute('aria-valuemax', questions.length);
-    $('progress').setAttribute('aria-valuenow', index);
-    $('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
+    $('progress').setAttribute('aria-valuenow', index);$('progress-fill').style.height = `${questions.length ? (index / questions.length) * 100 : 0}%`;
     return;
   }
 
@@ -172,8 +172,7 @@ function updateProgress() {
   const ratio = ((stage - 1) + used / STAGE_MS) / STAGE_COUNT;
   $('round').textContent = `第 ${Math.max(stageQuestionNo, 1)} 題・剩餘 ${left} 秒（第 ${stage} / ${STAGE_COUNT} 關）`;
   $('progress').setAttribute('aria-valuemax', 100);
-  $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));
-  $('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
+  $('progress').setAttribute('aria-valuenow', Math.round(ratio * 100));$('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
 }
 
 function answerLimitMs() {
@@ -217,8 +216,7 @@ function showQuestion() {
   $('question-type').textContent = q.type;
   $('question-text').textContent = q.text;
   $('question-text').style.color = q.color;
-  $('animal').dataset.result = '';
-  $('feedback').textContent = '題目正確就瞄準按空白鍵；不正確則不按';
+  $('animal').dataset.result = '';$('feedback').textContent = '題目正確就瞄準按空白鍵；不正確則不按';
   enableAnswers(true); updateClock(); updateProgress();
 }
 
@@ -235,25 +233,80 @@ function answer() {
   enableAnswers(false);
 }
 
+// 🎨 切換到下一張動物圖片 (彩蛋觸發)
+function switchToNextAnimal() {
+  // 防呆機制：如果素材小於或等於 1 張，直接跳過不換圖
+  if (!animalAssetList || animalAssetList.length <= 1) {
+    console.log(`ℹ️ 目前素材數量為 ${animalAssetList ? animalAssetList.length : 0} 張，不執行換圖彩蛋。`);
+    return;
+  }
+
+  // 計算下一張圖片索引 (循環輪播)
+  currentAssetIndex = (currentAssetIndex + 1) % animalAssetList.length;
+  const nextAssetUrl = animalAssetList[currentAssetIndex];
+
+  console.log(`🎉 [彩蛋觸發] 連續答對 ${consecutiveCorrect} 題！切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${nextAssetUrl}`);
+
+  const animalImgElem = $('animal-image');
+  if (animalImgElem) {
+    // 1. 加上縮放動畫，視覺上提示變身效果
+    animalImgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
+    animalImgElem.style.opacity = '0.2';
+    animalImgElem.style.transform = 'scale(0.6)';
+
+    // 2. 直接更新 DOM 元素的 src，不等待外部 Promise，確保瀏覽器立即載入
+    setTimeout(() => {
+      animalImgElem.src = nextAssetUrl;
+
+      // 載入失敗容錯機制 (例如 404 時退回預設圖)
+      animalImgElem.onerror = () => {
+        console.warn(`⚠️ 圖片切換失敗，退回預設圖檔: ${nextAssetUrl}`);
+        animalImgElem.src = DEFAULT_ANIMAL_PATH;
+      };
+
+      // 3. 圖片換好後恢復大小與透明度
+      animalImgElem.style.opacity = '1';
+      animalImgElem.style.transform = 'scale(1)';
+    }, 150);
+  }
+}
+
+// 紀錄答題結果與彩蛋觸發
 function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
+  const isSuccess = correct && onTarget;
   let message;
   reactionSamples.push(elapsed);
-  if (!pressed && !correct) {
-    timedOut++;
-    wrong++;
-    message = '漏答：正確的題目要按空白鍵';
-  } else if (!correct) {
-    wrong++; message = '誤按：不正確的題目不需要按鍵';
-  } else if (!onTarget) {
-    offTarget++; message = '判斷正確，但準心未對到動物，不計分';
+
+  if (isSuccess) {
+    consecutiveCorrect++;
+    score++;
+    message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
+
+    // 🔥 連續答對 5 題：觸發彩蛋換圖
+    if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
+      message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
+      switchToNextAnimal();
+    }
   } else {
-    score++; message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
+    // 答錯、漏答或沒瞄準到 -> 連擊中斷歸零
+    consecutiveCorrect = 0;
+
+    if (!pressed && !correct) {
+      timedOut++;
+      wrong++;
+      message = '漏答：正確的題目要按空白鍵';
+    } else if (!correct) {
+      wrong++; message = '誤按：不正確的題目不需要按鍵';
+    } else if (!onTarget) {
+      offTarget++; message = '判斷正確，但準心未對到動物，不計分';
+    }
   }
-  $('animal').dataset.result = correct && onTarget ? 'correct' : 'wrong';
+
+  $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
   $('feedback').textContent = message;
-  outcomes.push(Boolean(correct && onTarget));
+  outcomes.push(Boolean(isSuccess));
   updateProgress();
 }
 
@@ -305,8 +358,7 @@ function continueNextStage() {
 
 $('btn-next-stage').addEventListener('click', continueNextStage);
 
-$('btn-lobby').addEventListener('click', async () => {
-  $('btn-lobby').disabled = true;
+$('btn-lobby').addEventListener('click', async () => {$('btn-lobby').disabled = true;
   $('btn-next-stage').disabled = true;
   await saveCurrentRun(MID_STAGE);
   returnToLobby();
@@ -390,15 +442,14 @@ function finishGame() {
   $('summary').textContent = `誤按 ${wrong} 題・判斷正確但未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
   $('accuracy').textContent = `得分率 ${Math.round(score / answered * 100)}%`;
 
-  const $startGameBtn = $('btn-start-game');
+  const $startGameBtn =$('btn-start-game');
 
   if (isPractice) {
     $('result-title').textContent = '練習結束';
     $('restart').textContent = '再練習一次';
     $('restart').onclick = startGame;
 
-    if ($startGameBtn) {
-      $startGameBtn.hidden = false;
+    if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '進入正式遊戲';
       $startGameBtn.onclick = () => {
         window.location.href = 'DAT_single.html?mode=game';
@@ -409,8 +460,7 @@ function finishGame() {
     $('restart').textContent = '再玩一次';
     $('restart').onclick = startGame;
 
-    if ($startGameBtn) {
-      $startGameBtn.hidden = false;
+    if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
       $startGameBtn.onclick = returnToLobby;
     }
@@ -423,7 +473,6 @@ function finishGame() {
 
 async function saveGameDataToBackend(data) {
   const url = "http://127.0.0.1:5001/api/sessions";
-
 
   const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade') || 'G1';
   const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S03';
@@ -482,7 +531,6 @@ async function saveGameDataToBackend(data) {
   }
 }
 
-
 function move(delta) {
   const directions = new Set([...keys].map((key) => bindings[key]).concat([...pointerDirections.values()]));
   let dx = Number(directions.has('right')) - Number(directions.has('left'));
@@ -522,8 +570,7 @@ function tick(time) {
 }
 
 $('answer-true').addEventListener('click', answer);
-$('restart').addEventListener('click', startGame);
-$('leave-btn').addEventListener('click', leaveGame);
+$('restart').addEventListener('click', startGame);$('leave-btn').addEventListener('click', leaveGame);
 
 async function leaveGame() {
   $('leave-btn').disabled = true;
@@ -568,20 +615,90 @@ document.querySelectorAll('[data-move]').forEach((button) => {
   }
 });
 
-Promise.all(['assets/background.png', 'assets/crosshair.png', 'assets/animals/rabbit.png'].map((src) =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  })
-)).then(startGame).catch(() => {
-  $('feedback').textContent = '圖片載入失敗，請重新整理';
-});
+// ==================== 依據流程圖實作：動態載入學生素材與彩蛋清單 ====================
+
+const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+
+async function fetchStudentAssets() {
+  const rawId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S001';
+  const studentId = rawId.includes('_') ? rawId.split('_').pop() : rawId;
+
+  const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
+  console.log(`[流程 1] 遊戲 Call API: GET ${apiUrl}`);
+
+  try {
+    const res = await fetch(apiUrl);
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[流程 2] API 回傳結構:', data);
+
+      const files = data?.DAT?.assets?.files;
+
+      if (Array.isArray(files) && files.length > 0) {
+        // 將 API 回傳的所有素材轉為完整可存取的 URL，並存入全域陣列
+        animalAssetList = files.map((relativePath) =>
+          relativePath.startsWith('http')
+            ? relativePath
+            : `${ASSET_SERVER_HOST}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
+        );
+
+        currentAssetIndex = 0;
+        console.log(`[素材載入] 成功載入 ${animalAssetList.length} 張素材:`, animalAssetList);
+        return animalAssetList[0];
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ API 請求異常，開啟預設素材容錯:', err);
+  }
+
+  console.warn('⚠️ 未找到專屬素材，退回使用預設圖檔');
+  animalAssetList = [DEFAULT_ANIMAL_PATH];
+  currentAssetIndex = 0;
+  return DEFAULT_ANIMAL_PATH;
+}
+
+function downloadImage(src) {
+  return new Promise((resolve) => {
+    console.log(`[下載圖片] 開始下載: ${src}`);
+    const img = new Image();
+
+    img.onload = () => {
+      resolve(src);
+    };
+
+    img.onerror = () => {
+      console.warn(`⚠️ 圖片下載失敗 (404/壞聯)，切換為預設素材: ${src}`);
+      resolve(DEFAULT_ANIMAL_PATH);
+    };
+
+    img.src = src;
+  });
+}
+
+async function initGameWorkflow() {
+  console.log('🎮 遊戲開始，執行素材載入流程...');
+
+  const animalAssetUrl = await fetchStudentAssets();
+
+  const [bgSrc, crosshairSrc, finalAnimalSrc] = await Promise.all([
+    downloadImage('assets/background.png'),
+    downloadImage('assets/crosshair.png'),
+    downloadImage(animalAssetUrl)
+  ]);
+
+  const animalImgElem = $('animal-image');
+  if (animalImgElem) {
+    animalImgElem.src = finalAnimalSrc;
+    console.log(`[DOM 更新] 套用初始動物素材: ${finalAnimalSrc}`);
+  }
+
+  startGame();
+}
+
+initGameWorkflow();
 requestAnimationFrame(tick);
 
-
-// 攔截瀏覽器關閉/重新整理事件
 function blockUnload(event) {
   if (['aiming', 'answer'].includes(phase)) {
     event.preventDefault();
