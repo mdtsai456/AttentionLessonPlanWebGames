@@ -36,6 +36,10 @@ body {
     #8ecff0;
 }
 
+.stage[hidden] {
+  display: none !important;
+}
+
 .panel {
   width: min(430px, 100%);
   padding: 1.15rem 1.25rem 1.05rem;
@@ -226,5 +230,36 @@ body {
 }
 
 .error:empty {
+  display: none;
+}
+
+.stage-dual {
+  gap: 1.4rem;
+  align-items: center;
+}
+
+.stage-dual .panel {
+  width: min(420px, 46vw);
+  height: auto;
+  align-self: center;
+  position: relative;
+}
+
+.player-panel .wait-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: none;
+  border-radius: inherit;
+  background: rgba(18, 28, 36, 0.72);
+  color: #fff;
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.player-panel .wait-mask[hidden] {
   display: none;
 }

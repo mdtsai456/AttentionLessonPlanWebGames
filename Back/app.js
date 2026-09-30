@@ -1,6 +1,6 @@
 // =============================================================================
 // Back / 老師後台：查看學生進度
-// 流程：選學生 → 選第幾天 → 顯示當天五個遊戲的進度（0 / 50 / 100）。
+// 流程：選學生 → 選第幾天 → 當天五個遊戲的成績與明細直接展開。
 // 名單與場次來自後端；DCCS 只打完前 3 關為 50%，打完後段或其它遊戲為 100%。
 // =============================================================================
 
@@ -20,11 +20,16 @@ const studentSelect = document.getElementById("student-select");
 const dayRow = document.getElementById("day-row");
 const gameList = document.getElementById("game-list");
 const emptyHint = document.getElementById("empty-hint");
+const reportView = document.getElementById("report-view");
+const dayDetail = document.getElementById("day-detail");
+const dayPrompt = document.getElementById("day-prompt");
+const dayTitle = document.getElementById("day-title");
+const recordsBody = document.getElementById("records-tbody");
 const logoutBtn = document.getElementById("logout-btn");
 
 const state = {
   students: [], // [{ id, name, username }]
-  days: [], // 該學生有資料的天數，例如 [1, 2, 3, 4, 5]
+  days: [], // 固定第 1～24 天
   sessions: [], // 目前學生的場次，選天時直接從這裡算進度
   selectedStudentId: "",
   selectedDay: null, // 尚未選天時為 null
@@ -41,6 +46,11 @@ async function init() {
     location.href = "../Home/index.html";
     return;
   }
+
+  document.getElementById("view-teacher-name").textContent =
+    `${sessionStorage.getItem("teacher_name") || "--"} 老師`;
+  document.getElementById("view-teacher-school").textContent =
+    sessionStorage.getItem("teacher_school") || "--";
 
   state.students = await fetchTeacherStudents();
   renderStudents();
@@ -78,7 +88,7 @@ async function selectStudent(studentId) {
   state.progressByGame = {};
   state.detailByGame = {};
   state.sessions = studentId ? await fetchStudentReport(studentId) : [];
-  state.days = daysFromSessions(state.sessions);
+  state.days = TRAINING_DAYS;
   renderDays();
   renderProgress();
 }
@@ -104,7 +114,7 @@ function renderStudents() {
   const options = state.students
     .map(
       (student) =>
-        `<option value="${student.id}">${student.name}</option>`
+        `<option value="${student.id}">個案 ${student.name}（已測 ${student.sessionCount || 0} 場）</option>`
     )
     .join("");
 
@@ -114,14 +124,16 @@ function renderStudents() {
   `;
 }
 
+/** 每位玩家最多 24 個施測日，天數固定為第 1～24 天。 */
+const TRAINING_DAYS = Array.from({ length: 24 }, (_, index) => index + 1);
+
 /**
- * 畫第 1～5 天按鈕。
- * 還沒選學生時先顯示 1～5 天但全部 disabled；
- * 有學生則用後端回傳的 days（沒資料時仍顯示 1～5 天當版面）。
+ * 畫第 1～24 天按鈕。
+ * 還沒選學生時全部 disabled。
  */
 function renderDays() {
   const hasStudent = Boolean(state.selectedStudentId);
-  const days = state.days.length ? state.days : [1, 2, 3, 4, 5];
+  const days = TRAINING_DAYS;
 
   dayRow.innerHTML = days
     .map((day) => {
@@ -130,7 +142,7 @@ function renderDays() {
       return `
         <button
           type="button"
-          class="btn btn-day${selected}"
+          class="day-btn${selected}"
           data-day="${day}"
           ${disabled}
         >
@@ -146,72 +158,82 @@ function renderDays() {
  * 否則顯示提示：「請先選擇學生與天數」或「請選擇第幾天」。
  */
 function renderProgress() {
-  const ready = state.selectedStudentId && state.selectedDay != null;
-
-  if (!ready) {
+  const hasStudent = Boolean(state.selectedStudentId);
+  const hasDay = state.selectedDay != null;
+  emptyHint.hidden = hasStudent;
+  reportView.hidden = !hasStudent;
+  dayPrompt.hidden = !hasStudent || hasDay;
+  dayDetail.hidden = !hasDay;
+  if (hasStudent) fillStudentMeta();
+  if (!hasDay) {
     gameList.innerHTML = "";
-    emptyHint.textContent = state.selectedStudentId
-      ? "請選擇第幾天"
-      : "請先選擇學生與天數";
-    emptyHint.classList.remove("is-hidden");
+    recordsBody.innerHTML = "";
     return;
   }
 
-  emptyHint.classList.add("is-hidden");
+  dayTitle.textContent = `第 ${state.selectedDay} 天的遊戲`;
   gameList.innerHTML = GAMES.map((game) => {
     const percent = normalizeProgress(state.progressByGame[game.id]);
     const detail = state.detailByGame[game.id] || { reached: null, accuracy: null };
-    const times = checkpointTimes(game.id);
-    const timeRow = times.mid || times.end
-      ? `<div class="progress-times">
-          ${times.mid ? `<span class="progress-time time-mid">${times.mid}</span>` : ""}
-          ${times.end ? `<span class="progress-time time-end">${times.end}</span>` : ""}
-        </div>`
-      : "";
     return `
-      <article class="game-item" data-game-id="${game.id}">
-        <div class="game-item-row">
-          <span class="game-chip">${game.name}</span>
-          <div class="progress-row${timeRow ? " has-times" : ""}" aria-label="${game.name}進度 ${percent}%">
-            <div class="progress-track" data-progress="${percent}">
-              <div class="progress-fill"></div>
-              <span class="progress-mark mark-mid${percent >= 50 ? " is-reached" : ""}">✓</span>
-              <span class="progress-mark mark-end${percent === 100 ? " is-reached" : ""}">✓</span>
-            </div>
-            ${timeRow}
-          </div>
-          <span class="game-percent">${percent}%</span>
-          <button
-            type="button"
-            class="info-btn"
-            data-info="${game.id}"
-            aria-expanded="false"
-            aria-label="${game.name}各關正確率"
-          >i</button>
+      <article class="game-card">
+        <div class="card-head">
+          <span>${game.name}</span>
+          <span class="card-percent">${percent}%</span>
         </div>
-        <div class="level-detail" hidden>
-          ${renderLevelDetail(detail, game.id)}
+        <div class="progress-track" data-progress="${percent}" aria-label="${game.name}進度 ${percent}%">
+          <div class="progress-fill"></div>
         </div>
+        ${renderLevelDetail(detail, game.id)}
       </article>
+    `;
+  }).join("");
+  renderRecords();
+}
+
+function fillStudentMeta() {
+  const student = state.students.find((item) => item.id === state.selectedStudentId);
+  if (!student) return;
+  document.getElementById("view-student-key").textContent = `受試個案：${student.name}`;
+  document.getElementById("view-school-name").textContent =
+    `所屬場域：${student.school || teacherSchool()}`;
+  document.getElementById("view-total-sessions").textContent = String(student.sessionCount || 0);
+  document.getElementById("view-last-played").textContent = student.lastPlayedAt || "尚無評測紀錄";
+}
+
+function renderRecords() {
+  const rows = state.sessions
+    .filter((session) => Number(session.currentDay) === Number(state.selectedDay))
+    .slice()
+    .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+  if (!rows.length) {
+    recordsBody.innerHTML = '<tr><td class="empty-row" colspan="7">這天尚無施測紀錄</td></tr>';
+    return;
+  }
+
+  recordsBody.innerHTML = rows.map((session) => {
+    const stats = session.stats || {};
+    const mode = String(session.mode || "single").toLowerCase();
+    return `
+      <tr>
+        <td><strong>${gameLabel(session.gameType)}</strong></td>
+        <td><span class="mode-tag ${mode}">${mode === "double" ? "雙人" : "單人"}</span></td>
+        <td><strong>${formatAccuracy(stats.accuracy)}</strong></td>
+        <td>${stats.correctCount ?? "—"} / ${stats.wrongCount ?? "—"}</td>
+        <td>${formatDuration(stats.duration)}</td>
+        <td>${stats.stage ?? "—"}</td>
+        <td>${session.startTime || "—"}</td>
+      </tr>
     `;
   }).join("");
 }
 
-gameList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-info]");
-  if (!button) return;
-  const item = button.closest(".game-item");
-  const panel = item.querySelector(".level-detail");
-  const open = panel.hidden;
-  gameList.querySelectorAll(".level-detail").forEach((node) => {
-    node.hidden = true;
-  });
-  gameList.querySelectorAll("[data-info]").forEach((node) => {
-    node.setAttribute("aria-expanded", "false");
-  });
-  panel.hidden = !open;
-  button.setAttribute("aria-expanded", open ? "true" : "false");
-});
+function gameLabel(gameType) {
+  const id = WedGameApi.mapGameId(gameType);
+  const game = GAMES.find((item) => item.id === id);
+  return game ? game.name : gameType;
+}
 
 function renderLevelDetail(detail, gameId) {
   const accuracy = formatAccuracy(detail.accuracy);
@@ -319,21 +341,12 @@ async function fetchTeacherStudents() {
       name: student.studentKey,
       username: student.caseId,
       school: student.school,
+      sessionCount: student.sessionCount || 0,
+      lastPlayedAt: student.lastPlayedAt || "",
     }));
   } catch (_err) {
     return [];
   }
-}
-
-function daysFromSessions(sessions) {
-  const days = [
-    ...new Set(
-      sessions
-        .map((session) => Number(session.currentDay))
-        .filter((day) => Number.isFinite(day) && day >= 1)
-    ),
-  ].sort((a, b) => a - b);
-  return days.length ? days : [1, 2, 3, 4, 5];
 }
 
 function detailFromSessions(sessions, day) {
@@ -387,59 +400,6 @@ function levelsReached(gameId, stage) {
   if (stage <= 6) return stage;
   const percent = WedGameApi.progressFromRecord(gameId, { stats: { stage } });
   return percent >= 100 ? 6 : 3;
-}
-
-function checkpointOf(gameId, session) {
-  const stage = session.stats ? Number(session.stats.stage) : NaN;
-  if (!Number.isFinite(stage) || stage <= 0) return null;
-  if (stage <= 6) {
-    if (stage >= 6) return "end";
-    if (stage >= 3) return "mid";
-    return null;
-  }
-  const percent = WedGameApi.progressFromRecord(gameId, session);
-  if (percent >= 100) return "end";
-  if (percent >= 50) return "mid";
-  return null;
-}
-
-function checkpointTimes(gameId) {
-  let midAt = null;
-  let endAt = null;
-  state.sessions.forEach((session) => {
-    if (Number(session.currentDay) !== Number(state.selectedDay)) return;
-    if (WedGameApi.mapGameId(session.gameType) !== gameId) return;
-    const sentAt = parseUtcNaive(session.endTime);
-    if (!sentAt) return;
-    const checkpoint = checkpointOf(gameId, session);
-    if (checkpoint === "mid" && (!midAt || sentAt > midAt)) midAt = sentAt;
-    if (checkpoint === "end" && (!endAt || sentAt > endAt)) endAt = sentAt;
-  });
-  return {
-    mid: midAt ? formatTaiwanTime(midAt) : "",
-    end: endAt ? formatTaiwanTime(endAt) : "",
-  };
-}
-
-function parseUtcNaive(value) {
-  if (!value) return null;
-  const text = String(value).trim().replace(" ", "T");
-  const date = new Date(text.endsWith("Z") ? text : `${text}Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatTaiwanTime(date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const pick = (type) => parts.find((part) => part.type === type).value;
-  return `${pick("year")}-${pick("month")}-${pick("day")} ${pick("hour")}:${pick("minute")}`;
 }
 
 function progressFromSessions(sessions, day) {

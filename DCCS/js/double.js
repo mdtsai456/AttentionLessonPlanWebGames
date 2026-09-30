@@ -887,21 +887,16 @@ async function bootFromLobby() {
 
   const [lobby1, lobby2] = session.players;
 
-  let currentDay = lobby1.currentDay || lobby2.currentDay;
-  if (!currentDay) {
+  let day1 = lobby1.currentDay;
+  let day2 = lobby2.currentDay;
+  if (!day1 || !day2) {
     try {
-      const [day1, day2] = await Promise.all([
-        resolveCurrentDay(lobby1),
-        resolveCurrentDay(lobby2),
+      const [resolved1, resolved2] = await Promise.all([
+        day1 ? Promise.resolve(day1) : resolveCurrentDay(lobby1),
+        day2 ? Promise.resolve(day2) : resolveCurrentDay(lobby2),
       ]);
-
-      if (day1 !== day2) {
-        throw new Error(
-          `兩位玩家推導出的第幾天不一致（${day1} / ${day2}）`
-        );
-      }
-
-      currentDay = day1;
+      day1 = day1 || resolved1;
+      day2 = day2 || resolved2;
     } catch (err) {
       console.warn('無法自動判斷 currentDay，改由人工填寫：', err);
       return false;
@@ -911,8 +906,8 @@ async function bootFromLobby() {
   cameFromLobby = true;
 
   await startSession(
-    { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay },
-    { grade: lobby2.grade, caseId: lobby2.caseId, school: lobby2.school, currentDay }
+    { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay: day1 },
+    { grade: lobby2.grade, caseId: lobby2.caseId, school: lobby2.school, currentDay: day2 }
   );
 
   return true;

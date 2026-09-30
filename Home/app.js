@@ -90,7 +90,7 @@ function renderCredentialSlots(count, titles, includeSession) {
         ? `
           <label class="field">
             <span class="field-label">第幾天</span>
-            <input type="number" name="day-${index}" min="1" step="1" placeholder="例如 1" required />
+            <input type="number" name="day-${index}" min="1" max="24" step="1" placeholder="1～24" required />
           </label>
         `
         : "";
@@ -158,6 +158,15 @@ function validate(accounts) {
       return expected === 2
         ? `請輸入學生 ${missing + 1} 的第幾天`
         : "請輸入第幾天";
+    }
+    const outOfRange = accounts.findIndex((item) => {
+      const day = Number(item.currentDay);
+      return !Number.isInteger(day) || day < 1 || day > 24;
+    });
+    if (outOfRange !== -1) {
+      return expected === 2
+        ? `學生 ${outOfRange + 1} 的第幾天請輸入 1 到 24`
+        : "第幾天請輸入 1 到 24";
     }
   }
 

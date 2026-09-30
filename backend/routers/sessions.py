@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["sessions"])
 
 KNOWN_GAME_NAMES = frozenset({"DCCS", "DAT", "EFT", "IM", "TGame"})
-# 廠商只做這三款的雙人版（Q4）。IM／TGame 若日後也要雙人版，放寬這裡即可。
-DOUBLE_CAPABLE_GAMES = frozenset({"DCCS", "DAT", "EFT"})
+# 指令出擊沒有雙人版。勇闖迷宮雙人會打到第 3 關後回選單，必須能寫入才有 50% 進度。
+DOUBLE_CAPABLE_GAMES = frozenset({"DCCS", "DAT", "EFT", "TGame"})
 PAIR_ID_MAX_LENGTH = 36
 UNITY_CORE_STATS = (
     ("correct", "correct_count", to_int),
@@ -45,6 +45,14 @@ class UnityGamePayload(BaseModel):
     caseId: str
     school: str
     currentDay: int
+
+    @field_validator("currentDay")
+    @classmethod
+    def current_day_in_range(cls, value: int) -> int:
+        if value < 1 or value > 24:
+            raise ValueError("第幾天必須是 1 到 24")
+        return value
+
     startTime: int
     endTime: int
     stats: list[UnityStat]
@@ -201,7 +209,7 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
     pair_id: str | None = data.pairId
 
     if mode == "double" and game_name not in DOUBLE_CAPABLE_GAMES:
-        raise ValueError("雙人版僅支援 DAT／DCCS／EFT")
+        raise ValueError("雙人版僅支援 DAT／DCCS／EFT／TGame")
 
     if mode == "single":
         # 單人版忽略誤帶的 pairId，一律存 NULL。
