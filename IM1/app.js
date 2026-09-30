@@ -638,7 +638,21 @@ function renderMinimap() {
   for (let r = 0; r < state.rows; r++) {
     for (let c = 0; c < state.cols; c++) {
       const here = r === state.row && c === state.col;
-      html += `<span class="map-cell${here ? " is-here" : ""}" title="${ROOM_LABEL[state.rooms[r][c].type]}"></span>`;
+
+      // Begin - 20260929 - willie
+      // 有門就畫通道 / 沒有門就不畫
+      const room = state.rooms[r][c];
+      const connections = [
+        room.hasRight
+          ? '<span class="map-connection is-right" aria-hidden="true"></span>'
+          : "",
+        room.hasDown
+          ? '<span class="map-connection is-down" aria-hidden="true"></span>'
+          : "",
+      ].join("");
+      // End - 20260929 - willie
+
+      html += `<span class="map-cell${here ? " is-here" : ""}" title="${ROOM_LABEL[room.type]}">${connections}</span>`;
     }
   }
   minimapEl.innerHTML = html;

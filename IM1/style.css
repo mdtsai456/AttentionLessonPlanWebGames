@@ -296,15 +296,18 @@ body {
 
 .minimap {
   display: grid;
-  gap: 0.65rem;
+  gap: var(--map-gap);
   padding: 0.95rem;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 8px 18px rgba(80, 90, 70, 0.16);
   --map-cell: 4rem;
+  --map-gap: 0.95rem;
 }
 
 .map-cell {
+  position: relative;
+  z-index: 1;
   width: var(--map-cell);
   height: var(--map-cell);
   border-radius: 12px;
@@ -315,6 +318,36 @@ body {
 .map-cell.is-here {
   background: #ffe14a;
   box-shadow: inset 0 0 0 3px #e0b400;
+}
+
+/* 房間之間確實有門時，以綠色通道跨過格線間距。 */
+.map-connection {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #43a95e;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 1px 3px rgba(48, 92, 56, 0.32);
+  pointer-events: none;
+}
+
+.map-connection.is-right {
+  top: 50%;
+  left: 100%;
+  width: var(--map-gap);
+  height: 0.48rem;
+  transform: translateY(-50%);
+}
+
+.map-connection.is-down {
+  top: 100%;
+  left: 50%;
+  width: 0.48rem;
+  height: var(--map-gap);
+  transform: translateX(-50%);
 }
 
 .room-name {
