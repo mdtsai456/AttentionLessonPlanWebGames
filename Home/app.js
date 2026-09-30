@@ -175,7 +175,11 @@ function validate(accounts) {
 
 function backendErrorMessage(err) {
   if (err && err.name === "TypeError") {
-    return "後端連不上，請先啟動 http://127.0.0.1:5001";
+    const host = location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "後端連不上，請先啟動 http://127.0.0.1:5001";
+    }
+    return "後端連不上，請稍後再試";
   }
   return err && err.message ? err.message : "登入失敗，請稍後再試";
 }

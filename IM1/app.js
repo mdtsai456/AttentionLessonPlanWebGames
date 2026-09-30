@@ -1218,7 +1218,7 @@ async function fetchQuestions() {
  * 中場（progress 50）與全破（progress 100）都會呼叫一次。
  */
 async function submitResult(data) {
-  const url = "http://127.0.0.1:5001/api/sessions";
+  const url = `${window.WedGameApi.resolveApiBase()}/sessions`;
   const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade") || "G1";
   const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case") || "S03";
   const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school") || "KMU";

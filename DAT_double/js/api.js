@@ -2,23 +2,33 @@
  * DAT_double 資料庫 API 溝通模組
  */
 
-const API_BASE_URL = "http://127.0.0.1:5001";
+function sessionApiOrigin() {
+  if (window.WedGameApi && window.WedGameApi.resolveApiBase) {
+    return window.WedGameApi.resolveApiBase().replace(/\/api$/, "");
+  }
+  const host = location.hostname;
+  if (host === "localhost" || host === "127.0.0.1") {
+    return `${location.protocol}//${host}:5001`;
+  }
+  return "https://attention-lesson-plan-transfer-data.zeabur.app";
+}
 
 /**
  * 產生符合 GUID 規範的 UUID v4 供雙人局 pairId 使用
  */
 export function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
 /**
- * 送出單一學生的 Session 數據至 API (SQLite 存檔)
+ * 送出單一學生的 Session 數據至 API
  */
 export async function sendSessionToApi(payload) {
-  const endpoint = `${API_BASE_URL}/api/sessions`;
+  const endpoint = `${sessionApiOrigin()}/api/sessions`;
   try {
     const response = await fetch(endpoint, {
       method: "POST",
