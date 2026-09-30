@@ -78,7 +78,7 @@
     if (hostname === "localhost" || hostname === "127.0.0.1") {
       return global.location.protocol + "//" + hostname + ":5001/api";
     }
-    return "https://attention-lesson-plan-transfer-data.zeabur.app/api";
+    return "https://attention-lesson-plan-data.zeabur.app/api";
   }
 
   function expireSession(force) {

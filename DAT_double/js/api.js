@@ -10,7 +10,7 @@ function sessionApiOrigin() {
   if (host === "localhost" || host === "127.0.0.1") {
     return `${location.protocol}//${host}:5001`;
   }
-  return "https://attention-lesson-plan-transfer-data.zeabur.app";
+  return "https://attention-lesson-plan-data.zeabur.app";
 }
 
 /**
