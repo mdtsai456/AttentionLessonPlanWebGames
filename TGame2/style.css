@@ -315,12 +315,84 @@ body {
   right: 1.2vw;
 }
 
+/* 確定左下角按鈕區域層級夠高，且不被圖層遮擋 */
 .btn-leave {
   position: absolute;
   left: 2vw;
   bottom: 2.2vh;
-  z-index: 12;
-  min-width: 7.2rem;
+  z-index: 20; /* 提高 z-index 確保在最上層 */
+  min-width: 6rem;
+}
+
+.btn-reload {
+  position: absolute;
+  left: calc(2vw + 7.5rem); /* 微調間距 */
+  bottom: 2.2vh;
+  z-index: 20; /* 提高 z-index 確保在最上層 */
+}
+
+/* 針對小螢幕（手機/平板）進行按鈕位置防重疊處理 */
+@media (max-width: 720px) {
+  .btn-leave {
+    left: 1.5vw;
+    bottom: 1.5vh;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-reload {
+    left: calc(1.5vw + 5.5rem);
+    bottom: 1.5vh;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+/* 針對小螢幕（手機/平板）進行按鈕位置防重疊處理 */
+@media (max-width: 720px) {
+  .btn-leave {
+    left: 1.5vw;
+    bottom: 1.5vh;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-reload {
+    left: calc(1.5vw + 5.5rem);
+    bottom: 1.5vh;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 17vh;
+  z-index: 30;
+  max-width: 86vw;
+  margin: 0;
+  padding: 0.7rem 1.4rem;
+  transform: translateX(-50%);
+  border-radius: 20px;
+  background: rgba(76, 175, 80, 0.94);
+  box-shadow: 0 10px 24px rgba(30, 90, 60, 0.25);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  white-space: pre-line;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.toast.is-show {
+  opacity: 1;
+}
+
+.toast.is-error {
+  background: rgba(211, 90, 74, 0.94);
 }
 
 .hud-center {
@@ -553,5 +625,10 @@ body {
 
   .btn {
     width: 100%;
+  }
+
+  .btn-leave,
+  .btn-reload {
+    width: auto;
   }
 }

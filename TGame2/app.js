@@ -1,7 +1,8 @@
 // =============================================================================
 // TGame2 / 勇闖迷宮（雙人）
 // 左右各一組獨立 T 型迷宮與角色。P1 用 A / D，P2 用左右鍵。
-// 每一關倒數 60 秒共用；時間內兩人各自連續作答，互不等待。
+// 每一關倒數 60 秒共用：任一人第一次按鍵時，兩邊同時開始計時；
+// 時間到，兩邊一起進入下一關。時間內兩人各自連續作答，互不等待。
 // =============================================================================
 
 const TIME_LIMIT_SEC = 60;
@@ -28,7 +29,7 @@ const ALL_ITEMS = [
   "hat", "key", "soccer", "umbrella",
 ];
 
-const STAGE_RULES = [
+const DEFAULT_STAGE_RULES = [
   { prompt: "請選擇符合「可以吃的食物」的方向", correct: ["apple", "banana", "carrot"] },
   { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
   { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
@@ -36,6 +37,9 @@ const STAGE_RULES = [
   { prompt: "請選擇符合「水裡游的動物」的方向", correct: ["fish"] },
   { prompt: "請選擇符合「用來閱讀的」的方向", correct: ["book"] },
 ];
+
+let stageRules = DEFAULT_STAGE_RULES;
+let customThemes = null;
 
 const timerBox = document.getElementById("timer-box");
 const resultEl = document.getElementById("result");
@@ -48,6 +52,8 @@ const backBtn = document.getElementById("back-btn");
 
 const levelBox = document.getElementById("level-box");
 const midBreakEl = document.getElementById("mid-break");
+const reloadBtn = document.getElementById("reload-btn");
+const toastEl = document.getElementById("toast");
 
 const session = {
   level: 1,
@@ -57,6 +63,8 @@ const session = {
   startedAt: 0,
   timerId: null,
   endReason: "",
+  // 用於追蹤計時器是否已開始
+  timerStarted: false,
 };
 
 const players = {
@@ -76,6 +84,8 @@ document.getElementById("mid-continue").addEventListener("click", () => {
   startLevel(session.level + 1);
 });
 document.getElementById("leave-btn").addEventListener("click", leaveGame);
+//設定重新載入題目按鈕事件
+reloadBtn.addEventListener("click", onReloadClick);
 
 let savedStage = 0;
 
@@ -186,10 +196,9 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-init();
-
-function init() {
+async function init() {
   preloadSceneImages();
+  await loadCsvFromUrl(CSV_URL); // 先嘗試讀取 CSV，若失敗就沿用預設題目
   startGame();
 }
 
@@ -260,6 +269,7 @@ function startGame() {
   savedStage = 0;
   session.startedAt = Date.now();
   session.endReason = "";
+  stageRules = buildStageRules();
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
   document.getElementById("mid-continue").disabled = false;
@@ -280,6 +290,7 @@ function startLevel(level) {
   session.roundToken += 1;
   session.level = level;
   session.remaining = TIME_LIMIT_SEC;
+  session.timerStarted = false;
   session.playing = true;
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
@@ -299,6 +310,13 @@ function startLevel(level) {
   });
 
   renderLevel();
+  renderTimer();
+  // 計時不在這裡開始：等任一人第一次按鍵才同時開始（見 startLevelTimer）
+}
+
+function startLevelTimer() {
+  if (session.timerStarted) return;
+  session.timerStarted = true;
   renderTimer();
   session.timerId = setInterval(tick, 1000);
 }
@@ -336,8 +354,9 @@ function pick(items) {
 }
 
 function makeQuestion(level, seq) {
-  const rule = STAGE_RULES[level - 1];
-  const wrongItems = ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  const rule = stageRules[level - 1];
+  const wrongItems =
+    rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
   const correctItem = pick(rule.correct);
   const wrongItem = pick(wrongItems);
   const correctSide = Math.random() < 0.5 ? "left" : "right";
@@ -357,10 +376,8 @@ function currentQuestion(player) {
 function renderQuestion(player) {
   const question = currentQuestion(player);
   if (!question) return;
-  player.itemLeft.src = itemSrc(question.leftItem);
-  player.itemRight.src = itemSrc(question.rightItem);
-  player.itemLeft.alt = question.leftItem;
-  player.itemRight.alt = question.rightItem;
+  setItemImage(player.itemLeft, question.leftItem);
+  setItemImage(player.itemRight, question.rightItem);
   player.promptEl.textContent = question.prompt;
 }
 
@@ -369,7 +386,10 @@ function renderPlayerHud(player) {
 }
 
 function renderTimer() {
-  timerBox.textContent = `${Math.max(0, session.remaining)} 秒`;
+  const waiting = session.playing && !session.timerStarted;
+  timerBox.textContent = waiting
+    ? `${TIME_LIMIT_SEC} 秒 · 按鍵開始`
+    : `${Math.max(0, session.remaining)} 秒`;
 }
 
 function renderLevel() {
@@ -381,6 +401,8 @@ async function chooseDirection(player, choice) {
 
   const question = currentQuestion(player);
   if (!question) return;
+
+  startLevelTimer();
 
   const token = session.roundToken;
   player.busy = true;
@@ -503,7 +525,7 @@ function hideFeedback(player) {
 }
 
 function itemSrc(id) {
-  return `img/items/${id}.png`;
+  return `img/items/${encodeURIComponent(id)}.png`;
 }
 
 function resetSceneAndPlayer(player, keepHidden) {
@@ -592,9 +614,308 @@ function hidePlayerPlaceholder(player) {
   player.playerImg.classList.remove("is-hidden");
 }
 
+// =============================================================================
+// CSV 匯入題目
+// 欄位：主題, 主題描述, 類型, 項目1 ~ 項目N（可再加一欄「年級」）
+// 「類型」填 正確 / 錯誤；同一個主題可以分成多列。
+// 項目名稱若有對應的 img/items/名稱.png 就顯示圖片，沒有就自動產生文字卡。
+// =============================================================================
+
+const CORRECT_TYPES = ["正確", "對", "correct", "true", "o", "1"];
+const WRONG_TYPES = ["錯誤", "錯", "wrong", "false", "x", "0"];
+const missingImages = new Set();
+
+function detectDelimiter(text) {
+  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const counts = [",", "\t", ";"].map((d) => [d, firstLine.split(d).length - 1]);
+  counts.sort((a, b) => b[1] - a[1]);
+  return counts[0][1] > 0 ? counts[0][0] : ",";
+}
+
+function parseCSV(text) {
+  const delimiter = detectDelimiter(text);
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  const pushField = () => {
+    row.push(field);
+    field = "";
+  };
+  const pushRow = () => {
+    pushField();
+    if (row.some((cell) => cell.trim() !== "")) rows.push(row);
+    row = [];
+  };
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === delimiter) {
+      pushField();
+    } else if (ch === "\n") {
+      pushRow();
+    } else if (ch !== "\r") {
+      field += ch;
+    }
+  }
+  if (field !== "" || row.length) pushRow();
+  return rows;
+}
+
+function buildThemesFromRows(rows) {
+  const warnings = [];
+  if (rows.length < 2) {
+    throw new Error("檔案是空的，至少需要標題列與一列題目");
+  }
+
+  const header = rows[0].map((cell) => cell.trim());
+  const topicCol = header.indexOf("主題");
+  const typeCol = header.indexOf("類型");
+  const descCol = header.indexOf("主題描述");
+  const gradeCol = header.indexOf("年級");
+  if (topicCol < 0 || typeCol < 0) {
+    throw new Error("找不到「主題」或「類型」欄位，請確認第一列是標題列");
+  }
+
+  let itemCols = [];
+  header.forEach((name, index) => {
+    if (name.startsWith("項目")) itemCols.push(index);
+  });
+  if (!itemCols.length) {
+    const start = Math.max(topicCol, typeCol, descCol, gradeCol) + 1;
+    itemCols = header.map((_, index) => index).filter((index) => index >= start);
+  }
+  if (!itemCols.length) throw new Error("找不到「項目1、項目2…」欄位");
+
+  const cell = (cells, index) => (index >= 0 ? (cells[index] || "").trim() : "");
+  const byKey = new Map();
+
+  rows.slice(1).forEach((cells, index) => {
+    const line = index + 2;
+    const topic = cell(cells, topicCol);
+    if (!topic) {
+      warnings.push(`第 ${line} 列沒有主題，已略過`);
+      return;
+    }
+    const kind = cell(cells, typeCol).toLowerCase();
+    const isCorrect = CORRECT_TYPES.includes(kind);
+    const isWrong = WRONG_TYPES.includes(kind);
+    if (!isCorrect && !isWrong) {
+      warnings.push(`第 ${line} 列的類型「${cell(cells, typeCol)}」看不懂（請填正確或錯誤），已略過`);
+      return;
+    }
+
+    const grade = cell(cells, gradeCol);
+    const key = `${grade}|${topic}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, { topic, desc: "", grade, correct: [], wrong: [] });
+    }
+    const theme = byKey.get(key);
+    const desc = cell(cells, descCol);
+    if (desc && !theme.desc) theme.desc = desc;
+
+    const target = isCorrect ? theme.correct : theme.wrong;
+    itemCols
+      .map((col) => cell(cells, col))
+      .filter(Boolean)
+      .forEach((item) => {
+        if (!target.includes(item)) target.push(item);
+      });
+  });
+
+  const themes = [];
+  byKey.forEach((theme) => {
+    theme.wrong = theme.wrong.filter((item) => !theme.correct.includes(item));
+    if (!theme.correct.length) {
+      warnings.push(`「${theme.topic}」沒有正確項目，已略過`);
+      return;
+    }
+    themes.push(theme);
+  });
+
+  // 沒有「錯誤」列的主題：借用其他主題的正確項目當干擾選項
+  const usable = themes.filter((theme) => {
+    if (theme.wrong.length) return true;
+    const borrowed = new Set();
+    themes.forEach((other) => {
+      if (other === theme) return;
+      other.correct.forEach((item) => {
+        if (!theme.correct.includes(item)) borrowed.add(item);
+      });
+    });
+    if (!borrowed.size) {
+      warnings.push(`「${theme.topic}」沒有錯誤項目可當干擾選項，已略過`);
+      return false;
+    }
+    theme.wrong = [...borrowed];
+    warnings.push(`「${theme.topic}」沒有錯誤項目，暫用其他主題的項目當干擾（建議補上錯誤列）`);
+    return true;
+  });
+
+  if (!usable.length) throw new Error("沒有可用的主題");
+
+  return {
+    warnings,
+    themes: usable.map((theme) => ({
+      topic: theme.topic,
+      grade: theme.grade,
+      prompt: `請選擇符合「${theme.desc || theme.topic}」的方向`,
+      correct: theme.correct,
+      wrong: theme.wrong,
+    })),
+  };
+}
+
+// 相對於 index.html：上一層資料夾的 主題資料.csv
+const CSV_URL = "../主題資料.csv";
+
+async function loadCsvFromUrl(url) {
+  try {
+    const res = await fetch(encodeURI(url), { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buffer = await res.arrayBuffer();
+    let text;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    } catch (err) {
+      text = new TextDecoder("big5").decode(buffer);
+    }
+    const { themes, warnings } = buildThemesFromRows(parseCSV(text));
+    if (warnings.length) console.warn("CSV 提醒：\n" + warnings.join("\n"));
+    customThemes = themes;
+    return { ok: true, count: themes.length, warnings: warnings.length };
+  } catch (err) {
+    console.warn("讀取 CSV 失敗，沿用目前的題目：", err);
+    return { ok: false, error: err };
+  }
+}
+
+function isOverlayOpen() {
+  const shared = document.querySelector(".shared-stage-clear");
+  return (
+    !midBreakEl.classList.contains("is-hidden") ||
+    Boolean(shared && !shared.hidden)
+  );
+}
+
+async function onReloadClick() {
+  if (isOverlayOpen()) {
+    showToast("請先關閉關卡結算畫面，再重新載入題目", true);
+    return;
+  }
+  reloadBtn.disabled = true;
+  const result = await loadCsvFromUrl(CSV_URL);
+  reloadBtn.disabled = false;
+  if (!result.ok) {
+    showToast("讀取不到 主題資料.csv，請確認檔案位置", true);
+    return;
+  }
+  startGame();
+  const lines = [`已重新載入題目：${result.count} 個主題`];
+  if (result.count > STAGE_COUNT) {
+    lines.push(`每次遊戲會隨機抽 ${STAGE_COUNT} 個主題`);
+  } else if (result.count < STAGE_COUNT) {
+    lines.push(`主題不足 ${STAGE_COUNT} 個，部分關卡會重複`);
+  }
+  if (result.warnings) lines.push(`另有 ${result.warnings} 則提醒（詳見 Console）`);
+  showToast(lines.join("\n"), false);
+}
+
+function shuffled(list) {
+  const copy = list.slice();
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// 主題 ≤ 6：照檔案順序；主題 > 6：每次遊戲隨機抽 6 個；主題不足 6：循環補滿
+function buildStageRules() {
+  if (!customThemes || !customThemes.length) return DEFAULT_STAGE_RULES;
+  const picked =
+    customThemes.length > STAGE_COUNT
+      ? shuffled(customThemes).slice(0, STAGE_COUNT)
+      : customThemes.slice();
+  for (let i = 0; picked.length < STAGE_COUNT; i += 1) {
+    picked.push(customThemes[i % customThemes.length]);
+  }
+  return picked.map((theme) => ({
+    prompt: theme.prompt,
+    correct: theme.correct,
+    wrong: theme.wrong,
+  }));
+}
+
+let toastTimer = null;
+
+function showToast(message, isError) {
+  toastEl.textContent = message;
+  toastEl.classList.toggle("is-error", Boolean(isError));
+  toastEl.classList.add("is-show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("is-show"), 4500);
+}
+
+// 項目圖片：找不到 img/items/名稱.png 時，改用文字卡（SVG）
+function setItemImage(el, id) {
+  el.alt = id;
+  el.onerror = () => {
+    el.onerror = null;
+    missingImages.add(id);
+    el.src = labelCard(id);
+  };
+  el.src = missingImages.has(id) ? labelCard(id) : itemSrc(id);
+}
+
+function xmlEscape(text) {
+  return text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+}
+
+function labelCard(text) {
+  const chars = Array.from(text);
+  const half = Math.ceil(chars.length / 2);
+  const lines =
+    chars.length > 3
+      ? [chars.slice(0, half).join(""), chars.slice(half).join("")]
+      : [text];
+  const longest = Math.max(...lines.map((line) => Array.from(line).length));
+  const size = Math.min(72, Math.floor(168 / longest));
+  const lineHeight = size * 1.2;
+  const firstY = 100 - ((lines.length - 1) * lineHeight) / 2;
+  const tspans = lines
+    .map(
+      (line, index) =>
+        `<text x="100" y="${firstY + index * lineHeight}" text-anchor="middle" dominant-baseline="central" font-size="${size}" font-weight="800" fill="#2f5d3a" font-family="'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif">${xmlEscape(line)}</text>`
+    )
+    .join("");
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">` +
+    `<rect x="6" y="6" width="188" height="188" rx="36" fill="#fff" stroke="#57b8e8" stroke-width="8"/>` +
+    tspans +
+    `</svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
 function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
+// 必須放在檔案最後：init() 會用到上面所有 const，太早呼叫會踩到暫時性死區
+init();

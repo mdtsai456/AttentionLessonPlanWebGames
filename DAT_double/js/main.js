@@ -39,12 +39,18 @@ function clearMidBreak() {
   if (panel) panel.hidden = true;
 }
 
+// 任一玩家瞄準動物，兩位玩家同時開始出題
+function syncStart() {
+  players.forEach((player) => player.forceStart());
+}
+
 const state = {
   get playerPracticeFinished() { return playerPracticeFinished; },
   get currentGamePairId() { return currentGamePairId; },
   get players() { return players; },
   get playMode() { return playMode; },
   safeNavigateTo,
+  syncStart,
   waitForMidBreak,
   waitForStageClear
 };

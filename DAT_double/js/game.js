@@ -78,7 +78,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('question-text').textContent = '—';
     $('time-text').textContent = '尚未開始';
     $('time-fill').style.width = '100%';
-    $('feedback').textContent = `請先移動準心重疊動物；重疊後按 ${answerLabel} 作答`;
+    $('feedback').textContent = `任一位玩家把準心移到動物身上，雙方同時開始（按 ${answerLabel} 作答）`;
     $('animal').dataset.result = '';
     enableAnswers(false);
     updateProgress(); renderPositions();
@@ -113,7 +113,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('question-text').textContent = '—';
     $('time-text').textContent = '尚未開始';
     $('time-fill').style.width = '100%';
-    $('feedback').textContent = '將準心移到動物身上，開始遊戲';
+    $('feedback').textContent = '任一位玩家把準心移到動物身上，雙方同時開始';
     $('animal').dataset.result = '';
     enableAnswers(false);
     updateProgress(); renderPositions();
@@ -416,7 +416,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       let remaining = Math.min(delta, 5000);
       while (remaining > 0) { const step = Math.min(remaining, 20); move(step); remaining -= step; }
       if (phase === 'aiming') {
-        if (isOnAnimal()) showQuestion();
+        if (isOnAnimal()) getState().syncStart(playerIndex);
       } else if (phase === 'answer') {
         elapsed = Math.min(answerLimitMs(), elapsed + delta);
         updateClock();
@@ -499,6 +499,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
+    // 由 main.js 呼叫：若本玩家還在瞄準階段，就一起開始出題
+    forceStart: () => { if (phase === 'aiming' && !paused) showQuestion(); },
     pauseGame: () => { paused = true; },
     resumeGame: () => { paused = false; lastTime = undefined; },
   };

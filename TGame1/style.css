@@ -270,10 +270,59 @@ body {
   filter: drop-shadow(0 8px 14px rgba(40, 80, 50, 0.18));
 }
 
-.btn-leave {
+/* .btn-leave {
   margin-left: auto;
   min-width: 7.2rem;
+} */
+
+.hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
 }
+
+.btn-leave {
+  min-width: 7.2rem;
+}
+
+.btn-small {
+  min-width: 0;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 17vh;
+  z-index: 30;
+  max-width: 86vw;
+  margin: 0;
+  padding: 0.7rem 1.4rem;
+  transform: translateX(-50%);
+  border-radius: 20px;
+  background: rgba(76, 175, 80, 0.94);
+  box-shadow: 0 10px 24px rgba(30, 90, 60, 0.25);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  white-space: pre-line;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.toast.is-show {
+  opacity: 1;
+}
+
+.toast.is-error {
+  background: rgba(211, 90, 74, 0.94);
+}
+
 
 .hud-chip {
   display: flex;
