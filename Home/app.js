@@ -238,15 +238,16 @@ async function submitLogin() {
   enterBtn.disabled = true;
   errorMsg.textContent = "登入中…";
 
-  // 已拿到的學生登入結果；沒走完登入流程時要在 finally 登出，避免 token 留在 server 上。
-  const studentResults = [];
+  // 已拿到的登入結果；沒走完登入流程時要在 finally 登出，避免 token 留在 server 上。
+  const results = [];
   let loggedIn = false;
+  const teacher = state.role === "teacher";
   const dual = state.mode === "dual";
   // 雙人模式下正在登入第幾位學生，錯誤訊息用來加前綴；0 表示不在登入步驟。
   let loginSlot = 0;
 
   try {
-    if (state.role === "teacher") {
+    if (teacher) {
       const result = await WedGameApi.loginTeacher(
         accounts[0].username,
         accounts[0].password
@@ -255,45 +256,48 @@ async function submitLogin() {
         errorMsg.textContent = "帳號或密碼錯誤";
         return;
       }
-      storeTeacherSession(result);
-      loggedIn = true;
-      location.href = "../Back/index.html";
-      return;
-    }
-
-    for (const [index, account] of accounts.entries()) {
-      loginSlot = index + 1;
-      const result = await WedGameApi.loginStudent(
-        account.username,
-        account.password
-      );
-      if (!result) {
-        errorMsg.textContent = dual
-          ? `學生 ${loginSlot} 帳號或密碼錯誤`
-          : "帳號或密碼錯誤";
-        return;
+      results.push(result);
+    } else {
+      for (const [index, account] of accounts.entries()) {
+        loginSlot = index + 1;
+        const result = await WedGameApi.loginStudent(
+          account.username,
+          account.password
+        );
+        if (!result) {
+          errorMsg.textContent = dual
+            ? `學生 ${loginSlot} 帳號或密碼錯誤`
+            : "帳號或密碼錯誤";
+          return;
+        }
+        results.push(result);
       }
-      studentResults.push(result);
+      loginSlot = 0;
     }
-    loginSlot = 0;
 
-    const days = accounts.map((item) => item.currentDay);
+    // 下面會清掉 sessionStorage；已登入的人（例如按上一頁回來）再登入時，舊 token 要先登出。
+    WedGameApi.storedTokens().forEach((token) => WedGameApi.logout(token));
     try {
-      storeStudentSession(state.mode, studentResults, days);
+      if (teacher) {
+        storeTeacherSession(results[0]);
+      } else {
+        const days = accounts.map((item) => item.currentDay);
+        storeStudentSession(state.mode, results, days);
+      }
     } catch (_err) {
       // 寫到一半失敗時不要留下指向已登出 token 的登入狀態，也不要誤報成後端錯誤。
       sessionStorage.clear();
       throw new Error("無法儲存登入狀態，請重新整理頁面後再試");
     }
     loggedIn = true;
-    location.href = "../Select/index.html";
+    location.href = teacher ? "../Back/index.html" : "../Select/index.html";
   } catch (err) {
     const prefix = dual && loginSlot ? `學生 ${loginSlot}：` : "";
     errorMsg.textContent = `${prefix}${backendErrorMessage(err)}`;
   } finally {
     // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
     if (!loggedIn) {
-      studentResults.forEach((result) => WedGameApi.logout(result.token));
+      results.forEach((result) => WedGameApi.logout(result.token));
       enterBtn.disabled = false;
     }
   }

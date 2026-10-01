@@ -79,14 +79,17 @@
     }
   }
 
-  async function logoutAll() {
-    const tokens = [
+  /** 目前 sessionStorage 裡登入中的 token（去掉空值與重複）。 */
+  function storedTokens() {
+    return [
       sessionStorage.getItem("student1_token"),
       sessionStorage.getItem("student2_token"),
       sessionStorage.getItem("token"),
     ].filter((value, index, list) => value && list.indexOf(value) === index);
+  }
 
-    await Promise.all(tokens.map((token) => logout(token)));
+  async function logoutAll() {
+    await Promise.all(storedTokens().map((token) => logout(token)));
   }
 
   /** 手錶專心判定：回傳 1（專心）或 0。任何失敗都當 0，不擋畫面。 */
@@ -124,6 +127,7 @@
     authGet,
     logout,
     logoutAll,
+    storedTokens,
     fetchAttention,
     mapGameId,
     progressFromRecord,
