@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "注意力教案的遊戲資料中介 API：FastAPI 讀寫 MariaDB，接收 Unity 遊戲結果並供前端與研究查詢。"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.110.0",
+    "fastapi[standard]>=0.110.0",
     "uvicorn[standard]>=0.27.0",
     "pymysql>=1.1.0",
     "python-dotenv>=1.0.0",

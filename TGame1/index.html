@@ -68,12 +68,21 @@
           <span class="hud-chip hud-chip-sky">剩餘</span>
           <span class="hud-box" id="timer-box">60 秒</span>
         </div>
+                <div class="hud-actions">
+          <!-- <button type="button" class="btn btn-sky btn-small is-hidden" id="reset-themes-btn">還原預設題目</button>
+          <button type="button" class="btn btn-green btn-small" id="import-csv-btn">重新載入題目</button> -->
 
         <button type="button" class="btn btn-sky btn-leave" id="leave-btn">離開</button>
       </div>
+      
+        <input type="file" id="csv-input" accept=".csv,text/csv" hidden />
+      </div>
 
+      
       <p class="prompt" id="prompt">請選擇符合題目的方向</p>
       <p class="feedback" id="feedback" aria-live="assertive"></p>
+      // Toast message container
+      <p class="toast" id="toast" role="status" aria-live="polite"></p>
 
       <section class="result is-hidden" id="result" aria-label="結算">
         <h1 class="title" id="result-title">闖關結束</h1>
