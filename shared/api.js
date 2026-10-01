@@ -31,7 +31,11 @@
       err.status = res.status;
       throw err;
     }
-    return res.json();
+    try {
+      return await res.json();
+    } catch (_err) {
+      throw new Error("登入伺服器回應格式錯誤，請稍後再試");
+    }
   }
 
   async function loginStudent(account, password) {

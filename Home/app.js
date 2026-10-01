@@ -258,11 +258,19 @@ async function submitLogin() {
 
     let result2 = null;
     if (state.mode === "dual") {
-      result2 = await WedGameApi.loginStudent(
-        accounts[1].username,
-        accounts[1].password
-      );
+      // 學生 2 失敗時登出學生 1，避免 token 留在 server 上。
+      try {
+        result2 = await WedGameApi.loginStudent(
+          accounts[1].username,
+          accounts[1].password
+        );
+      } catch (err) {
+        WedGameApi.logout(result1.token);
+        errorMsg.textContent = `學生 2：${backendErrorMessage(err)}`;
+        return;
+      }
       if (!result2) {
+        WedGameApi.logout(result1.token);
         errorMsg.textContent = "學生 2 帳號或密碼錯誤";
         return;
       }
