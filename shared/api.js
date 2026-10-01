@@ -19,14 +19,17 @@
     });
   }
 
-  /** 401 才是帳密錯誤（回 null）；其他失敗丟出 Error，讓畫面顯示伺服器錯誤。 */
-  async function readLoginResponse(res) {
+  /**
+   * 401 才是帳密錯誤（回 null）；其他失敗丟出 Error，讓畫面顯示伺服器錯誤。
+   * contact：非 5xx 錯誤時提示該聯絡誰（老師登入失敗時不該提示去找老師）。
+   */
+  async function readLoginResponse(res, contact) {
     if (res.status === 401) return null;
     if (!res.ok) {
       throw new Error(
         res.status >= 500
           ? `登入伺服器發生錯誤（HTTP ${res.status}），請稍後再試`
-          : `登入失敗（HTTP ${res.status}），請聯絡老師或管理者`
+          : `登入失敗（HTTP ${res.status}），請聯絡${contact}`
       );
     }
     const badFormat = "登入伺服器回應格式錯誤，請稍後再試";
@@ -47,12 +50,12 @@
 
   async function loginStudent(account, password) {
     const res = await postJson("/auth/student/login", { account, password });
-    return readLoginResponse(res);
+    return readLoginResponse(res, "老師或管理者");
   }
 
   async function loginTeacher(account, password) {
     const res = await postJson("/auth/teacher/login", { account, password });
-    return readLoginResponse(res);
+    return readLoginResponse(res, "管理者");
   }
 
   async function authGet(path, token) {
