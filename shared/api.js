@@ -19,23 +19,27 @@
     });
   }
 
-  /** 401 才是帳密錯誤（回 null）；其他失敗丟出帶 status 的 Error，讓畫面顯示伺服器錯誤。 */
+  /** 401 才是帳密錯誤（回 null）；其他失敗丟出 Error，讓畫面顯示伺服器錯誤。 */
   async function readLoginResponse(res) {
     if (res.status === 401) return null;
     if (!res.ok) {
-      const message =
+      throw new Error(
         res.status >= 500
           ? `登入伺服器發生錯誤（HTTP ${res.status}），請稍後再試`
-          : `登入失敗（HTTP ${res.status}），請稍後再試`;
-      const err = new Error(message);
-      err.status = res.status;
-      throw err;
+          : `登入失敗（HTTP ${res.status}），請聯絡老師或管理者`
+      );
     }
+    const badFormat = "登入伺服器回應格式錯誤，請稍後再試";
+    let data;
     try {
-      return await res.json();
-    } catch (_err) {
-      throw new Error("登入伺服器回應格式錯誤，請稍後再試");
+      data = await res.json();
+    } catch (err) {
+      // 讀 body 時斷線是 TypeError，原樣丟出讓畫面顯示「後端連不上」。
+      if (err && err.name === "TypeError") throw err;
+      throw new Error(badFormat);
     }
+    if (!data) throw new Error(badFormat);
+    return data;
   }
 
   async function loginStudent(account, password) {

@@ -231,6 +231,12 @@ async function submitLogin() {
   if (enterBtn) enterBtn.disabled = true;
   errorMsg.textContent = "登入中…";
 
+  // 已拿到的學生登入結果；沒走完登入流程時要在 finally 登出，避免 token 留在 server 上。
+  const studentResults = [];
+  let loggedIn = false;
+  // 雙人模式下正在登入第幾位學生，錯誤訊息用來加前綴；0 表示不在登入步驟。
+  let loginSlot = 0;
+
   try {
     if (state.role === "teacher") {
       const result = await WedGameApi.loginTeacher(
@@ -246,43 +252,36 @@ async function submitLogin() {
       return;
     }
 
-    const result1 = await WedGameApi.loginStudent(
-      accounts[0].username,
-      accounts[0].password
-    );
-    if (!result1) {
-      errorMsg.textContent =
-        state.mode === "dual" ? "學生 1 帳號或密碼錯誤" : "帳號或密碼錯誤";
-      return;
-    }
-
-    let result2 = null;
-    if (state.mode === "dual") {
-      // 學生 2 失敗時登出學生 1，避免 token 留在 server 上。
-      try {
-        result2 = await WedGameApi.loginStudent(
-          accounts[1].username,
-          accounts[1].password
-        );
-      } catch (err) {
-        WedGameApi.logout(result1.token);
-        errorMsg.textContent = `學生 2：${backendErrorMessage(err)}`;
+    const dual = state.mode === "dual";
+    const count = dual ? 2 : 1;
+    for (let index = 0; index < count; index += 1) {
+      loginSlot = index + 1;
+      const result = await WedGameApi.loginStudent(
+        accounts[index].username,
+        accounts[index].password
+      );
+      if (!result) {
+        errorMsg.textContent = dual
+          ? `學生 ${loginSlot} 帳號或密碼錯誤`
+          : "帳號或密碼錯誤";
         return;
       }
-      if (!result2) {
-        WedGameApi.logout(result1.token);
-        errorMsg.textContent = "學生 2 帳號或密碼錯誤";
-        return;
-      }
+      studentResults.push(result);
     }
+    loginSlot = 0;
 
-    const results = result2 ? [result1, result2] : [result1];
     const days = accounts.map((item) => item.currentDay);
-    storeStudentSession(state.mode, results, days);
+    storeStudentSession(state.mode, studentResults, days);
+    loggedIn = true;
     location.href = "../Select/index.html";
   } catch (err) {
-    errorMsg.textContent = backendErrorMessage(err);
+    const prefix =
+      state.mode === "dual" && loginSlot ? `學生 ${loginSlot}：` : "";
+    errorMsg.textContent = `${prefix}${backendErrorMessage(err)}`;
   } finally {
+    if (!loggedIn) {
+      studentResults.forEach((result) => WedGameApi.logout(result.token));
+    }
     if (enterBtn) enterBtn.disabled = false;
   }
 }
