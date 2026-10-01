@@ -19,16 +19,29 @@
     });
   }
 
+  /** 401 才是帳密錯誤（回 null）；其他失敗丟出帶 status 的 Error，讓畫面顯示伺服器錯誤。 */
+  async function readLoginResponse(res) {
+    if (res.status === 401) return null;
+    if (!res.ok) {
+      const message =
+        res.status >= 500
+          ? `登入伺服器發生錯誤（HTTP ${res.status}），請稍後再試`
+          : `登入失敗（HTTP ${res.status}），請稍後再試`;
+      const err = new Error(message);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  }
+
   async function loginStudent(account, password) {
     const res = await postJson("/auth/student/login", { account, password });
-    if (!res.ok) return null;
-    return res.json();
+    return readLoginResponse(res);
   }
 
   async function loginTeacher(account, password) {
     const res = await postJson("/auth/teacher/login", { account, password });
-    if (!res.ok) return null;
-    return res.json();
+    return readLoginResponse(res);
   }
 
   async function authGet(path, token) {
