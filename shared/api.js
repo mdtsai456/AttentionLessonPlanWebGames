@@ -38,7 +38,10 @@
       if (err && err.name === "TypeError") throw err;
       throw new Error(badFormat);
     }
-    if (!data) throw new Error(badFormat);
+    // 2xx 但沒有 token（proxy 回 {}、API 位址設錯等）不能算登入成功。
+    if (!data || typeof data.token !== "string" || !data.token) {
+      throw new Error(badFormat);
+    }
     return data;
   }
 
@@ -65,7 +68,12 @@
   async function logout(token) {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      await fetch(`${resolveApiBase()}/auth/logout`, { method: "POST", headers });
+      // keepalive：登出後常馬上換頁或關分頁，請求仍要送到後端。
+      await fetch(`${resolveApiBase()}/auth/logout`, {
+        method: "POST",
+        headers,
+        keepalive: true,
+      });
     } catch (_err) {
       // 本機狀態仍會清掉，後端失敗不擋登出。
     }

@@ -34,6 +34,14 @@ loginForm.addEventListener("submit", (event) => {
   submitLogin();
 });
 
+// 登入成功後按鈕會保持停用；從下一頁按「上一頁」由 bfcache 還原時要重新打開。
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  const enterBtn = loginForm.querySelector('[type="submit"]');
+  if (enterBtn) enterBtn.disabled = false;
+  errorMsg.textContent = "";
+});
+
 /**
  * 選擇身份。
  * 老師：直接顯示一組帳密欄位。
@@ -248,6 +256,7 @@ async function submitLogin() {
         return;
       }
       storeTeacherSession(result);
+      loggedIn = true;
       location.href = "../Back/index.html";
       return;
     }
@@ -271,7 +280,13 @@ async function submitLogin() {
     loginSlot = 0;
 
     const days = accounts.map((item) => item.currentDay);
-    storeStudentSession(state.mode, studentResults, days);
+    try {
+      storeStudentSession(state.mode, studentResults, days);
+    } catch (_err) {
+      // 寫到一半失敗時不要留下指向已登出 token 的登入狀態，也不要誤報成後端錯誤。
+      sessionStorage.clear();
+      throw new Error("無法儲存登入狀態，請重新整理頁面後再試");
+    }
     loggedIn = true;
     location.href = "../Select/index.html";
   } catch (err) {
@@ -282,7 +297,8 @@ async function submitLogin() {
     if (!loggedIn) {
       studentResults.forEach((result) => WedGameApi.logout(result.token));
     }
-    if (enterBtn) enterBtn.disabled = false;
+    // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
+    if (enterBtn && !loggedIn) enterBtn.disabled = false;
   }
 }
 
