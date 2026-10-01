@@ -64,7 +64,9 @@ const players = {
 
 init();
 
+/** 進頁後先拉進度，再把遊戲列表畫出來；同時查手錶專心判定。 */
 async function init() {
+  celebrateAttention();
   if (isDouble) {
     singleStage.hidden = true;
     dualStage.hidden = false;
@@ -274,6 +276,29 @@ async function fetchStudentProgress(slot) {
   } catch (_err) {
     return progress;
   }
+}
+
+/**
+ * 手錶判定專心就放煙火。每次登入只放一次（登入時 sessionStorage 會清空）；
+ * 還沒達標時，每次回到這頁都會再查一次。雙人時兩位各自查，任一位達標就放。
+ * 雙人一律說「你們」，不點名是哪一位，避免兩人互相比較。
+ */
+async function celebrateAttention() {
+  const SHOWN_KEY = "attention_fireworks_shown";
+  if (sessionStorage.getItem(SHOWN_KEY) || !window.showFireworks) return;
+
+  const isDouble = sessionStorage.getItem("game_mode") === "double";
+  const tokens = isDouble
+    ? [sessionStorage.getItem("student1_token"), sessionStorage.getItem("student2_token")]
+    : [sessionStorage.getItem("student1_token") || sessionStorage.getItem("token")];
+  const results = await Promise.all(tokens.map((token) => WedGameApi.fetchAttention(token)));
+  if (!results.includes(1)) return;
+
+  const message = isDouble
+    ? "聽說這裡有專心的小朋友，原來是你們！"
+    : "聽說這裡有專心的小朋友，原來是你！";
+  sessionStorage.setItem(SHOWN_KEY, "1");
+  window.showFireworks(message);
 }
 
 /**
