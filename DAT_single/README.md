@@ -14,6 +14,10 @@ const DEFAULT_ANIMAL_POOL = [
 ### 更改 DAT_single/DAT_single.js
 - 241~337行(function updateAnimalImage 附近)：連續答對更換動物角色彩蛋
 - 650 行開始(function fetchStudentAssets)：assets 的 API 串接
+### 學生 ID（10/01）
+- 後端 `caseId` 是 `S01` 這種格式。打素材 API 前由 `assetStudentId()` 補成三位數，例如 `S01` → `S001`。
+- 網址：`https://attention-lesson-plan-assets.zeabur.app/api/students/S001/assets`
+- 目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`。
 ### 修改一些 bug
 - 修改會在每關最後一秒跑很多題目的問題
 - 動物角色圖片完全載入才會顯示

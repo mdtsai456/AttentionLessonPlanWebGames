@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DAT 動物追擊令・雙人版</title>
-  <link rel="stylesheet" href="DAT_double.css?v=3">
+  <link rel="stylesheet" href="DAT_double.css?v=5">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
@@ -13,7 +13,7 @@
 <script src="../shared/session-timeout.js"></script>
 <script src="../shared/leave-confirm.js"></script>
 <script src="../shared/stage-clear.js" defer></script>
-<script type="module" src="js/main.js" defer></script>
+<script type="module" src="js/main.js?v=5" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
@@ -38,6 +38,7 @@
     <div class="animal-field" data-ui="field" aria-label="動物與玩家準心">
       <div class="animal" data-ui="animal">
         <img class="animal-image" data-ui="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+        <span class="aim-ring" aria-hidden="true"></span>
       </div>
       <img class="crosshair" data-ui="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
     </div>
@@ -84,6 +85,7 @@
     <div class="animal-field" data-ui="field" aria-label="動物與玩家準心">
       <div class="animal" data-ui="animal">
         <img class="animal-image" data-ui="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+        <span class="aim-ring" aria-hidden="true"></span>
       </div>
       <img class="crosshair" data-ui="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
     </div>

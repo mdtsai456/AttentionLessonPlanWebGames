@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DAT 動物追擊令・單人版</title>
-  <link rel="stylesheet" href="DAT_single.css">
+  <link rel="stylesheet" href="DAT_single.css?v=5">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
-  <script src="DAT_single.js" defer></script>
+  <script src="DAT_single.js?v=5" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令單人遊戲">
@@ -26,6 +26,7 @@
     <div class="animal-field" id="field" aria-label="動物與玩家準心">
       <div class="animal" id="animal">
         <img class="animal-image" id="animal-image" src="assets/animals/rabbit.png" alt="兔子" draggable="false">
+        <span class="aim-ring" aria-hidden="true"></span>
       </div>
       <img class="crosshair" id="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
     </div>

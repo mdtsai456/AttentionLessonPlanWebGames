@@ -24,13 +24,19 @@ CORS_ALLOW_ORIGINS=https://attention-wabgames.zeabur.app
 
 ## DAT
 
+動物圖向素材平台抓取：
+
+`https://attention-lesson-plan-assets.zeabur.app/api/students/{學生ID}/assets`
+
+網址裡的學生 ID 用後端個案編號 `caseId` 補成三位數。例如登入的是 `S01`，實際打 `S001`。目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`，不會改成三位數。沒有客製圖時用本機 `assets/animals/` 的預設圖。
+
 ### Single
 
-- 
+- `DAT_single/DAT_single.js` 的 `assetStudentId()` 把 `caseId` 補成三位數後呼叫素材 API。
 
 ### Double
 
-- 
+- `DAT_double/js/main.js` 的 `assetStudentId()` 分別把兩位玩家的個案編號補成三位數後呼叫素材 API。沒有客製圖的那位用預設圖。
 
 ## DCCS
 

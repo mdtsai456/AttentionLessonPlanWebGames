@@ -15,6 +15,10 @@ const DEFAULT_ANIMAL_POOL = [
 ];
 ### 更改 DAT_double/js/main.js
 - 158 行之後(function fetchStudentAssetList 附近)： assets 的 API 串接
+### 學生 ID（10/01）
+- 後端個案編號是 `S01` 這種格式。兩位玩家各自由 `assetStudentId()` 補成三位數再打素材 API，例如 `S01` → `S001`。
+- 網址：`https://attention-lesson-plan-assets.zeabur.app/api/students/S001/assets`
+- 目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`。沒有客製圖的那位用預設圖。
 ### 更改 DAT_double/js/game.js
 -  62~110 行(function setAnimalAssets 附近)：連續答對的彩蛋
 ### 修改一些 bug

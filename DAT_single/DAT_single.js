@@ -23,7 +23,6 @@ let submitted = false;
 let questions = [], index = 0, score = 0, wrong = 0, offTarget = 0, timedOut = 0, outcomes = [];
 let reactionSamples = [], activeMs = 0, focusMs = 0;
 let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
-const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
 // 彩蛋機制全域變數
@@ -195,16 +194,26 @@ function renderPositions() {
 }
 
 function isOnAnimal() {
-  if (!animalPixels) return false;
-  const rect = $('animal-image').getBoundingClientRect();
   const field = $('field').getBoundingClientRect();
+  const aimX = field.left + aim.x / 100 * field.width;
+  const aimY = field.top + aim.y / 100 * field.height;
+  const animalRect = $('animal').getBoundingClientRect();
+  if (animalRect.width && animalRect.height) {
+    const radius = Math.min(animalRect.width, animalRect.height) * 0.36;
+    const centerX = animalRect.left + animalRect.width / 2;
+    const centerY = animalRect.top + animalRect.height / 2;
+    if (Math.hypot(aimX - centerX, aimY - centerY) <= radius) return true;
+  }
+  if (typeof RABBIT_HIT_MASK === 'undefined') return false;
+  const rect = $('animal-image').getBoundingClientRect();
   const size = Math.min(rect.width, rect.height);
+  if (!size) return false;
   const left = rect.left + (rect.width - size) / 2;
   const top = rect.top + (rect.height - size) / 2;
-  const x = Math.floor((field.left + aim.x / 100 * field.width - left) / size * animalPixels.width);
-  const y = Math.floor((field.top + aim.y / 100 * field.height - top) / size * animalPixels.height);
-  if (x < 0 || y < 0 || x >= animalPixels.width || y >= animalPixels.height) return false;
-  return animalPixels.rows[y][x] === '1';
+  const x = Math.floor((aimX - left) / size * 128);
+  const y = Math.floor((aimY - top) / size * 128);
+  if (x < 0 || y < 0 || x >= 128 || y >= 128) return false;
+  return RABBIT_HIT_MASK[y][x] === '1';
 }
 
 function showQuestion() {
@@ -660,9 +669,17 @@ const DEFAULT_ANIMAL_POOL = [
   'assets/animals/bird.png',
 ];
 
+function assetStudentId(rawId) {
+  const id = String(rawId || '').trim();
+  const caseId = id.includes('_') ? id.split('_').pop() : id;
+  const match = /^([A-Za-z]+)(\d+)$/.exec(caseId);
+  if (!match) return caseId;
+  return `${match[1].toUpperCase()}${String(Number(match[2])).padStart(3, '0')}`;
+}
+
 async function fetchStudentAssets() {
   const rawId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S001';
-  const studentId = rawId.includes('_') ? rawId.split('_').pop() : rawId;
+  const studentId = assetStudentId(rawId);
 
   const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
   console.log(`[流程 1] 遊戲 Call API: GET ${apiUrl}`);

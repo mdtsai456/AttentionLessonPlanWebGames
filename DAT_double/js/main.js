@@ -1,6 +1,6 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer } from './game.js';
+import { createPlayer } from './game.js?v=4';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -173,6 +173,14 @@ const DEFAULT_ANIMAL_POOL = [
   'assets/animals/bird.png',
 ];
 
+function assetStudentId(rawId) {
+  const id = String(rawId || '').trim();
+  const caseId = id.includes('_') ? id.split('_').pop() : id;
+  const match = /^([A-Za-z]+)(\d+)$/.exec(caseId);
+  if (!match) return caseId;
+  return `${match[1].toUpperCase()}${String(Number(match[2])).padStart(3, '0')}`;
+}
+
 // 1. 抓取玩家 (P1/P2) 素材清單，自動補充不足部分以觸發彩蛋
 async function fetchStudentAssetList(playerIndex) {
   const isP1 = (playerIndex === 0);
@@ -182,7 +190,7 @@ async function fetchStudentAssetList(playerIndex) {
                 (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
                 (isP1 ? 'S01' : 'S02');
 
-  const studentId = rawId.includes('_') ? rawId.split('_').pop() : rawId;
+  const studentId = assetStudentId(rawId);
   const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
 
   let assetList = [];

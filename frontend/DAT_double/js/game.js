@@ -47,7 +47,6 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let startTimeMs = 0, endTimeMs = 0;
 
   let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
-  const animalPixels = { width: 128, height: 128, rows: RABBIT_HIT_MASK };
 
   let stageCount = TOTAL_STAGES;
   let questionsPerStage = GAME_QUESTIONS;
@@ -223,17 +222,26 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   function isOnAnimal() {
-    if (!animalPixels) return false;
-    const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image') || $('animal-image');
-    const rect = imgElem.getBoundingClientRect();
     const field = $('field').getBoundingClientRect();
+    const aimX = field.left + aim.x / 100 * field.width;
+    const aimY = field.top + aim.y / 100 * field.height;
+    const animalRect = $('animal').getBoundingClientRect();
+    if (animalRect.width && animalRect.height) {
+      const radius = Math.min(animalRect.width, animalRect.height) * 0.36;
+      const centerX = animalRect.left + animalRect.width / 2;
+      const centerY = animalRect.top + animalRect.height / 2;
+      if (Math.hypot(aimX - centerX, aimY - centerY) <= radius) return true;
+    }
+    if (typeof RABBIT_HIT_MASK === 'undefined') return false;
+    const rect = ($('animal-image') || element.querySelector('.animal-image')).getBoundingClientRect();
     const size = Math.min(rect.width, rect.height);
+    if (!size) return false;
     const left = rect.left + (rect.width - size) / 2;
     const top = rect.top + (rect.height - size) / 2;
-    const x = Math.floor((field.left + aim.x / 100 * field.width - left) / size * animalPixels.width);
-    const y = Math.floor((field.top + aim.y / 100 * field.height - top) / size * animalPixels.height);
-    if (x < 0 || y < 0 || x >= animalPixels.width || y >= animalPixels.height) return false;
-    return animalPixels.rows[y][x] === '1';
+    const x = Math.floor((aimX - left) / size * 128);
+    const y = Math.floor((aimY - top) / size * 128);
+    if (x < 0 || y < 0 || x >= 128 || y >= 128) return false;
+    return RABBIT_HIT_MASK[y][x] === '1';
   }
 
   function answerLimitMs() {
