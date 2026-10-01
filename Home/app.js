@@ -8,6 +8,7 @@ const panel = document.querySelector(".panel");
 const roleStep = document.getElementById("role-step");
 const modeStep = document.getElementById("mode-step");
 const loginForm = document.getElementById("login-form");
+const enterBtn = loginForm.querySelector('[type="submit"]');
 const credentialSlots = document.getElementById("credential-slots");
 const errorMsg = document.getElementById("error-msg");
 
@@ -37,8 +38,7 @@ loginForm.addEventListener("submit", (event) => {
 // 登入成功後按鈕會保持停用；從下一頁按「上一頁」由 bfcache 還原時要重新打開。
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;
-  const enterBtn = loginForm.querySelector('[type="submit"]');
-  if (enterBtn) enterBtn.disabled = false;
+  enterBtn.disabled = false;
   errorMsg.textContent = "";
 });
 
@@ -235,13 +235,13 @@ async function submitLogin() {
   errorMsg.textContent = message;
   if (message) return;
 
-  const enterBtn = loginForm.querySelector('[type="submit"]');
-  if (enterBtn) enterBtn.disabled = true;
+  enterBtn.disabled = true;
   errorMsg.textContent = "登入中…";
 
   // 已拿到的學生登入結果；沒走完登入流程時要在 finally 登出，避免 token 留在 server 上。
   const studentResults = [];
   let loggedIn = false;
+  const dual = state.mode === "dual";
   // 雙人模式下正在登入第幾位學生，錯誤訊息用來加前綴；0 表示不在登入步驟。
   let loginSlot = 0;
 
@@ -261,13 +261,11 @@ async function submitLogin() {
       return;
     }
 
-    const dual = state.mode === "dual";
-    const count = dual ? 2 : 1;
-    for (let index = 0; index < count; index += 1) {
+    for (const [index, account] of accounts.entries()) {
       loginSlot = index + 1;
       const result = await WedGameApi.loginStudent(
-        accounts[index].username,
-        accounts[index].password
+        account.username,
+        account.password
       );
       if (!result) {
         errorMsg.textContent = dual
@@ -290,15 +288,14 @@ async function submitLogin() {
     loggedIn = true;
     location.href = "../Select/index.html";
   } catch (err) {
-    const prefix =
-      state.mode === "dual" && loginSlot ? `學生 ${loginSlot}：` : "";
+    const prefix = dual && loginSlot ? `學生 ${loginSlot}：` : "";
     errorMsg.textContent = `${prefix}${backendErrorMessage(err)}`;
   } finally {
+    // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
     if (!loggedIn) {
       studentResults.forEach((result) => WedGameApi.logout(result.token));
+      enterBtn.disabled = false;
     }
-    // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
-    if (enterBtn && !loggedIn) enterBtn.disabled = false;
   }
 }
 
