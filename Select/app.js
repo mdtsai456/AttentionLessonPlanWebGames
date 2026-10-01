@@ -1,6 +1,7 @@
 // =============================================================================
 // Select / 學生選遊戲頁
-// 列出五個遊戲與進度條（0 / 50 / 100），點選後按 ENTER 開始。
+// 單人：五個遊戲、一條進度。雙人：左右各一份選單（不含指令出擊），
+// 各自看自己當天的進度；兩邊都按 ENTER 且選同一個遊戲才進入。
 // 進度依後端該生當天場次：DCCS 只打完前 3 關為 50%，打完後段或其它遊戲為 100%。
 // =============================================================================
 
@@ -13,17 +14,52 @@ const GAMES = [
   { id: "InstructionGame", name: "指令出擊" },
 ];
 
+/** 雙人沒有指令出擊。 */
+const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
+
+const ROUTES = {
+  DCCS: {
+    single: "../tutorial/DCCS_tutorial.html",
+    double: "../tutorial/DCCS_double_tutorial.html",
+  },
+  EFT: {
+    single: "../tutorial/DAT_tutorial.html",
+    double: "../tutorial/DAT_double_tutorial.html",
+  },
+  DAT: {
+    single: "../tutorial/EFT_tutorial.html",
+    double: "../tutorial/EFT_double_tutorial.html",
+  },
+  TGame: {
+    single: "../tutorial/TGame_tutorial.html",
+    double: "../tutorial/TGame_double_tutorial.html",
+  },
+  InstructionGame: {
+    single: "../tutorial/InstructionGame_tutorial.html",
+    double: "../tutorial/InstructionGame_tutorial.html",
+  },
+};
+
 /** 進度只允許這三個值；其他數字會被正規化到最接近的一檔。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
+const isDouble = ["double", "dual"].includes(sessionStorage.getItem("game_mode") || "single");
+
+const singleStage = document.getElementById("single-stage");
+const dualStage = document.getElementById("dual-stage");
 const gameList = document.getElementById("game-list");
 const errorMsg = document.getElementById("error-msg");
 const enterBtn = document.getElementById("enter-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
 const state = {
-  selectedGameId: null, // 目前選到的遊戲 id，尚未選擇時為 null
-  progressByGame: {}, // { [gameId]: 0 | 50 | 100 }
+  selectedGameId: null,
+  progressByGame: {},
+};
+
+const players = {
+  1: { selectedGameId: null, confirmed: false, progressByGame: {} },
+  2: { selectedGameId: null, confirmed: false, progressByGame: {} },
 };
 
 init();
@@ -31,32 +67,54 @@ init();
 /** 進頁後先拉進度，再把遊戲列表畫出來；同時查手錶專心判定。 */
 async function init() {
   celebrateAttention();
-  state.progressByGame = await fetchStudentProgress();
+  if (isDouble) {
+    singleStage.hidden = true;
+    dualStage.hidden = false;
+    const [progress1, progress2] = await Promise.all([
+      fetchStudentProgress(1),
+      fetchStudentProgress(2),
+    ]);
+    players[1].progressByGame = progress1;
+    players[2].progressByGame = progress2;
+    renderPlayerGames(1);
+    renderPlayerGames(2);
+    return;
+  }
+
+  dualStage.hidden = true;
+  state.progressByGame = await fetchStudentProgress(1);
   renderGames();
 }
 
-/**
- * 依 GAMES 畫出每列：遊戲按鈕 + 進度條。
- * 50% 會點亮中間勾、100% 會點亮終點勾。
- */
 function renderGames() {
-  gameList.innerHTML = GAMES.map((game) => {
-    const percent = normalizeProgress(state.progressByGame[game.id]);
-    return `
-      <article class="game-item" data-game-id="${game.id}">
-        <button type="button" class="btn btn-game" data-select-game="${game.id}">
-          ${game.name}
-        </button>
-        <div class="progress-row" aria-label="${game.name}進度 ${percent}%">
-          <div class="progress-track" data-progress="${percent}">
-            <div class="progress-fill"></div>
-            <span class="progress-mark mark-mid${percent === 50 ? " is-reached" : ""}">✓</span>
-            <span class="progress-mark mark-end${percent === 100 ? " is-reached" : ""}">✓</span>
-          </div>
+  gameList.innerHTML = GAMES.map((game) => gameCard(game, state.progressByGame)).join("");
+}
+
+function renderPlayerGames(slot) {
+  const list = dualStage.querySelector(`[data-game-list="${slot}"]`);
+  const player = players[slot];
+  list.innerHTML = DUO_GAMES.map((game) => gameCard(game, player.progressByGame)).join("");
+  list.querySelectorAll("[data-select-game]").forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.selectGame === player.selectedGameId);
+  });
+}
+
+function gameCard(game, progressByGame) {
+  const percent = normalizeProgress(progressByGame[game.id]);
+  return `
+    <article class="game-item" data-game-id="${game.id}">
+      <button type="button" class="btn btn-game" data-select-game="${game.id}">
+        ${game.name}
+      </button>
+      <div class="progress-row" aria-label="${game.name}進度 ${percent}%">
+        <div class="progress-track" data-progress="${percent}">
+          <div class="progress-fill"></div>
+          <span class="progress-mark mark-mid${percent === 50 ? " is-reached" : ""}">✓</span>
+          <span class="progress-mark mark-end${percent === 100 ? " is-reached" : ""}">✓</span>
         </div>
-      </article>
-    `;
-  }).join("");
+      </div>
+    </article>
+  `;
 }
 
 gameList.addEventListener("click", (event) => {
@@ -69,6 +127,23 @@ enterBtn.addEventListener("click", () => {
   enterSelectedGame();
 });
 
+dualStage.addEventListener("click", (event) => {
+  const panel = event.target.closest("[data-player]");
+  if (!panel) return;
+  const slot = Number(panel.dataset.player);
+  if (event.target.closest("[data-wait]")) {
+    cancelConfirm(slot);
+    return;
+  }
+  if (players[slot].confirmed) return;
+  const button = event.target.closest("[data-select-game]");
+  if (button) {
+    selectPlayerGame(slot, button.dataset.selectGame);
+    return;
+  }
+  if (event.target.closest("[data-enter]")) confirmPlayer(slot);
+});
+
 logoutBtn.addEventListener("click", async () => {
   logoutBtn.disabled = true;
   try {
@@ -79,7 +154,6 @@ logoutBtn.addEventListener("click", async () => {
   }
 });
 
-/** 記錄選到的遊戲，並只讓該顆按鈕呈現按下狀態。 */
 function selectGame(gameId) {
   state.selectedGameId = gameId;
   errorMsg.textContent = "";
@@ -88,88 +162,81 @@ function selectGame(gameId) {
   });
 }
 
-/** 確認已選遊戲後組 payload；目前只 log，之後改呼叫開始遊戲 API。 */
-async function enterSelectedGame() {
+function selectPlayerGame(slot, gameId) {
+  players[slot].selectedGameId = gameId;
+  playerError(slot).textContent = "";
+  const list = dualStage.querySelector(`[data-game-list="${slot}"]`);
+  list.querySelectorAll("[data-select-game]").forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.selectGame === gameId);
+  });
+}
+
+function confirmPlayer(slot) {
+  const player = players[slot];
+  if (!player.selectedGameId) {
+    playerError(slot).textContent = "請先選擇一個遊戲";
+    return;
+  }
+  player.confirmed = true;
+  playerError(slot).textContent = "";
+  dualStage.querySelector(`[data-wait="${slot}"]`).hidden = false;
+  tryLaunch();
+}
+
+function cancelConfirm(slot) {
+  players[slot].confirmed = false;
+  dualStage.querySelector(`[data-wait="${slot}"]`).hidden = true;
+}
+
+function tryLaunch() {
+  if (!players[1].confirmed || !players[2].confirmed) return;
+  if (players[1].selectedGameId !== players[2].selectedGameId) {
+    cancelConfirm(1);
+    cancelConfirm(2);
+    playerError(1).textContent = "請選擇同一個遊戲";
+    playerError(2).textContent = "請選擇同一個遊戲";
+    return;
+  }
+  goToGame(players[1].selectedGameId, true);
+}
+
+function playerError(slot) {
+  return dualStage.querySelector(`[data-error="${slot}"]`);
+}
+
+function enterSelectedGame() {
   if (!state.selectedGameId) {
     errorMsg.textContent = "請先選擇一個遊戲";
     return;
   }
-
-  const game = GAMES.find((item) => item.id === state.selectedGameId);
-  const payload = {
-    gameId: game.id,
-    gameName: game.name,
-    progress: normalizeProgress(state.progressByGame[game.id]),
-  };
-
-  // -------------------------------------------------------------------------
-  // 後端接點：開始遊戲（之後接 API 時改這裡即可）
-  //
-  // 建議：POST /api/games/start
-  // payload 範例：
-  // {
-  //   gameId: "DAT",
-  //   gameName: "漂浮泡泡",
-  //   progress: 50   // 只會是 0 / 50 / 100
-  // }
-  //
-  // const response = await fetch("/api/games/start", {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify(payload),
-  // });
-  // if (!response.ok) {
-  //   errorMsg.textContent = "無法開始遊戲，請稍後再試";
-  //   return;
-  // }
-  // const data = await response.json();
-  // location.href = data.redirectUrl;
-  // -------------------------------------------------------------------------
-
-  console.log("[start game payload 待接後端]", payload);
   errorMsg.textContent = "";
-
-  const storedMode = sessionStorage.getItem("game_mode") || "single";
-  const isDouble = storedMode === "double" || storedMode === "dual";
-  const ROUTES = {
-    DCCS: {
-      single: "../tutorial/DCCS_tutorial.html",
-      double: "../tutorial/DCCS_double_tutorial.html",
-    },
-    EFT: {
-      single: "../tutorial/DAT_tutorial.html",
-      double: "../tutorial/DAT_double_tutorial.html",
-    },
-    DAT: {
-      single: "../tutorial/EFT_tutorial.html",
-      double: "../tutorial/EFT_double_tutorial.html",
-    },
-    TGame: {
-      single: "../tutorial/TGame_tutorial.html",
-      double: "../tutorial/TGame_double_tutorial.html",
-    },
-    InstructionGame: {
-      single: "../tutorial/InstructionGame_tutorial.html",
-      double: "../tutorial/InstructionGame_tutorial.html",
-    },
-  };
-  const pages = ROUTES[game.id];
-  if (pages) {
-    location.href = isDouble ? pages.double : pages.single;
-    return;
-  }
-  errorMsg.textContent = "這個遊戲尚未開放";
+  goToGame(state.selectedGameId, false);
 }
 
-function emptyProgress() {
-  return GAMES.reduce((result, game) => {
+function goToGame(gameId, doubleMode) {
+  const pages = ROUTES[gameId];
+  if (!pages) {
+    const message = "這個遊戲尚未開放";
+    if (doubleMode) {
+      playerError(1).textContent = message;
+      playerError(2).textContent = message;
+    } else {
+      errorMsg.textContent = message;
+    }
+    return;
+  }
+  location.href = doubleMode ? pages.double : pages.single;
+}
+
+function emptyProgress(games = GAMES) {
+  return games.reduce((result, game) => {
     result[game.id] = 0;
     return result;
   }, {});
 }
 
-function progressFromRecords(records, day) {
-  const progress = emptyProgress();
+function progressFromRecords(records, day, games = GAMES) {
+  const progress = emptyProgress(games);
   const targetDay = Number(day);
   records.forEach((record) => {
     if (Number(record.currentDay) !== targetDay) return;
@@ -183,13 +250,18 @@ function progressFromRecords(records, day) {
   return progress;
 }
 
-/** 讀取這位學生當天五個遊戲的進度。 */
-async function fetchStudentProgress() {
-  const progress = emptyProgress();
-  const token = sessionStorage.getItem("student1_token") || sessionStorage.getItem("token");
-  const studentKey = sessionStorage.getItem("student1_key");
-  const school = sessionStorage.getItem("student1_school") || sessionStorage.getItem("school");
-  const day = sessionStorage.getItem("student1_day") || sessionStorage.getItem("current_day") || "1";
+/** 讀取這位學生當天的進度。slot 1 用 student1_*，slot 2 用 student2_*。 */
+async function fetchStudentProgress(slot) {
+  const games = isDouble ? DUO_GAMES : GAMES;
+  const progress = emptyProgress(games);
+  const token = sessionStorage.getItem(`student${slot}_token`)
+    || (slot === 1 ? sessionStorage.getItem("token") : "");
+  const studentKey = sessionStorage.getItem(`student${slot}_key`);
+  const school = sessionStorage.getItem(`student${slot}_school`)
+    || (slot === 1 ? sessionStorage.getItem("school") : "");
+  const day = sessionStorage.getItem(`student${slot}_day`)
+    || (slot === 1 ? sessionStorage.getItem("current_day") || sessionStorage.getItem("currentDay") : "")
+    || "1";
 
   if (!token || !studentKey || !school) return progress;
 
@@ -200,7 +272,7 @@ async function fetchStudentProgress() {
     );
     if (!res.ok) return progress;
     const body = await res.json();
-    return progressFromRecords(body.records || [], day);
+    return progressFromRecords(body.records || [], day, games);
   } catch (_err) {
     return progress;
   }

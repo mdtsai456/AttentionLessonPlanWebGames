@@ -4,42 +4,82 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WedGame · 學生進度</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <button type="button" class="btn btn-logout" id="logout-btn">登出</button>
-    <main class="stage">
-      <section class="panel" aria-label="學生進度">
-        <h1 class="title">學生進度</h1>
-        <p class="label">選擇學生與天數，查看當日五個遊戲進度</p>
-
-        <div class="filters">
-          <label class="field">
-            <span class="field-label">選擇學生</span>
-            <select id="student-select">
+    <div class="dms-wrapper">
+      <header class="top-navbar">
+        <div class="brand">
+          <h2>Attention Lesson Plan</h2>
+          <span class="badge">學生進度</span>
+        </div>
+        <div class="nav-controls">
+          <div class="teacher-identity">
+            <strong id="view-teacher-name">--</strong>
+            <span id="view-teacher-school" class="badge-muted">--</span>
+          </div>
+          <div class="select-group">
+            <select id="student-select" aria-label="選擇學生">
               <option value="">請選擇學生</option>
             </select>
-          </label>
-
-          <div class="field">
-            <span class="field-label">選擇第幾天</span>
-            <div class="day-row" id="day-row" role="group" aria-label="選擇第幾天"></div>
           </div>
+          <button type="button" class="btn-text" id="logout-btn">登出</button>
+        </div>
+      </header>
+
+      <main class="content-area">
+        <div id="empty-hint" class="empty-card">
+          <h3>請於上方選取學生</h3>
+          <p>選好學生後，再選第 1 到第 24 天，當天五個遊戲的成績會直接展開。</p>
         </div>
 
-        <div class="game-list" id="game-list"></div>
-        <p class="hint" id="empty-hint">請先選擇學生與天數</p>
-      </section>
-    </main>
-    <script>
-      window.API_BASE_URL = "http://127.0.0.1:5001/api";
-    </script>
+        <div id="report-view" hidden>
+          <section class="meta-card">
+            <div>
+              <h2 id="view-student-key">--</h2>
+              <p id="view-school-name" class="meta-sub">--</p>
+            </div>
+            <div class="meta-stats">
+              <div>累計施測場次：<strong id="view-total-sessions">0</strong> 次</div>
+              <div>最後評測時間：<span id="view-last-played">--</span></div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <h3 class="section-title">選擇第幾天</h3>
+            <div class="day-row" id="day-row" role="group" aria-label="選擇第幾天"></div>
+            <p id="day-prompt" class="day-prompt">請選擇第幾天，查看當天成績。</p>
+          </section>
+
+          <div id="day-detail" hidden>
+            <section class="section-card">
+              <h3 class="section-title" id="day-title">當天遊戲</h3>
+              <div id="game-list" class="cards-grid"></div>
+            </section>
+
+            <section class="section-card">
+              <h3 class="section-title">當天施測明細</h3>
+              <div class="table-container">
+                <table class="report-table">
+                  <thead>
+                    <tr>
+                      <th>遊戲</th>
+                      <th>模式</th>
+                      <th>正確率</th>
+                      <th>答對 / 答錯</th>
+                      <th>耗時</th>
+                      <th>關卡</th>
+                      <th>開始時間</th>
+                    </tr>
+                  </thead>
+                  <tbody id="records-tbody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
     <script src="../shared/session-timeout.js"></script>
     <script src="../shared/api.js"></script>
     <script src="app.js"></script>

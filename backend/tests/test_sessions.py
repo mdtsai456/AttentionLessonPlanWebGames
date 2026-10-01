@@ -210,11 +210,27 @@ def test_post_session_without_mode_defaults_to_single(write_calls):
     assert write_calls[0]["pair_id"] is None
 
 
-def test_post_session_double_mode_rejects_non_capable_game(write_calls):
+def test_post_session_double_mode_accepts_tgame(write_calls):
     payload = dccs_payload()
     payload["lessonId"] = "lesson25_TGame"
     for stat in payload["data"]["stats"]:
         stat["apiname"] = stat["apiname"].replace("DCCS_", "TGame_")
+    payload["data"]["mode"] = "double"
+    payload["data"]["pairId"] = "p1"
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 201
+    assert write_calls[0]["mode"] == "double"
+    assert write_calls[0]["game_type"] == "TGAME"
+
+
+def test_post_session_double_mode_rejects_non_capable_game(write_calls):
+    payload = dccs_payload()
+    payload["lessonId"] = "lesson25_IM"
+    for stat in payload["data"]["stats"]:
+        stat["apiname"] = stat["apiname"].replace("DCCS_", "IM_")
     payload["data"]["mode"] = "double"
     payload["data"]["pairId"] = "p1"
 

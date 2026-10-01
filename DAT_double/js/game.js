@@ -368,7 +368,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       sessionStorage.getItem(isP1 ? "student1_case" : "student2_case") ||
       (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey) ||
       (isP1 ? "S01" : "S02");
-    const currentDay = parseInt(sessionStorage.getItem("current_day") || "1", 10);
+    const currentDay = parseInt(
+      sessionStorage.getItem(isP1 ? "student1_day" : "student2_day")
+        || (isP1 ? sessionStorage.getItem("current_day") : "")
+        || "1",
+      10
+    );
 
     const payload = {
       lessonId: "1140908_EFT",
@@ -476,7 +481,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       sessionStorage.getItem(isP1 ? 'student1_case' : 'student2_case') ||
       (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
       (isP1 ? 'S01' : 'S02');
-    const currentDay = parseInt(sessionStorage.getItem('current_day') || '1', 10);
+    const currentDay = parseInt(
+      sessionStorage.getItem(isP1 ? 'student1_day' : 'student2_day')
+        || (isP1 ? sessionStorage.getItem('current_day') : '')
+        || '1',
+      10
+    );
     await sendSessionToApi({
       lessonId: '1140908_EFT',
       data: {

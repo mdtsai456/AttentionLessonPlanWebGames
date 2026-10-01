@@ -14,7 +14,7 @@
   </head>
   <body>
     <button type="button" class="btn btn-logout" id="logout-btn">登出</button>
-    <main class="stage">
+    <main class="stage" id="single-stage">
       <section class="panel" aria-label="選擇遊戲">
         <h1 class="title">選擇遊戲</h1>
         <p class="label">請選擇要遊玩的遊戲</p>
@@ -25,9 +25,24 @@
         <button type="button" class="btn btn-enter" id="enter-btn">ENTER</button>
       </section>
     </main>
-    <script>
-      window.API_BASE_URL = "http://127.0.0.1:5001/api";
-    </script>
+    <main class="stage stage-dual" id="dual-stage" hidden>
+      <section class="panel player-panel" data-player="1" aria-label="玩家 1 選擇遊戲">
+        <h1 class="title">玩家 1</h1>
+        <p class="label">請選擇要遊玩的遊戲</p>
+        <div class="game-list" data-game-list="1"></div>
+        <p class="error" data-error="1" role="alert"></p>
+        <button type="button" class="btn btn-enter" data-enter="1">ENTER</button>
+        <button type="button" class="wait-mask" data-wait="1" hidden>等待玩家二確認</button>
+      </section>
+      <section class="panel player-panel" data-player="2" aria-label="玩家 2 選擇遊戲">
+        <h1 class="title">玩家 2</h1>
+        <p class="label">請選擇要遊玩的遊戲</p>
+        <div class="game-list" data-game-list="2"></div>
+        <p class="error" data-error="2" role="alert"></p>
+        <button type="button" class="btn btn-enter" data-enter="2">ENTER</button>
+        <button type="button" class="wait-mask" data-wait="2" hidden>等待玩家一確認</button>
+      </section>
+    </main>
     <script src="../shared/session-timeout.js"></script>
     <script src="../shared/api.js"></script>
     <script src="../shared/fireworks.js"></script>

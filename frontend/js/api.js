@@ -5,7 +5,7 @@
 // 2. 沒設定時，依目前頁面的 hostname 自動判斷：本機開發（localhost/127.0.0.1）
 //    用同 hostname 換成後端的 5001 port；其他情況一律指向正式部署的 Zeabur。
 const DEV_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
-const PROD_API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app/api";
+const PROD_API_BASE_URL = "https://attention-lesson-plan-data.zeabur.app/api";
 
 function resolveBaseUrl() {
   if (window.API_BASE_URL) return window.API_BASE_URL;

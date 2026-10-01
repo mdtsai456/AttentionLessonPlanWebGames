@@ -8,7 +8,7 @@
     if (DEV_HOSTS[hostname]) {
       return `${protocol}//${hostname}:5001/api`;
     }
-    return "https://attention-lesson-plan-transfer-data.zeabur.app/api";
+    return "https://attention-lesson-plan-data.zeabur.app/api";
   }
 
   async function postJson(path, body) {
