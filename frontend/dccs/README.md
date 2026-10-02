@@ -106,3 +106,18 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 送不出去時整包 JSON 暫存在瀏覽器的 `localStorage`（key 前綴
 `dccs_pending_`）。**下次開啟遊戲時會自動重送**（每次載入只跑一次，成功的
 才刪掉），所以後端或資料庫短暫不通都不會掉資料。
+
+## 5. 已知問題
+
+### 雙人版的開始畫面目前不會出現（2026-10-02）
+
+`double.html` 的 `#shared-title`（「賽道攔截／按 Enter 或空白鍵開始」）只在
+兩個玩家都進入 `title` 階段時顯示（`js/double.js` 的 `handlePlayerPhase`）。
+但兩個 `mountDCCS` 實例都設了 `autoStart: true`，依 `SPEC.md` 4.15 節
+`autoStart` 會略過標題畫面、不發出 `title` 階段，所以這個畫面永遠不會出現。
+實際流程是：共用教學 → 按 Enter → 直接進第 1 關。
+
+這是照規格運作的結果，不是壞掉。待決定：
+
+- 不需要開始畫面 → 刪掉 `#shared-title` 和 `double.js` 裡相關的程式。
+- 需要開始畫面 → 拿掉 `autoStart`，並確認教學與開始畫面的順序。

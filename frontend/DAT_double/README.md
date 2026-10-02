@@ -1,3 +1,20 @@
+# 已知問題
+
+## 「進入練習模式」按了沒反應，遊戲無法開始（2026-10-02）
+
+- 現象：開 `DAT_double.html`，說明畫面按「進入練習模式」沒有反應。console 有
+  `Cannot read properties of null (reading 'addEventListener')`，位置在
+  `js/main.js` 第 69 行。
+- 原因：`5f7bf9e`（10/01 合併 `origin/dat_assets_api_angel`）把根目錄舊版
+  `DAT_double/js/main.js` 整份蓋到這裡，兩份檔案現在完全一樣。結果：
+  - 第 69 行綁定 `#leave-btn`，但本頁 HTML 沒有這顆按鈕，`getElementById`
+    拿到 `null` 就丟錯。錯誤發生在模組最上層，後面的程式全部沒執行，包含最後的
+    `initDoubleGameWorkflow()`（抓素材、`beginSession()`）。
+  - 合併前這裡的 `main.js` 有綁定 `#start-practice-btn`（按下後隱藏
+    `#tutorial-overlay`），合併後這段不見了。
+- 修法方向：在 `main.js` 補回 `#start-practice-btn` 的綁定，`#leave-btn` 改成
+  找不到就略過（或在 HTML 補上按鈕），再確認素材載入和開局流程正常。
+
 # 09.28 ~ 10.04 (README 更新時間: 9/30)
 ##  更新彩蛋與素材 api 
 - 測試以 s070 做為有素材的範例（原本的圖片加上一些藍色標記）
