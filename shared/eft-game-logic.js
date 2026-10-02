@@ -14,11 +14,12 @@ export function shuffleCopy(items, random = Math.random) {
   return shuffled;
 }
 
-export function createQuestion(random = Math.random) {
+export function createQuestion(random = Math.random, styleCount = EFT_ARROW_STYLES.length) {
+  const availableStyles = Math.max(1, Math.floor(styleCount));
   return {
     direction: random() < 0.5 ? 'right' : 'left',
     opposite: random() < 0.5,
-    style: Math.floor(random() * EFT_ARROW_STYLES.length),
+    style: Math.floor(random() * availableStyles),
   };
 }
 

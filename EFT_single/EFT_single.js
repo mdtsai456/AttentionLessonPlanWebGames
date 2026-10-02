@@ -184,7 +184,13 @@ function bindEvents() {
 }
 
 function preloadGameAssets() {
-    preloadEftAssets().then(startGame).catch(() => {
+    const studentId = sessionStorage.getItem('caseId')
+        || sessionStorage.getItem('student1_case')
+        || 'S001';
+    preloadEftAssets({ studentId }).then((arrowAssets) => {
+        player.setArrowAssets(arrowAssets);
+        startGame();
+    }).catch(() => {
         $('feedback').textContent = '遊戲圖片載入失敗，請重新整理';
     });
 }

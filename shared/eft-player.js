@@ -1,12 +1,17 @@
 import {
-    EFT_ARROW_STYLES,
     createQuestion,
     getArrowAssetPath,
     getExpectedDirection,
     levelAccuracyText,
     shuffleCopy,
 } from './eft-game-logic.js';
-import { getArrowPlaceholderPath, ASSET_OPPOSITE_HINT } from './eft-assets.js';
+import {
+    ASSET_EMPTY_BUBBLE,
+    ASSET_OPPOSITE_HINT,
+    ASSET_TARGET_BUBBLE,
+    DEFAULT_ARROW_STYLE,
+    getArrowPlaceholderPath,
+} from './eft-assets.js';
 
 const STAGE_COUNT = 6;
 const STAGE_MS = 60_000;
@@ -32,6 +37,7 @@ export function createEftPlayer({
     let outcomes = [], reactionSamples = [], answerStartedAt = 0;
     let startTimeMs = 0;
     let stage = 1, stageQuestion = 0, stageStartedAt = 0, stageOutcomes = [], levelAccuracies = [];
+    let arrowAssets = [...DEFAULT_ARROW_STYLE];
     let clockId = 0;
 
     function setEnabled(enabled) {
@@ -64,7 +70,11 @@ export function createEftPlayer({
     }
 
     function makeQuestion() {
-        return createQuestion(random);
+        return createQuestion(random, arrowAssets.length);
+    }
+
+    function setArrowAssets(assets) {
+        arrowAssets = Array.isArray(assets) && assets.length ? [...assets] : [...DEFAULT_ARROW_STYLE];
     }
 
     function shuffle(items) {
@@ -98,11 +108,11 @@ export function createEftPlayer({
 
     function renderMemoryBubbles(field, positions) {
         createBubble(field, positions[0], [
-            { src: 'assets/arrow/目標泡泡.png', zIndex: 0 },
+            { src: ASSET_TARGET_BUBBLE, zIndex: 0 },
         ], '黃色目標泡泡');
         for (let positionIndex = 1; positionIndex < positions.length; positionIndex++) {
             createBubble(field, positions[positionIndex], [
-                { src: 'assets/arrow/空泡泡.png', zIndex: 0 },
+                { src: ASSET_EMPTY_BUBBLE, zIndex: 0 },
             ], '空泡泡');
         }
     }
@@ -110,12 +120,12 @@ export function createEftPlayer({
     function renderAnswerBubbles(field, positions) {
         for (let positionIndex = 0; positionIndex < positions.length; positionIndex++) {
             const direction = positionIndex === 0 ? question.direction : pick(['left', 'right']);
-            const style = positionIndex === 0 ? question.style : Math.floor(random() * EFT_ARROW_STYLES.length);
+            const style = positionIndex === 0 ? question.style : Math.floor(random() * arrowAssets.length);
             const label = `泡泡：${question.opposite ? '紅色虛線，' : ''}箭頭向${direction === 'left' ? '左' : '右'}`;
             const layers = [
-                { src: 'assets/arrow/空泡泡.png', zIndex: 0 },
+                { src: ASSET_EMPTY_BUBBLE, zIndex: 0 },
                 {
-                    src: getArrowPlaceholderPath(style),
+                    src: getArrowPlaceholderPath(style, arrowAssets),
                     zIndex: 1,
                     flipHorizontal: direction === 'right',
                 },
@@ -337,6 +347,7 @@ export function createEftPlayer({
         recordOutcome,
         renderQuestion,
         resetGame,
+        setArrowAssets,
         setEnabled,
         setPhase: (nextPhase) => { phase = nextPhase; },
         shuffle,

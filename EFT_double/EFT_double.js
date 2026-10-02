@@ -90,6 +90,7 @@ function createPlayer(element, keyBindings, playerIndex) {
     return {
         startGame: player.startGame,
         completedStages: player.completedStages,
+        setArrowAssets: player.setArrowAssets,
         saveRun: (stage) => savePlayerRun(player, playerIndex, stage),
     };
 }
@@ -147,7 +148,16 @@ document.getElementById('mid-lobby').addEventListener('click', () => {
 });
 
 // 預載素材後，同時開始兩位玩家的第一題。
-preloadEftAssets({ backgroundAssets: ['assets/background.png'] }).then(() => players.forEach((player) => player.startGame())).catch(() => {
+Promise.all(players.map((player, playerIndex) => preloadEftAssets({
+    studentId: getPlayerIdentity(playerIndex).caseId,
+    backgroundAssets: playerIndex === 0 ? ['assets/background.png'] : [],
+}))).then((arrowAssetsByPlayer) => {
+    players.forEach((player, playerIndex) => {
+        player.setArrowAssets(arrowAssetsByPlayer[playerIndex]);
+        player.startGame();
+    });
+}).catch((error) => {
+    console.error('EFT 雙人載入或啟動失敗：', error);
     document.querySelectorAll('[data-ui="feedback"]').forEach((feedback) => {
         feedback.textContent = '圖片載入失敗，請重新整理';
     });

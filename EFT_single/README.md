@@ -8,7 +8,9 @@
 
 ## 未來素材 API 與圖層組合
 
-目前 API 尚未串接。現行 `shared/eft-assets.js` 依共用箭頭樣式產生完整本地素材清單；單人與雙人都等泡泡與箭頭載入完成後才開始，雙人另外預載背景。未來 API 素材可依下列圖層組合，遊戲開始前先載入並檢查各素材；API 缺少素材時需逐層使用本地資產 fallback。
+箭頭素材由 `shared/eft-assets.js` 呼叫 `GET /api/students/{studentId}/assets` 取得，讀取 `EFT.assets.files` 中的完整 URL。學生編號沿用 `DAT_single` 的格式：例如 `G1_S03` 正規化為 `S003`。雙人版會依兩位玩家各自的 case ID 分別載入，不共用不同學生的素材；相同學生編號可共用該編號的快取請求。
+
+若 API 回傳空陣列、HTTP 錯誤或網路錯誤，使用 `DEFAULT_ARROW_STYLE` 的四個本地箭頭佔位圖。API URL 單張預載失敗時，只將該位置替換成本地對應佔位圖。泡泡、反向提示與箭頭全部預載完成後才開始遊戲，雙人版另預載背景。
 
 | 畫面狀態 | 素材圖層順序 |
 | --- | --- |
@@ -18,6 +20,6 @@
 
 API 預期提供一般氣泡、發光氣泡、反向提示及箭頭素材。箭頭類素材預設一律朝左；需要朝右時由 renderer 將箭頭圖層水平翻轉。顯示箭頭時一律使用一般氣泡，不顯示發光氣泡；反向提示只在題目需要虛線／反向提示時疊加。
 
-Fallback 順序：素材 API 未提供正式素材前，使用目前佔位圖 `assets/arrow/箭頭00.PNG` 至 `箭頭03.PNG` 與 `assets/arrow/反向提示.PNG`；記憶畫面使用 `assets/arrow/目標泡泡.png`（發光目標）與 `assets/arrow/空泡泡.png`（一般氣泡）。正式 API 素材缺少任一必要圖層或載入失敗時，該題回退目前的完整泡泡圖片：一般方向用 `assets/arrow/IMG_*.PNG`，反向題用 `assets/opposite_arrow/IMG_*.PNG`。保留現有資產直到 API 覆蓋率及 fallback 驗收完成。佔位圖目前可能尚未乾淨，正式素材補齊後直接替換，不需為佔位圖增加去背或裁切流程。
+Fallback 順序：API 空清單或請求失敗時使用 `assets/arrow/箭頭00.png` 至 `箭頭03.png`；某個 API URL 無法載入時，只替換成相同索引的本地箭頭。記憶目標使用 `assets/arrow/目標泡泡.png`，非目標與答案底圖使用 `assets/arrow/空泡泡.png`，反向題疊加 `assets/arrow/反向提示.png`。目前不再預載舊的完整箭頭合成圖；正式素材補齊後直接替換佔位圖，不需增加去背或裁切流程。
 
 整合時應以穩定的素材名稱／manifest 作為 API 與 renderer 間的契約，處理載入失敗及快取；所有素材在遊戲開始前載入，不要在每題期間才發出素材請求。現行實作使用 DOM 疊圖，未來若改用 Canvas 再處理高 DPI 繪製。
