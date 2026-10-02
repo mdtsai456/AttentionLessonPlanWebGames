@@ -62,8 +62,8 @@
     const res = await fetch(`${resolveApiBase()}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (res.status === 401 && global.WedGameSession) {
-      global.WedGameSession.expireSession(true);
+    if (res.status === 401 && global.WebGameSession) {
+      global.WebGameSession.expireSession(true);
     }
     return res;
   }
@@ -123,7 +123,7 @@
     return 100;
   }
 
-  global.WedGameApi = {
+  global.WebGameApi = {
     resolveApiBase,
     loginStudent,
     loginTeacher,

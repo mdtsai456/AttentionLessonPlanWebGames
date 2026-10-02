@@ -65,7 +65,7 @@ studentSelect.addEventListener("change", () => {
 logoutBtn.addEventListener("click", async () => {
   logoutBtn.disabled = true;
   try {
-    await WedGameApi.logoutAll();
+    await WebGameApi.logoutAll();
   } finally {
     sessionStorage.clear();
     location.href = "../Home/index.html";
@@ -230,7 +230,7 @@ function renderRecords() {
 }
 
 function gameLabel(gameType) {
-  const id = WedGameApi.mapGameId(gameType);
+  const id = WebGameApi.mapGameId(gameType);
   const game = GAMES.find((item) => item.id === id);
   return game ? game.name : gameType;
 }
@@ -318,7 +318,7 @@ async function fetchStudentReport(studentKey) {
   const school = teacherSchool();
   if (!token || !studentKey || !school) return [];
 
-  const res = await WedGameApi.authGet(
+  const res = await WebGameApi.authGet(
     `/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(school)}`,
     token
   );
@@ -333,7 +333,7 @@ async function fetchTeacherStudents() {
   if (!token) return [];
 
   try {
-    const res = await WedGameApi.authGet("/me/students", token);
+    const res = await WebGameApi.authGet("/me/students", token);
     if (!res.ok) return [];
     const body = await res.json();
     return (body.students || []).map((student) => ({
@@ -353,7 +353,7 @@ function detailFromSessions(sessions, day) {
   const detail = {};
   sessions.forEach((session) => {
     if (Number(session.currentDay) !== Number(day)) return;
-    const gameId = WedGameApi.mapGameId(session.gameType);
+    const gameId = WebGameApi.mapGameId(session.gameType);
     if (!GAMES.some((game) => game.id === gameId)) return;
     const stage = session.stats ? Number(session.stats.stage) : NaN;
     const accuracy = session.stats ? Number(session.stats.accuracy) : NaN;
@@ -398,7 +398,7 @@ function parseLevelAccuracy(stats) {
 function levelsReached(gameId, stage) {
   if (!Number.isFinite(stage) || stage <= 0) return null;
   if (stage <= 6) return stage;
-  const percent = WedGameApi.progressFromRecord(gameId, { stats: { stage } });
+  const percent = WebGameApi.progressFromRecord(gameId, { stats: { stage } });
   return percent >= 100 ? 6 : 3;
 }
 
@@ -406,11 +406,11 @@ function progressFromSessions(sessions, day) {
   const progress = emptyProgress();
   sessions.forEach((session) => {
     if (Number(session.currentDay) !== Number(day)) return;
-    const gameId = WedGameApi.mapGameId(session.gameType);
+    const gameId = WebGameApi.mapGameId(session.gameType);
     if (!Object.prototype.hasOwnProperty.call(progress, gameId)) return;
     progress[gameId] = Math.max(
       progress[gameId],
-      WedGameApi.progressFromRecord(gameId, session)
+      WebGameApi.progressFromRecord(gameId, session)
     );
   });
   return progress;
