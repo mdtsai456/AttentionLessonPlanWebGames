@@ -645,7 +645,7 @@ export function createOverlays(container) {
   );
   const titleEl = buildOverlay(
     'dccs-overlay-title',
-    '<h1>賽道攔截 · DCCS</h1>' +
+    '<h1>賽道攔截</h1>' +
       '<p class="dccs-hint">按 <span class="dccs-kbd">Enter</span> 或 ' +
       '<span class="dccs-kbd">空白鍵</span> 開始</p>' +
       '<p class="dccs-hint dccs-small dccs-title-meta"></p>'
