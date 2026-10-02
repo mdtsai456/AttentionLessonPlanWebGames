@@ -19,16 +19,43 @@
     });
   }
 
+  /**
+   * 401 才是帳密錯誤（回 null）；其他失敗丟出 Error，讓畫面顯示伺服器錯誤。
+   * contact：非 5xx 錯誤時提示該聯絡誰（老師登入失敗時不該提示去找老師）。
+   */
+  async function readLoginResponse(res, contact) {
+    if (res.status === 401) return null;
+    if (!res.ok) {
+      throw new Error(
+        res.status >= 500
+          ? `登入伺服器發生錯誤（HTTP ${res.status}），請稍後再試`
+          : `登入失敗（HTTP ${res.status}），請聯絡${contact}`
+      );
+    }
+    const badFormat = "登入伺服器回應格式錯誤，請稍後再試";
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      // 讀 body 時斷線是 TypeError，原樣丟出讓畫面顯示「後端連不上」。
+      if (err && err.name === "TypeError") throw err;
+      throw new Error(badFormat);
+    }
+    // 2xx 但沒有 token（proxy 回 {}、API 位址設錯等）不能算登入成功。
+    if (!data || typeof data.token !== "string" || !data.token) {
+      throw new Error(badFormat);
+    }
+    return data;
+  }
+
   async function loginStudent(account, password) {
     const res = await postJson("/auth/student/login", { account, password });
-    if (!res.ok) return null;
-    return res.json();
+    return readLoginResponse(res, "老師或管理者");
   }
 
   async function loginTeacher(account, password) {
     const res = await postJson("/auth/teacher/login", { account, password });
-    if (!res.ok) return null;
-    return res.json();
+    return readLoginResponse(res, "管理者");
   }
 
   async function authGet(path, token) {
@@ -44,20 +71,28 @@
   async function logout(token) {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      await fetch(`${resolveApiBase()}/auth/logout`, { method: "POST", headers });
+      // keepalive：登出後常馬上換頁或關分頁，請求仍要送到後端。
+      await fetch(`${resolveApiBase()}/auth/logout`, {
+        method: "POST",
+        headers,
+        keepalive: true,
+      });
     } catch (_err) {
       // 本機狀態仍會清掉，後端失敗不擋登出。
     }
   }
 
-  async function logoutAll() {
-    const tokens = [
+  /** 目前 sessionStorage 裡登入中的 token（去掉空值與重複）。 */
+  function storedTokens() {
+    return [
       sessionStorage.getItem("student1_token"),
       sessionStorage.getItem("student2_token"),
       sessionStorage.getItem("token"),
     ].filter((value, index, list) => value && list.indexOf(value) === index);
+  }
 
-    await Promise.all(tokens.map((token) => logout(token)));
+  async function logoutAll() {
+    await Promise.all(storedTokens().map((token) => logout(token)));
   }
 
   /** 手錶專心判定：回傳 1（專心）或 0。任何失敗都當 0，不擋畫面。 */
@@ -95,6 +130,7 @@
     authGet,
     logout,
     logoutAll,
+    storedTokens,
     fetchAttention,
     mapGameId,
     progressFromRecord,
