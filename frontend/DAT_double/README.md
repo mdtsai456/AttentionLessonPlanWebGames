@@ -19,8 +19,9 @@
     - 「回首頁」「離開」都導向 `../Select/index.html`，`frontend/` 底下沒有這頁（404）。
 - 影響範圍：沒有頁面連到 `frontend/DAT_double/`，學生走的是根目錄
   `DAT_double/`，不受影響。
-- 待決定：`frontend/DAT_double/` 要整份對齊根目錄版（HTML、CSS、`api.js`，
-  以及 `shared/` 和 `Select/` 的路徑），還是退回合併前的版本，或是刪掉。
+- 待決定（追蹤：[#16](https://github.com/mdtsai456/AttentionLessonPlanWebGames/issues/16)）：
+  `frontend/DAT_double/` 要整份對齊根目錄版（HTML、CSS、`api.js`，以及
+  `shared/` 和 `Select/` 的路徑），還是退回合併前的版本，或是刪掉。
 
 # 09.28 ~ 10.04 (README 更新時間: 9/30)
 ##  更新彩蛋與素材 api 

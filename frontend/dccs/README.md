@@ -116,7 +116,7 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 `autoStart` 會略過標題畫面、不發出 `title` 階段，所以這個畫面永遠不會出現。
 實際流程是：共用教學 → 按 Enter → 直接進第 1 關。
 
-這是照規格運作的結果，不是壞掉。待決定：
+這是照規格運作的結果，不是壞掉。待決定（追蹤：[#15](https://github.com/mdtsai456/AttentionLessonPlanWebGames/issues/15)）：
 
 - 不需要開始畫面 → 刪掉 `#shared-title` 和 `double.js` 裡相關的程式。
 - 需要開始畫面 → 拿掉 `autoStart`，並確認教學與開始畫面的順序。
