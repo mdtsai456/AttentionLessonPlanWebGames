@@ -12,8 +12,19 @@
     `initDoubleGameWorkflow()`（抓素材、`beginSession()`）。
   - 合併前這裡的 `main.js` 有綁定 `#start-practice-btn`（按下後隱藏
     `#tutorial-overlay`），合併後這段不見了。
-- 修法方向：在 `main.js` 補回 `#start-practice-btn` 的綁定，`#leave-btn` 改成
-  找不到就略過（或在 HTML 補上按鈕），再確認素材載入和開局流程正常。
+- `js/game.js` 也一起換成了根目錄版本。根目錄版要搭配根目錄的 HTML 和
+  `../shared/*.js` 才能運作，本頁兩者都沒有。所以只補上面兩處，遊戲能開始，
+  但會在後面卡住（2026-10-02 在暫存複本實測與讀程式確認）：
+  - 練習結束後沒有 `#enter-formal-btn`，無法進正式關卡。
+  - 正式關卡第 1 關結束時呼叫 `window.showStageClear`（根目錄
+    `shared/stage-clear.js` 提供），本頁沒有載入，會丟錯並卡住。
+  - 第 3 關結束等 `#mid-break` 面板，本頁沒有，會永遠停在等待。
+  - 「回首頁」「離開」都導向 `../Select/index.html`，`frontend/` 底下沒有這頁（404）。
+- 影響範圍：目前學生實際的流程是 `frontend/index.html` 登入 → 根目錄 `Home/`
+  → `Select/` → `tutorial/DAT_double_tutorial.html` → 根目錄 `DAT_double/`，
+  沒有任何頁面連到 `frontend/DAT_double/`，所以學生玩到的版本是正常的。
+- 待決定：`frontend/DAT_double/` 要整份對齊根目錄版（HTML、CSS、`api.js`，
+  以及 `shared/` 和 `Select/` 的路徑），還是退回合併前的版本，或是刪掉。
 
 # 09.28 ~ 10.04 (README 更新時間: 9/30)
 ##  更新彩蛋與素材 api 
