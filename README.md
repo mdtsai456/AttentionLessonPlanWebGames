@@ -4,7 +4,7 @@
 
 前端服務使用專案根目錄的 `zbpack.json`，以靜態網站模式部署，輸出目錄為 `.`。
 根目錄的 `index.html` 會自動導向 `Home/index.html`，因此直接開啟
-`https://attention-wabgames.zeabur.app/` 即可進入登入頁。
+`https://attention-webgames.zeabur.app/` 即可進入登入頁。
 
 正式後端為 `https://attention-lesson-plan-data.zeabur.app`，前端 API 前綴為
 `https://attention-lesson-plan-data.zeabur.app/api`；本機開發仍使用 `localhost` 或
@@ -13,7 +13,7 @@
 後端 Zeabur 服務的環境變數需允許前端網域：
 
 ```text
-CORS_ALLOW_ORIGINS=https://attention-wabgames.zeabur.app
+CORS_ALLOW_ORIGINS=https://attention-webgames.zeabur.app
 ```
 
 若已允許其他網域，將此前端網域加入逗號分隔的清單。設定後需重新部署或啟動後端。
