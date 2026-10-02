@@ -238,7 +238,7 @@ function createPlayer(element, keyBindings, playerIndex) {
     const avgReactionMs = reactionSamples.length
       ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
       : 0;
-    await fetch(`${window.WedGameApi.resolveApiBase()}/sessions`, {
+    await fetch(`${window.WebGameApi.resolveApiBase()}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

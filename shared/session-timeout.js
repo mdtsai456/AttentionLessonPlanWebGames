@@ -71,8 +71,8 @@
 
   function apiBase() {
     if (global.API_BASE_URL) return global.API_BASE_URL;
-    if (global.WedGameApi && global.WedGameApi.resolveApiBase) {
-      return global.WedGameApi.resolveApiBase();
+    if (global.WebGameApi && global.WebGameApi.resolveApiBase) {
+      return global.WebGameApi.resolveApiBase();
     }
     const hostname = global.location.hostname;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -126,7 +126,7 @@
     }
   }
 
-  global.WedGameSession = {
+  global.WebGameSession = {
     ttlMs: TTL_MS,
     stampLoginExpiry: stampLoginExpiry,
     expireSession: expireSession,

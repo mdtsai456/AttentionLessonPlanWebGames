@@ -3,8 +3,8 @@
  */
 
 function sessionApiOrigin() {
-  if (window.WedGameApi && window.WedGameApi.resolveApiBase) {
-    return window.WedGameApi.resolveApiBase().replace(/\/api$/, "");
+  if (window.WebGameApi && window.WebGameApi.resolveApiBase) {
+    return window.WebGameApi.resolveApiBase().replace(/\/api$/, "");
   }
   const host = location.hostname;
   if (host === "localhost" || host === "127.0.0.1") {

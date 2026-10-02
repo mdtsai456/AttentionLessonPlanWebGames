@@ -147,7 +147,7 @@ dualStage.addEventListener("click", (event) => {
 logoutBtn.addEventListener("click", async () => {
   logoutBtn.disabled = true;
   try {
-    await WedGameApi.logoutAll();
+    await WebGameApi.logoutAll();
   } finally {
     sessionStorage.clear();
     location.href = "../Home/index.html";
@@ -240,11 +240,11 @@ function progressFromRecords(records, day, games = GAMES) {
   const targetDay = Number(day);
   records.forEach((record) => {
     if (Number(record.currentDay) !== targetDay) return;
-    const gameId = WedGameApi.mapGameId(record.gameType);
+    const gameId = WebGameApi.mapGameId(record.gameType);
     if (!Object.prototype.hasOwnProperty.call(progress, gameId)) return;
     progress[gameId] = Math.max(
       progress[gameId],
-      WedGameApi.progressFromRecord(gameId, record)
+      WebGameApi.progressFromRecord(gameId, record)
     );
   });
   return progress;
@@ -266,7 +266,7 @@ async function fetchStudentProgress(slot) {
   if (!token || !studentKey || !school) return progress;
 
   try {
-    const res = await WedGameApi.authGet(
+    const res = await WebGameApi.authGet(
       `/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(school)}`,
       token
     );
@@ -291,7 +291,7 @@ async function celebrateAttention() {
   const tokens = isDouble
     ? [sessionStorage.getItem("student1_token"), sessionStorage.getItem("student2_token")]
     : [sessionStorage.getItem("student1_token") || sessionStorage.getItem("token")];
-  const results = await Promise.all(tokens.map((token) => WedGameApi.fetchAttention(token)));
+  const results = await Promise.all(tokens.map((token) => WebGameApi.fetchAttention(token)));
   if (!results.includes(1)) return;
 
   const message = isDouble

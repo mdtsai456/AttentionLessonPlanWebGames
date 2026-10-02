@@ -200,7 +200,7 @@ function storeTeacherSession(result) {
   sessionStorage.setItem("teacher_id", String(result.teacherId));
   sessionStorage.setItem("teacher_name", result.teacherName);
   sessionStorage.setItem("teacher_school", result.school);
-  window.WedGameSession?.stampLoginExpiry(result.expiresAt);
+  window.WebGameSession?.stampLoginExpiry(result.expiresAt);
 }
 
 function storeStudentSlot(slot, result, day) {
@@ -226,7 +226,7 @@ function storeStudentSession(mode, results, days) {
   sessionStorage.setItem("school", results[0].school);
   sessionStorage.setItem("current_day", String(days[0]));
   sessionStorage.setItem("currentDay", String(days[0]));
-  window.WedGameSession?.stampLoginExpiry(results.map((item) => item.expiresAt));
+  window.WebGameSession?.stampLoginExpiry(results.map((item) => item.expiresAt));
 }
 
 async function submitLogin() {
@@ -248,7 +248,7 @@ async function submitLogin() {
 
   try {
     if (teacher) {
-      const result = await WedGameApi.loginTeacher(
+      const result = await WebGameApi.loginTeacher(
         accounts[0].username,
         accounts[0].password
       );
@@ -260,7 +260,7 @@ async function submitLogin() {
     } else {
       for (const [index, account] of accounts.entries()) {
         loginSlot = index + 1;
-        const result = await WedGameApi.loginStudent(
+        const result = await WebGameApi.loginStudent(
           account.username,
           account.password
         );
@@ -276,7 +276,7 @@ async function submitLogin() {
     }
 
     // 下面會清掉 sessionStorage；已登入的人（例如按上一頁回來）再登入時，舊 token 要先登出。
-    WedGameApi.storedTokens().forEach((token) => WedGameApi.logout(token));
+    WebGameApi.storedTokens().forEach((token) => WebGameApi.logout(token));
     try {
       if (teacher) {
         storeTeacherSession(results[0]);
@@ -297,7 +297,7 @@ async function submitLogin() {
   } finally {
     // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
     if (!loggedIn) {
-      results.forEach((result) => WedGameApi.logout(result.token));
+      results.forEach((result) => WebGameApi.logout(result.token));
       enterBtn.disabled = false;
     }
   }

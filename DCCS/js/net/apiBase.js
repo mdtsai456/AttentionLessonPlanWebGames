@@ -7,8 +7,8 @@ export function resolveApiBase() {
     typeof window !== 'undefined' ? window.API_BASE_URL : null;
   if (override) return String(override).replace(/\/+$/, '');
 
-  if (window.WedGameApi && window.WedGameApi.resolveApiBase) {
-    return window.WedGameApi.resolveApiBase();
+  if (window.WebGameApi && window.WebGameApi.resolveApiBase) {
+    return window.WebGameApi.resolveApiBase();
   }
 
   const host = window.location.hostname;
