@@ -147,7 +147,7 @@ document.getElementById('mid-lobby').addEventListener('click', () => {
 });
 
 // 預載素材後，同時開始兩位玩家的第一題。
-preloadEftAssets({ includeBackground: true }).then(() => players.forEach((player) => player.startGame())).catch(() => {
+preloadEftAssets({ backgroundAssets: ['assets/background.png'] }).then(() => players.forEach((player) => player.startGame())).catch(() => {
     document.querySelectorAll('[data-ui="feedback"]').forEach((feedback) => {
         feedback.textContent = '圖片載入失敗，請重新整理';
     });

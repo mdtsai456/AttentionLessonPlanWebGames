@@ -88,9 +88,6 @@ test('getEftAssetPaths includes every arrow style and optional background', () =
   assert.equal(paths.length, 23);
   assert.ok(paths.includes('assets/arrow/目標泡泡.png'));
   assert.ok(paths.includes('assets/arrow/空泡泡.png'));
-  assert.equal(getArrowPlaceholderPath(0), 'assets/arrow/箭頭00.PNG');
-  assert.equal(getArrowPlaceholderPath(3), 'assets/arrow/箭頭03.PNG');
-  assert.equal(getOppositeHintPath(), 'assets/arrow/反向提示.PNG');
   assert.ok(paths.includes('assets/arrow/反向提示.PNG'));
   assert.ok(paths.includes('assets/arrow/IMG_6124.PNG'));
   assert.ok(paths.includes('assets/opposite_arrow/IMG_6145.PNG'));

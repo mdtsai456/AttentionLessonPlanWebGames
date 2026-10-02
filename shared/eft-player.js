@@ -6,7 +6,7 @@ import {
     levelAccuracyText,
     shuffleCopy,
 } from './eft-game-logic.js';
-import { getArrowPlaceholderPath, getOppositeHintPath } from './eft-assets.js';
+import { getArrowPlaceholderPath, ASSET_OPPOSITE_HINT } from './eft-assets.js';
 
 const STAGE_COUNT = 6;
 const STAGE_MS = 60_000;
@@ -121,7 +121,7 @@ export function createEftPlayer({
                 },
             ];
             if (question.opposite) {
-                layers.push({ src: getOppositeHintPath(), zIndex: 2 });
+                layers.push({ src: ASSET_OPPOSITE_HINT, zIndex: 2 });
             }
             createBubble(field, positions[positionIndex], layers, label);
         }
