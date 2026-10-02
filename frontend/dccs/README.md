@@ -111,8 +111,7 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 
 ### 雙人版的開始畫面目前不會出現（2026-10-02）
 
-`double.html` 的 `#shared-title`（「賽道攔截／按 Enter 或空白鍵開始」）只在
-兩個玩家都進入 `title` 階段時顯示（`js/double.js` 的 `handlePlayerPhase`）。
+`double.html` 的 `#shared-title` 開始畫面只在兩個玩家都進入 `title` 階段時顯示（`js/double.js` 的 `handlePlayerPhase`）。
 但兩個 `mountDCCS` 實例都設了 `autoStart: true`，依 `SPEC.md` 4.15 節
 `autoStart` 會略過標題畫面、不發出 `title` 階段，所以這個畫面永遠不會出現。
 實際流程是：共用教學 → 按 Enter → 直接進第 1 關。
