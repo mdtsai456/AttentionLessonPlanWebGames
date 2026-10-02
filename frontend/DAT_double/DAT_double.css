@@ -314,12 +314,15 @@ button:disabled {
 
 /* 結算畫面 */
 .overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 5;
-  background: #67442975;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .result-card {
@@ -395,19 +398,67 @@ button:disabled {
   gap: 1cqw;
 }
 
-
-/* 補充在 DAT_double.css 底部 */
-
-/* 教學說明書 Overlay 樣式 */
 .tutorial-card {
-  width: 80%;
-  max-width: 900px;
-  padding: 3cqw;
-  border: .5cqw solid #fff;
-  border-radius: 3cqw;
+  width: 90%;
+  max-width: 860px;
+  max-height: 88vh;
   background: #fff8e9;
+  border: 4px solid #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  padding: 20px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+}
+
+.tutorial-card h1 {
+  margin: 0 0 14px 0;
+  font-size: 1.6rem;
+  color: #4a2e18;
   text-align: center;
-  box-shadow: 0 1cqw 3cqw rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.tutorial-card .instructions-content {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.tutorial-card .instruction-col {
+  flex: 1;
+}
+
+.tutorial-card .rule-box {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0 18px;
+  padding: 10px 16px;
+}
+
+.tutorial-card #start-practice-btn,
+.tutorial-card button.primary {
+  display: inline-block;
+  position: static;
+  margin: 0 auto;
+  transform: none;
+  flex-shrink: 0;
+  padding: 10px 36px;
+  font-size: 1.15rem;
+  border-radius: 999px;
+  background: #2ea44f;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
+.tutorial-card #start-practice-btn {
+  margin: 12px auto 4px;
+  display: inline-block;
 }
 
 .tutorial-card h1 {
