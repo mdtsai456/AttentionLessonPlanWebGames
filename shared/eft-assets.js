@@ -41,7 +41,9 @@ export function getArrowAssets(studentId = 'S001') {
             const arrowAssets = Array.isArray(files)
                 ? files.filter((file) => typeof file === 'string' && file.trim()).map((file) => file.trim())
                 : [];
-            return arrowAssets.length ? arrowAssets : defaultArrowAssets();
+            return arrowAssets.length
+                ? [DEFAULT_ARROW_STYLE[0], ...arrowAssets]
+                : defaultArrowAssets();
         } catch {
             return defaultArrowAssets();
         }

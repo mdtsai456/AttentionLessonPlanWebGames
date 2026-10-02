@@ -38,6 +38,7 @@ export function createEftPlayer({
     let startTimeMs = 0;
     let stage = 1, stageQuestion = 0, stageStartedAt = 0, stageOutcomes = [], levelAccuracies = [];
     let arrowAssets = [...DEFAULT_ARROW_STYLE];
+    let arrowStyleIndex = 0, consecutiveCorrect = 0;
     let clockId = 0;
 
     function setEnabled(enabled) {
@@ -70,11 +71,13 @@ export function createEftPlayer({
     }
 
     function makeQuestion() {
-        return createQuestion(random, arrowAssets.length);
+        return { ...createQuestion(random, arrowAssets.length), style: arrowStyleIndex };
     }
 
     function setArrowAssets(assets) {
         arrowAssets = Array.isArray(assets) && assets.length ? [...assets] : [...DEFAULT_ARROW_STYLE];
+        arrowStyleIndex = 0;
+        consecutiveCorrect = 0;
     }
 
     function shuffle(items) {
@@ -120,7 +123,7 @@ export function createEftPlayer({
     function renderAnswerBubbles(field, positions) {
         for (let positionIndex = 0; positionIndex < positions.length; positionIndex++) {
             const direction = positionIndex === 0 ? question.direction : pick(['left', 'right']);
-            const style = positionIndex === 0 ? question.style : Math.floor(random() * arrowAssets.length);
+            const style = arrowStyleIndex;
             const label = `泡泡：${question.opposite ? '紅色虛線，' : ''}箭頭向${direction === 'left' ? '左' : '右'}`;
             const layers = [
                 { src: ASSET_EMPTY_BUBBLE, zIndex: 0 },
@@ -209,6 +212,8 @@ export function createEftPlayer({
         stageStartedAt = 0;
         stageOutcomes = [];
         levelAccuracies = [];
+        arrowStyleIndex = 0;
+        consecutiveCorrect = 0;
         setEnabled(false);
         getUi('bubble-field').replaceChildren();
         delete panel.dataset.result;
@@ -230,7 +235,17 @@ export function createEftPlayer({
         reactionSamples.push(reactionMs);
         outcomes.push(correct);
         stageOutcomes.push(correct);
-        if (correct) score++;
+        if (correct) {
+            score++;
+            consecutiveCorrect++;
+            if (consecutiveCorrect === 5) {
+                arrowStyleIndex = Math.min(arrowStyleIndex + 1, arrowAssets.length - 1);
+                consecutiveCorrect = 0;
+            }
+        } else {
+            consecutiveCorrect = 0;
+            arrowStyleIndex = Math.max(arrowStyleIndex - 1, 0);
+        }
         index++;
         getUi('score').textContent = `${score} 分`;
         updateProgress();
@@ -324,6 +339,8 @@ export function createEftPlayer({
             stageStartedAt,
             stageOutcomes: [...stageOutcomes],
             levelAccuracies: [...levelAccuracies],
+            arrowStyleIndex,
+            consecutiveCorrect,
         };
     }
 

@@ -6,7 +6,7 @@
 
 單人與雙人頁共用 `shared/eft-player.js` 的單一玩家流程：題目產生、記憶／作答畫面、限時、計分與逐關結果。單人只建立一個 player；雙人建立兩個互相隔離的 player，再由頁面協調兩人的過關與中場等待。玩家控制器透過 UI selector adapter 與 stage-end callback 接合頁面，不將雙人同步或存檔身份放進共用核心。
 
-## 未來素材 API 與圖層組合
+## 素材 API 與圖層組合
 
 箭頭素材由 `shared/eft-assets.js` 呼叫 `GET /api/students/{studentId}/assets` 取得，讀取 `EFT.assets.files` 中的完整 URL。學生編號沿用 `DAT_single` 的格式：例如 `G1_S03` 正規化為 `S003`。雙人版會依兩位玩家各自的 case ID 分別載入，不共用不同學生的素材；相同學生編號可共用該編號的快取請求。
 
@@ -20,6 +20,8 @@
 
 API 預期提供一般氣泡、發光氣泡、反向提示及箭頭素材。箭頭類素材預設一律朝左；需要朝右時由 renderer 將箭頭圖層水平翻轉。顯示箭頭時一律使用一般氣泡，不顯示發光氣泡；反向提示只在題目需要虛線／反向提示時疊加。
 
-Fallback 順序：API 空清單或請求失敗時使用 `assets/arrow/箭頭00.png` 至 `箭頭03.png`；某個 API URL 無法載入時，只替換成相同索引的本地箭頭。記憶目標使用 `assets/arrow/目標泡泡.png`，非目標與答案底圖使用 `assets/arrow/空泡泡.png`，反向題疊加 `assets/arrow/反向提示.png`。目前不再預載舊的完整箭頭合成圖；正式素材補齊後直接替換佔位圖，不需增加去背或裁切流程。
+箭頭樣式依每位玩家獨立記錄：起始使用本地綠色 `箭頭00.png`，其後依 API `files` 順序前進。連續答對 5 題升一級，答錯或漏答降一級；素材到最後一種後維持該樣式，不循環。API 清單為空或請求失敗時使用完整本地 `箭頭00.png` 至 `箭頭03.png` 序列。雙人版的連擊與樣式索引互相獨立。
+
+Fallback 順序：API 空清單或請求失敗時使用 `assets/arrow/箭頭00.png` 至 `箭頭03.png`；某個 API URL 無法載入時，只替換成相同索引的本地箭頭。記憶目標使用 `assets/arrow/目標泡泡.png`，非目標與答案底圖使用 `assets/arrow/空泡泡.png`，反向題疊加 `assets/arrow/反向提示.png`。
 
 整合時應以穩定的素材名稱／manifest 作為 API 與 renderer 間的契約，處理載入失敗及快取；所有素材在遊戲開始前載入，不要在每題期間才發出素材請求。現行實作使用 DOM 疊圖，未來若改用 Canvas 再處理高 DPI 繪製。
