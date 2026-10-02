@@ -113,7 +113,7 @@ function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
 }
 
 function drawTick(ctx, vx, vy, w, h) {
-  const cx = vx + w * 0.90;
+  const cx = vx + w * 0.80;
   const cy = vy + h * 0.08;
   const r = h * 0.045;
 

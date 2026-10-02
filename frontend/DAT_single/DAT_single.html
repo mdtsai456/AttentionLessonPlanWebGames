@@ -31,17 +31,17 @@
       <img class="crosshair" id="crosshair" src="assets/crosshair.png" alt="玩家準心" draggable="false">
     </div>
     <section class="answer-panel" aria-label="作答區">
-      <p class="rule">方向鍵 / WASD 移動準心 · 正確按空白鍵，不正確不按</p>
+      <p class="rule">WASD 移動準心 · 正確按空白鍵，不正確不按</p>
       <p id="feedback" role="status" aria-live="polite">素材載入中…</p>
       <div class="answer-buttons">
         <button class="capture" id="answer-true" type="button" disabled>正確 <span>空白鍵 / 點選</span></button>
       </div>
     </section>
     <div class="movement" aria-label="準心方向控制">
-      <button data-move="up" aria-label="準心向上">↑</button>
-      <button data-move="left" aria-label="準心向左">←</button>
-      <button data-move="down" aria-label="準心向下">↓</button>
-      <button data-move="right" aria-label="準心向右">→</button>
+      <button data-move="up" aria-label="準心向上">W</button>
+      <button data-move="left" aria-label="準心向左">A</button>
+      <button data-move="down" aria-label="準心向下">S</button>
+      <button data-move="right" aria-label="準心向右">D</button>
     </div>
     <div class="overlay" id="results" hidden>
       <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
