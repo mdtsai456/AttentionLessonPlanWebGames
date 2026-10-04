@@ -13,6 +13,8 @@ const TURN_WALK_FRAME_MS = 130;
 const NEAR_MS = 1080;
 const TURN_MS = 650;
 const ARRIVE_MS = 320;
+const PRELOAD_TIMEOUT_MS = 8000;
+const ITEM_SWAP_MAX_WAIT_MS = 300;
 const SCENE_TURN = {
   left: "turn-left",
   right: "turn-right",
@@ -200,9 +202,14 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function init() {
-  preloadSceneImages();
+  [players.p1, players.p2].forEach((player) => {
+    player.promptEl.textContent = "圖片載入中…";
+  });
+  const scenesReady = preloadSceneImages();
   const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV，失敗就用預設題目
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
+  // 等場景與角色圖解碼完才開局；網路太慢時最多等 8 秒，避免卡在載入畫面
+  await Promise.race([scenesReady, wait(PRELOAD_TIMEOUT_MS)]);
   startGame();
 }
 
@@ -298,6 +305,8 @@ function startLevel(level) {
   session.playing = true;
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
+  preloadLevelItems(level);
+  if (level < STAGE_COUNT) preloadLevelItems(level + 1);
 
   [players.p1, players.p2].forEach((player) => {
     player.busy = false;
@@ -462,14 +471,18 @@ async function chooseDirection(player, choice) {
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");
   renderQuestion(player);
-  player.questionShownAt = Date.now();
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
-  await wait(40);
+  // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
+  await Promise.all([
+    wait(40),
+    Promise.race([itemsDecoded(player), wait(ITEM_SWAP_MAX_WAIT_MS)]),
+  ]);
   if (!sameRound(token)) {
     player.busy = false;
     return;
   }
+  player.questionShownAt = Date.now();
 
   player.playerEl.classList.remove("is-snap");
   player.scene.classList.remove("is-snap");
@@ -588,12 +601,67 @@ function setPlayerSprite(player, src) {
   player.playerImg.src = src;
 }
 
+// 預載過的 Image 物件留在這裡，避免被 GC 回收後又重新下載、解碼
+const preloadedImages = new Map();
+
+// 回傳 Promise<boolean>：圖片可用為 true，載入失敗為 false（不會 reject）
+function preloadImage(src) {
+  if (preloadedImages.has(src)) return preloadedImages.get(src).ready;
+  const image = new Image();
+  let ready;
+  if (typeof image.decode === "function") {
+    image.src = src;
+    ready = image
+      .decode()
+      .then(() => true, () => image.complete && image.naturalWidth > 0);
+  } else {
+    ready = new Promise((resolve) => {
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = src;
+    });
+  }
+  preloadedImages.set(src, { image, ready });
+  return ready;
+}
+
+function levelItemIds(level) {
+  const rule = stageRules[level - 1];
+  if (!rule) return [];
+  const wrongItems =
+    rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  return Array.from(new Set([...rule.correct, ...wrongItems]));
+}
+
+// 該關所有可能出現的物品圖先下載並解碼；找不到的直接記進 missingImages，之後改用文字卡
+function preloadLevelItems(level) {
+  return Promise.all(
+    levelItemIds(level)
+      .filter((id) => !missingImages.has(id))
+      .map((id) =>
+        preloadImage(itemSrc(id)).then((ok) => {
+          if (!ok) missingImages.add(id);
+        })
+      )
+  );
+}
+
+function itemsDecoded(player) {
+  return Promise.all(
+    [player.itemLeft, player.itemRight].map((el) =>
+      el.decode ? el.decode().catch(() => {}) : Promise.resolve()
+    )
+  );
+}
+
 function preloadSceneImages() {
   const sources = [
+    "img/TGameBack.png",
     "img/TGameNear.png",
     "img/TGameTurnLeft.png",
     "img/TGameTurnRight.png",
     ...[players.p1, players.p2].flatMap((player) => [
+      player.assets.back,
       player.assets.turn.left,
       player.assets.turn.right,
       ...player.assets.walkBack,
@@ -602,10 +670,7 @@ function preloadSceneImages() {
     ]),
   ];
 
-  Array.from(new Set(sources)).forEach((src) => {
-    const image = new Image();
-    image.src = src;
-  });
+  return Promise.all(Array.from(new Set(sources)).map(preloadImage));
 }
 
 function showPlayerPlaceholder(player) {
