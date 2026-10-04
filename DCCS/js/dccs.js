@@ -839,6 +839,7 @@ export function mountDCCS(options) {
                   void finish({ skipResult: true }).catch(fail);
                   return;
                 }
+                emitPhase('playing');
               }
 
               if (previousLevel !== 3) {
