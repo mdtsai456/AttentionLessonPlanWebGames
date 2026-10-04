@@ -1,5 +1,6 @@
 // 登出後按上一頁：Chrome 會從 bfcache 原樣還原頁面、不重跑 script。
 import { test, expect } from "@playwright/test";
+import { DCCS_PAGE } from "../site.mjs";
 import { HOME_URL, STUDENT, loginAs } from "./helpers.mjs";
 
 // Playwright 預設帶 --disable-back-forward-cache，舊版 headless 也不支援 bfcache。
@@ -56,3 +57,27 @@ test("學生仍登入時從教學頁按上一頁，留在還原的 Select", asyn
   expect(shows).toContainEqual({ path: "/Select/index.html", persisted: true });
   await expect(page).toHaveURL(/\/Select\/index\.html$/);
 });
+
+for (const loggedOut of [true, false]) {
+  test(`DCCS 從 bfcache 還原：${loggedOut ? "已登出者回 Home" : "仍登入者正常顯示"}`, async ({ page }) => {
+    const shows = await trackPageshow(page);
+    await loginAs(page, STUDENT);
+    await page.goto(DCCS_PAGE);
+    await expect(page.locator("#game-root canvas")).toBeVisible();
+
+    // 不攔截請求，保留真正的 bfcache；離開遊戲後在 Home 模擬清除登入資料。
+    await page.goto("Home/index.html");
+    if (loggedOut) await page.evaluate(() => sessionStorage.clear());
+
+    await page.goBack({ waitUntil: "commit" });
+    await expect.poll(() => shows).toContainEqual({ path: `/${DCCS_PAGE}`, persisted: true });
+
+    if (loggedOut) {
+      await expect(page).toHaveURL(HOME_URL);
+    } else {
+      await expect(page).toHaveURL(/\/DCCS\/index\.html$/);
+      await expect(page.locator("#game-root canvas")).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.style.visibility)).not.toBe("hidden");
+    }
+  });
+}
