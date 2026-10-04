@@ -61,6 +61,8 @@ const session = {
   roundToken: 0,
   levelDeadline: 0,
   playing: false,
+  paused: false,
+  pausedRemainingMs: TIME_LIMIT_MS,
   startedAt: 0,
   timerId: null,
   endReason: "",
@@ -184,7 +186,7 @@ document.getElementById("mid-lobby").addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (!session.playing) return;
+  if (event.repeat || !session.playing || session.paused) return;
 
   if (event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -244,8 +246,11 @@ function createPlayer(id) {
     currentQuestion: null,
     reactionSamples: [],
     questionShownAt: 0,
+    pausedReactionMs: 0,
     score: 0,
     busy: false,
+    ready: false,
+    pendingCorrect: false,
     answers: [],
     walkTimer: null,
     walkFrame: 0,
@@ -311,6 +316,8 @@ function startLevel(level) {
   session.levelDeadline = 0;
   session.timerStarted = false;
   session.playing = true;
+  session.paused = false;
+  viewportGuard.hide();
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
   preloadLevelItems(level);
@@ -318,6 +325,7 @@ function startLevel(level) {
 
   [players.p1, players.p2].forEach((player) => {
     player.busy = false;
+    player.pendingCorrect = false;
     player.questionSeq = 0;
     player.currentQuestion = makeQuestion(level, 0);
     player.promptEl.classList.remove("is-hidden");
@@ -330,6 +338,7 @@ function startLevel(level) {
     renderPlayerHud(player);
   });
 
+  viewportGuard.update();
   // 計時不在這裡開始：等任一人第一次按鍵才同時開始（見 startLevelTimer）
 }
 
@@ -343,7 +352,7 @@ function startLevelTimer() {
 }
 
 function tick() {
-  if (!session.playing) return;
+  if (!session.playing || session.paused) return;
   renderAllHud();
   if (Date.now() >= session.levelDeadline) endLevel();
 }
@@ -352,6 +361,8 @@ function endLevel() {
   if (!session.playing) return;
   const finishedLevel = session.level;
   session.playing = false;
+  session.paused = false;
+  viewportGuard.hide();
   session.roundToken += 1;
   clearInterval(session.timerId);
   settlePlayers();
@@ -363,7 +374,10 @@ function endLevel() {
     return;
   }
   if (finishedLevel < STAGE_COUNT) {
-    window.showStageClear(finishedLevel).then(() => startLevel(finishedLevel + 1));
+    const token = session.roundToken;
+    window.showStageClear(finishedLevel).then(() => {
+      if (token === session.roundToken && !session.playing) startLevel(finishedLevel + 1);
+    });
     return;
   }
   finishGame();
@@ -393,12 +407,23 @@ function currentQuestion(player) {
   return player.currentQuestion;
 }
 
-function renderQuestion(player) {
+async function renderQuestion(player) {
   const question = currentQuestion(player);
-  if (!question) return;
+  if (!question) return false;
+  const token = session.roundToken;
+  const isCurrent = () => token === session.roundToken && player.currentQuestion === question;
+  player.ready = false;
+  player.itemLeft.classList.add("is-fading");
+  player.itemRight.classList.add("is-fading");
   setItemImage(player.itemLeft, question.leftItem);
   setItemImage(player.itemRight, question.rightItem);
   player.promptEl.textContent = question.prompt;
+  if (!await window.TGameSupport.prepareItems([player.itemLeft, player.itemRight], ITEM_SWAP_MAX_WAIT_MS, isCurrent, labelCard)) return false;
+  player.ready = true;
+  player.questionShownAt = Date.now();
+  player.itemLeft.classList.remove("is-fading");
+  player.itemRight.classList.remove("is-fading");
+  return true;
 }
 
 function setText(el, text) {
@@ -417,11 +442,12 @@ function renderPlayerHud(player) {
   if (!session.timerStarted) {
     setText(player.roundEl, `剩餘 ${TIME_LIMIT_SEC} 秒・按鍵開始${levelText}`);
   } else {
-    const left = Math.max(0, Math.ceil((session.levelDeadline - Date.now()) / 1000));
+    const leftMs = session.paused ? session.pausedRemainingMs : session.levelDeadline - Date.now();
+    const left = Math.max(0, Math.ceil(leftMs / 1000));
     setText(player.roundEl, `第 ${player.questionSeq + 1} 題・剩餘 ${left} 秒${levelText}`);
   }
   const used = session.timerStarted
-    ? Math.min(TIME_LIMIT_MS, Date.now() - (session.levelDeadline - TIME_LIMIT_MS))
+    ? Math.min(TIME_LIMIT_MS, TIME_LIMIT_MS - (session.paused ? session.pausedRemainingMs : session.levelDeadline - Date.now()))
     : 0;
   const ratio = (session.level - 1 + used / TIME_LIMIT_MS) / STAGE_COUNT;
   player.progressEl.setAttribute("aria-valuenow", Math.round(ratio * 100));
@@ -429,7 +455,11 @@ function renderPlayerHud(player) {
 }
 
 async function chooseDirection(player, choice) {
-  if (!session.playing || player.busy) return;
+  if (!session.playing || session.paused || player.busy || !player.ready) return;
+  if (session.timerStarted && Date.now() >= session.levelDeadline) {
+    tick();
+    return;
+  }
 
   const question = currentQuestion(player);
   if (!question) return;
@@ -440,6 +470,7 @@ async function chooseDirection(player, choice) {
   player.busy = true;
   player.reactionSamples.push(Math.max(0, Date.now() - player.questionShownAt));
   const isCorrect = choice === question.correct;
+  player.pendingCorrect = isCorrect;
   if (isCorrect) player.score += 1;
 
   player.answers.push({
@@ -461,10 +492,7 @@ async function chooseDirection(player, choice) {
   renderPlayerHud(player);
 
   await wait(NEAR_MS);
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
 
   if (!isCorrect) {
     hideFeedback(player);
@@ -480,27 +508,22 @@ async function chooseDirection(player, choice) {
   setSceneBg(player, SCENE_TURN[choice]);
   await wait(TURN_MS);
 
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
 
+  player.pendingCorrect = false;
   player.questionSeq += 1;
   player.currentQuestion = makeQuestion(session.level, player.questionSeq);
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");
-  renderQuestion(player);
+  const questionReady = renderQuestion(player);
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
   // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
   await Promise.all([
     wait(40),
-    Promise.race([itemsDecoded(player), wait(ITEM_SWAP_MAX_WAIT_MS)]),
+    questionReady,
   ]);
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
   player.questionShownAt = Date.now();
 
   player.playerEl.classList.remove("is-snap");
@@ -510,12 +533,12 @@ async function chooseDirection(player, choice) {
   player.itemLeft.classList.remove("is-fading");
   player.itemRight.classList.remove("is-fading");
   await wait(ARRIVE_MS);
-
+  if (!sameRound(token)) return;
   player.busy = false;
 }
 
 function sameRound(token) {
-  return token === session.roundToken && session.playing;
+  return token === session.roundToken && session.playing && !session.paused;
 }
 
 function settlePlayers() {
@@ -664,14 +687,6 @@ function preloadLevelItems(level) {
           if (!ok) missingImages.add(id);
         })
       )
-  );
-}
-
-function itemsDecoded(player) {
-  return Promise.all(
-    [player.itemLeft, player.itemRight].map((el) =>
-      el.decode ? el.decode().catch(() => {}) : Promise.resolve()
-    )
   );
 }
 
@@ -975,6 +990,56 @@ function wait(ms) {
     setTimeout(resolve, ms);
   });
 }
+
+function pauseForViewport() {
+  if (!session.playing) return false;
+  if (session.paused) {
+    // 再次縮小時取消尚未完成的恢復，保留已保存的時間與題目。
+    session.roundToken += 1;
+    return true;
+  }
+  if (session.timerStarted && Date.now() >= session.levelDeadline) { tick();return false; }
+  session.pausedRemainingMs = session.timerStarted ? session.levelDeadline - Date.now() : TIME_LIMIT_MS;
+  [players.p1, players.p2].forEach((player) => {
+    const lastAnswer = player.answers[player.answers.length - 1];
+    player.pausedReactionMs = player.ready && (!player.busy || lastAnswer?.questionId !== player.currentQuestion.id)
+      ? Math.max(0, Date.now() - player.questionShownAt) : 0;
+  });
+  session.paused = true;
+  session.roundToken += 1;
+  clearInterval(session.timerId);
+  settlePlayers();
+  [players.p1, players.p2].forEach((player) => {
+    if (player.pendingCorrect) {
+      player.questionSeq += 1;
+      player.currentQuestion = makeQuestion(session.level, player.questionSeq);
+    }
+    player.pendingCorrect = false;
+    void renderQuestion(player);
+  });
+  renderAllHud();
+  return true;
+}
+
+async function resumeViewport() {
+  if (!session.playing || !session.paused || !viewportGuard.isUsable()) return false;
+  const token = ++session.roundToken;
+  const ready = await Promise.all([renderQuestion(players.p1), renderQuestion(players.p2)]);
+  if (!ready.every(Boolean) || token !== session.roundToken || !viewportGuard.isUsable()) return false;
+  session.paused = false;
+  if (session.timerStarted) {
+    session.levelDeadline = Date.now() + session.pausedRemainingMs;
+    session.timerId = setInterval(tick, HUD_TICK_MS);
+  }
+  [players.p1, players.p2].forEach((player) => { player.questionShownAt = Date.now() - player.pausedReactionMs; });
+  renderAllHud();
+  return true;
+}
+
+const viewportGuard = window.TGameSupport.createViewportGuard({
+  minWidth: 700, minHeight: 500, landscape: true,
+  onBlock: pauseForViewport, onResume: resumeViewport, onLeave: leaveGame,
+});
 
 // 必須放在檔案最後：init() 會用到上面所有 const，太早呼叫會踩到暫時性死區
 init();

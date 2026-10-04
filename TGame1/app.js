@@ -87,13 +87,20 @@ let customThemes = null; // 由 CSV 自動載入；失敗時維持 null 使用�
 
 const state = {
   level: 1,
+  roundToken: 0,
+  levelDeadline: 0,
   questionSeq: 0,
   currentQuestion: null,
   score: 0,
   wrong: 0,
   remaining: TIME_LIMIT_SEC,
   busy: false,
+  ready: false,
+  pendingCorrect: false,
   playing: false,
+  paused: false,
+  pausedRemainingMs: 0,
+  pausedReactionMs: 0,
   answers: [],
   reactionSamples: [],
   questionShownAt: 0,
@@ -123,7 +130,7 @@ lobbyBtn.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (!state.playing || state.busy) return;
+  if (event.repeat || !state.playing || state.paused || state.busy) return;
 
   if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -157,6 +164,7 @@ function startGame(rules = buildStageRules()) {
   state.reactionSamples = [];
   state.startedAt = Date.now();
   state.endReason = "";
+  savedStage = 0;
   stageRules = rules;
   nextStageBtn.disabled = false;
   lobbyBtn.disabled = false;
@@ -165,11 +173,17 @@ function startGame(rules = buildStageRules()) {
 
 function startLevel(level) {
   clearInterval(state.timerId);
+  state.roundToken += 1;
   state.level = level;
+  state.levelDeadline = Date.now() + TIME_LIMIT_SEC * 1000;
   state.questionSeq = 0;
   state.remaining = TIME_LIMIT_SEC;
   state.busy = false;
+  state.pendingCorrect = false;
   state.playing = true;
+  state.paused = false;
+  viewportGuard.hide();
+  state.pausedReactionMs = 0;
   state.currentQuestion = makeQuestion(level, 0);
   preloadLevelItems(level);
   if (level < STAGE_COUNT) preloadLevelItems(level + 1);
@@ -184,11 +198,12 @@ function startLevel(level) {
   state.questionShownAt = Date.now();
   renderHud();
   state.timerId = setInterval(tick, 1000);
+  viewportGuard.update();
 }
 
 function tick() {
-  if (!state.playing) return;
-  state.remaining -= 1;
+  if (!state.playing || state.paused) return;
+  state.remaining = Math.max(0, Math.ceil((state.levelDeadline - Date.now()) / 1000));
   renderHud();
   if (state.remaining <= 0) {
     endLevel();
@@ -219,16 +234,23 @@ function makeQuestion(level, seq) {
   };
 }
 
-function renderQuestion() {
+async function renderQuestion() {
   const question = currentQuestion();
-  if (!question) return;
-  // itemLeft.src = itemSrc(question.leftItem);
-  // itemRight.src = itemSrc(question.rightItem);
-  // itemLeft.alt = question.leftItem;
-  // itemRight.alt = question.rightItem;
+  if (!question) return false;
+  const token = state.roundToken;
+  const isCurrent = () => token === state.roundToken && state.currentQuestion === question;
+  state.ready = false;
+  itemLeft.classList.add("is-fading");
+  itemRight.classList.add("is-fading");
   setItemImage(itemLeft, question.leftItem);
   setItemImage(itemRight, question.rightItem);
   promptEl.textContent = question.prompt;
+  if (!await window.TGameSupport.prepareItems([itemLeft, itemRight], ITEM_SWAP_MAX_WAIT_MS, isCurrent, labelCard)) return false;
+  state.ready = true;
+  state.questionShownAt = Date.now();
+  itemLeft.classList.remove("is-fading");
+  itemRight.classList.remove("is-fading");
+  return true;
 }
 
 function renderHud() {
@@ -238,12 +260,19 @@ function renderHud() {
 }
 
 async function chooseDirection(choice) {
+  if (!state.playing || state.paused || state.busy || !state.ready) return;
+  if (Date.now() >= state.levelDeadline) {
+    tick();
+    return;
+  }
+  const token = state.roundToken;
   const question = currentQuestion();
   if (!question) return;
 
   state.busy = true;
   state.reactionSamples.push(Math.max(0, Date.now() - state.questionShownAt));
   const isCorrect = choice === question.correct;
+  state.pendingCorrect = isCorrect;
   if (isCorrect) state.score += 1;
   else state.wrong += 1;
 
@@ -266,10 +295,7 @@ async function chooseDirection(choice) {
   renderHud();
 
   await wait(NEAR_MS);
-  if (!state.playing) {
-    state.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
 
   if (!isCorrect) {
     hideFeedback();
@@ -285,27 +311,22 @@ async function chooseDirection(choice) {
   setSceneBg(SCENE_TURN[choice]);
   await wait(TURN_MS);
 
-  if (!state.playing) {
-    state.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
 
+  state.pendingCorrect = false;
   state.questionSeq += 1;
   state.currentQuestion = makeQuestion(state.level, state.questionSeq);
   itemLeft.classList.add("is-fading");
   itemRight.classList.add("is-fading");
-  renderQuestion();
+  const questionReady = renderQuestion();
   hideFeedback();
   resetSceneAndPlayer(true);
   // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
   await Promise.all([
     wait(40),
-    Promise.race([itemsDecoded(), wait(ITEM_SWAP_MAX_WAIT_MS)]),
+    questionReady,
   ]);
-  if (!state.playing) {
-    state.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
   state.questionShownAt = Date.now();
   player.classList.remove("is-snap");
   scene.classList.remove("is-snap");
@@ -314,12 +335,19 @@ async function chooseDirection(choice) {
   itemLeft.classList.remove("is-fading");
   itemRight.classList.remove("is-fading");
   await wait(ARRIVE_MS);
-
+  if (!sameRound(token)) return;
   state.busy = false;
 }
 
+function sameRound(token) {
+  return token === state.roundToken && state.playing && !state.paused;
+}
+
 function pausePlay() {
+  state.roundToken += 1;
   state.playing = false;
+  state.paused = false;
+  viewportGuard.hide();
   clearInterval(state.timerId);
   hideFeedback();
   resetSceneAndPlayer();
@@ -338,7 +366,10 @@ function endLevel() {
     return;
   }
   if (finishedLevel < STAGE_COUNT) {
-    window.showStageClear(finishedLevel).then(() => startLevel(finishedLevel + 1));
+    const token = state.roundToken;
+    window.showStageClear(finishedLevel).then(() => {
+      if (token === state.roundToken && !state.playing) startLevel(finishedLevel + 1);
+    });
     return;
   }
   finishGame("complete");
@@ -538,14 +569,6 @@ function preloadLevelItems(level) {
           if (!ok) missingImages.add(id);
         })
       )
-  );
-}
-
-function itemsDecoded() {
-  return Promise.all(
-    [itemLeft, itemRight].map((el) =>
-      el.decode ? el.decode().catch(() => {}) : Promise.resolve()
-    )
   );
 }
 
@@ -896,6 +919,53 @@ async function submitResult(data) {
     console.error("成績送出失敗：", err);
   }
 }
+
+function pauseForViewport() {
+  if (!state.playing) return false;
+  if (state.paused) {
+    // 再次縮小時取消尚未完成的恢復，不能只檢查解碼結束時的尺寸。
+    state.roundToken += 1;
+    return true;
+  }
+  if (Date.now() >= state.levelDeadline) { tick();return false; }
+  state.pausedRemainingMs = state.levelDeadline - Date.now();
+  const lastAnswer = state.answers[state.answers.length - 1];
+  state.pausedReactionMs = state.ready && (!state.busy || lastAnswer?.questionId !== state.currentQuestion.id)
+    ? Math.max(0, Date.now() - state.questionShownAt) : 0;
+  state.remaining = Math.ceil(state.pausedRemainingMs / 1000);
+  state.paused = true;
+  state.roundToken += 1;
+  clearInterval(state.timerId);
+  if (state.pendingCorrect) {
+    state.questionSeq += 1;
+    state.currentQuestion = makeQuestion(state.level, state.questionSeq);
+  }
+  state.pendingCorrect = false;
+  state.busy = false;
+  resetSceneAndPlayer();
+  hideFeedback();
+  void renderQuestion();
+  renderHud();
+  return true;
+}
+
+async function resumeViewport() {
+  if (!state.playing || !state.paused || !viewportGuard.isUsable()) return false;
+  const token = ++state.roundToken;
+  const ready = await renderQuestion();
+  if (!ready || token !== state.roundToken || !viewportGuard.isUsable()) return false;
+  state.paused = false;
+  state.levelDeadline = Date.now() + state.pausedRemainingMs;
+  state.questionShownAt = Date.now() - state.pausedReactionMs;
+  state.timerId = setInterval(tick, 1000);
+  renderHud();
+  return true;
+}
+
+const viewportGuard = window.TGameSupport.createViewportGuard({
+  minWidth: 600, minHeight: 450,
+  onBlock: pauseForViewport, onResume: resumeViewport, onLeave: leaveGame,
+});
 
 // 所有 const / function 都宣告完才啟動，避免 TDZ 錯誤
 init();

@@ -404,10 +404,8 @@ body {
 }
 
 /* 半個畫面放不下分數與倒數同一列：倒數移到第二列 */
-@media (max-width: 920px) {
-  .round {
-    top: calc(2.2vh + 2.6rem);
-  }
+@media (max-width: 1120px) {
+  .round { top: calc(2.2vh + 2.7rem); }
 }
 
 .toast {
@@ -471,9 +469,9 @@ body {
 .prompt {
   position: absolute;
   left: 50%;
-  bottom: 6.2vh;
+  bottom: calc(2.2vh + 4rem);
   z-index: 8;
-  width: min(420px, 92%);
+  width: min(420px, calc(100% - var(--panel-w) - 2vw));
   margin: 0;
   padding: 0.65rem 1rem;
   transform: translateX(-50%);
@@ -489,10 +487,13 @@ body {
   text-shadow: 0 2px 0 rgba(20, 70, 80, 0.25);
 }
 
+.lane[data-player="p1"] .prompt { left: calc((100% + var(--panel-w)) / 2); }
+.lane[data-player="p2"] .prompt { left: calc((100% - var(--panel-w)) / 2); }
+
 .feedback {
   position: absolute;
   left: 50%;
-  top: 11vh;
+  top: calc(2.2vh + 3rem);
   z-index: 9;
   margin: 0;
   padding: 0.35rem 1rem;
@@ -645,4 +646,7 @@ body {
   .btn-leave {
     width: auto;
   }
+}
+@media (max-width: 1120px) {
+  .feedback { top: calc(2.2vh + 5rem); }
 }
