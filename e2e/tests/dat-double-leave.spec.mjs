@@ -8,6 +8,9 @@ test.describe('版面', () => {
     await game.open();
     await game.playThrough(6);
     expect(await game.elementOnLeaveButton()).toBe('leave-btn');
+    if (test.info().project.name === 'chromium') {
+      await game.page.screenshot({ path: '../.context/dat-double-six-stage-results.png' });
+    }
   });
 
   for (const viewport of [{ width: 1024, height: 600 }, { width: 1920, height: 1080 }]) {
@@ -201,6 +204,28 @@ test.describe('第 3 關中場', () => {
 });
 
 test.describe('遊戲進行中', () => {
+  test('一般換關遮罩開啟仍能點離開並確認返回大廳', async ({ game, page }) => {
+    await game.open();
+    await game.startQuestions();
+    await game.skipStageTime();
+    await expect(page.locator('.shared-stage-clear')).toBeVisible();
+    expect(await game.elementOnLeaveButton()).toBe('leave-btn');
+    game.api.acceptLeave = true;
+    await page.click('#leave-btn', { noWaitAfter: true });
+    await expect(page).toHaveURL(/\/Select\/index\.html$/);
+    expect(game.posted()).toEqual([]);
+  });
+
+  test('第1關按離開並確認：確實返回大廳，不必重玩', async ({ game, page }) => {
+    await game.open();
+    await game.startQuestions();
+    game.api.acceptLeave = true;
+    await page.click('#leave-btn', { noWaitAfter: true });
+    await expect(page).toHaveURL(/\/Select\/index\.html$/);
+    expect(game.dialogs).toEqual(['beforeunload']);
+    expect(game.posted()).toEqual([]);
+  });
+
   test('第 1 關按「離開」：不存檔、跳確認框', async ({ game }) => {
     await game.open();
     await game.startQuestions();

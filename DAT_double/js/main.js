@@ -1,12 +1,27 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer, TOTAL_STAGES, MID_STAGE } from './game.js?v=8';
+import { createPlayer, TOTAL_STAGES, MID_STAGE } from './game.js?v=9';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
 
 const midWait = [false, false];
 const midResume = [null, null];
+let exitPending = false;
+
+async function withExitLock(action) {
+  if (exitPending) return;
+  exitPending = true;
+  const buttons = [...document.querySelectorAll('#leave-btn, #enter-formal-btn, #mid-continue, #mid-lobby, .shared-stage-clear-btn, [data-ui="restart"], [data-ui="back-home"]')];
+  const disabled = buttons.map((button) => button.disabled);
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await action();
+  } finally {
+    buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+    exitPending = false;
+  }
+}
 
 function waitForMidBreak(playerIndex, resume) {
   midWait[playerIndex] = true;
@@ -77,12 +92,14 @@ async function saveCheckpoint() {
 
 // 兩位玩家都玩完六關才直接回大廳；否則照舊跳確認框
 async function leaveToLobby() {
-  const completed = await saveCheckpoint();
-  if (playMode === 'game' && completed >= TOTAL_STAGES) {
-    safeNavigateTo('../Select/index.html');
-  } else {
-    window.askLeave('../Select/index.html');
-  }
+  await withExitLock(async () => {
+    const completed = await saveCheckpoint();
+    if (playMode === 'game' && completed >= TOTAL_STAGES) {
+      safeNavigateTo('../Select/index.html');
+    } else {
+      window.askLeave('../Select/index.html');
+    }
+  });
 }
 
 document.getElementById('leave-btn').addEventListener('click', leaveToLobby);
@@ -162,11 +179,10 @@ if (midContinue) {
 }
 if (midLobby) {
   midLobby.addEventListener('click', async () => {
-    // 存檔期間鎖住中場按鈕，避免又按「繼續遊玩」後被導回大廳
-    midLobby.disabled = true;
-    if (midContinue) midContinue.disabled = true;
-    await saveCheckpoint();
-    safeNavigateTo('../Select/index.html');
+    await withExitLock(async () => {
+      await saveCheckpoint();
+      safeNavigateTo('../Select/index.html');
+    });
   });
 }
 

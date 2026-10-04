@@ -133,10 +133,11 @@ button:focus-visible {
 }
 
 .btn-leave {
-  position: absolute;
+  position: fixed;
   top: 3%;
   right: 2%;
-  z-index: 6;
+  /* 位於遊戲容器外，保持在共用換關遮罩（200）之上。 */
+  z-index: 201;
   appearance: none;
   border: none;
   border-radius: 999px;

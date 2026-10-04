@@ -10,13 +10,13 @@
     href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="DAT_single.css?v=5">
+  <link rel="stylesheet" href="DAT_single.css?v=6">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <script src="../shared/api.js"></script>
   <script src="../shared/session-timeout.js"></script>
   <script src="../shared/leave-confirm.js"></script>
-  <script src="../shared/stage-clear.js" defer></script>
-  <script src="DAT_single.js?v=6" defer></script>
+  <script src="../shared/stage-clear.js?v=2" defer></script>
+  <script src="DAT_single.js?v=8" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令單人遊戲">
@@ -28,7 +28,6 @@
     </aside>
     <header class="score"><span>得分</span><strong id="score">0 分</strong></header>
     <div class="round" id="round">第 1 題・剩餘 60 秒（第 1 / 6 關）</div>
-    <button class="btn-leave" id="leave-btn" type="button">離開</button>
     <section class="question-panel" aria-label="判斷題目">
       <div class="question"><span class="caption" id="question-type">等待瞄準</span><strong id="question-text">—</strong></div>
       <div class="time"><span id="time-text">尚未開始</span><div class="time-track"><div id="time-fill"></div></div></div>
@@ -76,5 +75,6 @@
       </div>
     </div>
   </main>
+  <button class="btn-leave" id="leave-btn" type="button">離開</button>
 </body>
 </html>

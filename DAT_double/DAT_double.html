@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attention Lesson Plan - 動物追擊令・雙人版</title>
-  <link rel="stylesheet" href="DAT_double.css?v=6">
+  <link rel="stylesheet" href="DAT_double.css?v=7">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
@@ -12,12 +12,11 @@
 <script src="../shared/api.js"></script>
 <script src="../shared/session-timeout.js"></script>
 <script src="../shared/leave-confirm.js"></script>
-<script src="../shared/stage-clear.js" defer></script>
-<script type="module" src="js/main.js?v=9" defer></script>
+<script src="../shared/stage-clear.js?v=2" defer></script>
+<script type="module" src="js/main.js?v=10" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
-    <button type="button" class="btn-leave" id="leave-btn">離開</button>
     <button type="button" id="enter-formal-btn" class="enter-formal" hidden>進入正式遊戲</button>
     <section class="player player-1" aria-label="玩家一">
     <!--      -->
@@ -138,5 +137,6 @@
       </section>
     </div>
   </main>
+  <button type="button" class="btn-leave" id="leave-btn">離開</button>
 </body>
 </html>

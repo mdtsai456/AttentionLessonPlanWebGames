@@ -19,12 +19,14 @@ export const test = base.extend({
       delayMs: 0,
       failNext: 0,
       holdNext: 0,
+      acceptLeave: false,
       releaseHeld() { heldRequests.splice(0).forEach((release) => release()); },
     };
 
     page.on('dialog', async (dialog) => {
       dialogs.push(dialog.type());
-      await dialog.dismiss();
+      if (api.acceptLeave) await dialog.accept();
+      else await dialog.dismiss();
     });
     page.on('pageerror', (error) => pageErrors.push(error.message));
 

@@ -68,7 +68,7 @@ CORS_ALLOW_ORIGINS=https://attention-webgames.zeabur.app
 
 ## 瀏覽器測試（e2e）
 
-`e2e/` 用 Playwright 在 Chromium、Firefox、WebKit 實際開遊戲頁面測試，目前涵蓋 DAT 雙人版的鍵盤／畫面按鈕瞄準與作答、離開與存檔流程、正式與練習題型，以及返回按鈕的 Space／Enter／數字鍵盤 Enter 操作。測試會自己用 `python3 -m http.server` 提供 repo 根目錄、攔下存檔 API（不會寫進資料庫）。練習遊玩測試保留每題 10 秒計時，存檔流程測試則快轉 `Date.now` 跳過每關 60 秒。
+`e2e/` 用 Playwright 在 Chromium、Firefox、WebKit 實際開遊戲頁面測試，涵蓋 DAT 雙人版的鍵盤／畫面按鈕瞄準與作答、正式與練習題型，以及單人／雙人版的離開與存檔流程：六關結算直接返回大廳、換關與中場離開、取消離開後繼續、存檔延遲與失敗重試、重玩，以及返回按鈕的 Space／Enter／數字鍵盤 Enter 操作。測試會自己用 `python3 -m http.server` 提供 repo 根目錄、攔下存檔 API（不會寫進資料庫）。雙人練習遊玩測試保留每題 10 秒計時，單人／雙人存檔流程測試則快轉 `Date.now` 跳過每關 60 秒。
 
 ```bash
 cd e2e

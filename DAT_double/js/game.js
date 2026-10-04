@@ -498,12 +498,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   document.addEventListener('visibilitychange', clearInput);
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    if (event.target?.disabled) return;
     if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
       event.preventDefault(); keys.add(event.code);
     }
     if (answerCodes.includes(event.code)) {
       // 返回按鈕使用瀏覽器原生的 Space／Enter 操作，不攔截成遊戲作答。
-      if (event.target?.dataset?.ui === 'back-home') return;
+      if (event.target?.dataset?.ui === 'back-home' || event.target?.id === 'leave-btn') return;
       event.preventDefault();
       if (!event.repeat) {
         if (phase === 'finished' && event.target === $('restart')) startGame();

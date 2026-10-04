@@ -39,6 +39,7 @@ let stageQuestionNo = 0;
 let levelOutcomes = [[]];
 
 function startGame() {
+  saveState = { stage: 0, pending: Promise.resolve() };
   gameStartTime = Date.now();
   stage = 1;
   stageDeadline = 0;
@@ -396,11 +397,7 @@ function continueNextStage() {
 
 $('btn-next-stage').addEventListener('click', continueNextStage);
 
-$('btn-lobby').addEventListener('click', async () => {$('btn-lobby').disabled = true;
-  $('btn-next-stage').disabled = true;
-  await saveCurrentRun(MID_STAGE);
-  returnToLobby();
-});
+$('btn-lobby').addEventListener('click', returnToLobby);
 
 function endQuestion() {
   if (phase !== 'answer') return;
@@ -431,7 +428,22 @@ function answeredCount() {
   return Math.max(index, 1);
 }
 
-let savedStage = 0;
+let saveState = { stage: 0, pending: Promise.resolve() };
+let exitPending = false;
+
+async function withExitLock(action) {
+  if (exitPending) return;
+  exitPending = true;
+  const buttons = [...document.querySelectorAll('#leave-btn, #restart, #btn-start-game, #btn-lobby, #btn-next-stage, .shared-stage-clear-btn')];
+  const disabled = buttons.map((button) => button.disabled);
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await action();
+  } finally {
+    buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+    exitPending = false;
+  }
+}
 
 function sessionMetrics() {
   const questionCount = score + wrong + offTarget;
@@ -448,9 +460,12 @@ function sessionMetrics() {
 }
 
 function saveCurrentRun(stage) {
-  savedStage = stage;
+  const runSave = saveState;
+  if (runSave.stage >= stage) return runSave.pending;
+  const previousStage = runSave.stage;
+  runSave.stage = stage;
   const metrics = sessionMetrics();
-  return saveGameDataToBackend({
+  runSave.pending = saveGameDataToBackend({
     score: score,
     wrong: wrong,
     offTarget: offTarget,
@@ -463,12 +478,27 @@ function saveCurrentRun(stage) {
     questionCount: metrics.questionCount,
     aimRatio: metrics.aimRatio,
     focusMs: metrics.focusMs,
+  }).then((saved) => {
+    // 舊局的失敗回應只能回退舊局，不能改到重玩後的新局。
+    if (!saved && runSave.stage === stage) runSave.stage = previousStage;
   });
+  return runSave.pending;
 }
 
-function returnToLobby() {
-  window.removeEventListener('beforeunload', blockUnload);
-  window.location.href = '../Select/index.html';
+async function saveCheckpoint() {
+  if (isPractice) return;
+  const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
+  const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+  if (checkpoint) await saveCurrentRun(checkpoint);
+}
+
+async function returnToLobby() {
+  await withExitLock(async () => {
+    await saveCheckpoint();
+    window.removeEventListener('beforeunload', blockUnload);
+    window.__askLeave = false;
+    window.location.href = '../Select/index.html';
+  });
 }
 
 function finishGame() {
@@ -486,7 +516,6 @@ function finishGame() {
   if (isPractice) {
     $('result-title').textContent = '練習結束';
     $('restart').textContent = '再練習一次';
-    $('restart').onclick = startGame;
 
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '進入正式遊戲';
@@ -497,7 +526,6 @@ function finishGame() {
   } else {
     $('result-title').textContent = '挑戰完成！';
     $('restart').textContent = '再玩一次';
-    $('restart').onclick = startGame;
 
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
@@ -561,12 +589,15 @@ async function saveGameDataToBackend(data) {
     if (res.status === 201) {
       const result = await res.json();
       console.log('✅ [API 成功] 資料已成功寫入資料庫！Session ID:', result.sessionId);
+      return true;
     } else {
       const errData = await res.json().catch(() => ({}));
       console.error(`❌ [API 錯誤 ${res.status}]:`, errData.detail || '寫入失敗');
+      return false;
     }
   } catch (err) {
     console.error('❌ [API 網路連線異常]:', err);
+    return false;
   }
 }
 
@@ -617,17 +648,14 @@ $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', startGame);$('leave-btn').addEventListener('click', leaveGame);
 
 async function leaveGame() {
-  $('leave-btn').disabled = true;
-  try {
-    if (!isPractice) {
-      const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
-      const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-      if (checkpoint && checkpoint !== savedStage) await saveCurrentRun(checkpoint);
-    }
-  } finally {
-    window.removeEventListener('beforeunload', blockUnload);
-    window.askLeave('../Select/index.html');
+  if (phase === 'finished') {
+    await returnToLobby();
+    return;
   }
+  await withExitLock(async () => {
+    await saveCheckpoint();
+    window.askLeave('../Select/index.html');
+  });
 }
 
 function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
@@ -635,15 +663,22 @@ window.addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', clearInput);
 document.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+  if (!$('results').hidden && event.key === 'Tab') {
+    const buttons = [...$('results').querySelectorAll('button:not([hidden]):not(:disabled)')];
+    if (!buttons.length) return;
+    event.preventDefault();
+    const current = buttons.indexOf(document.activeElement);
+    const next = current < 0 ? (event.shiftKey ? buttons.length - 1 : 0)
+      : (current + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+    return;
+  }
   if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
     event.preventDefault(); keys.add(event.code);
   }
   if (event.code === 'Space' && phase === 'answer' && !paused && event.target !== $('leave-btn')) {
     event.preventDefault();
     if (!event.repeat) answer();
-  }
-  if (!$('results').hidden && event.key === 'Tab') {
-    event.preventDefault();
   }
 });
 document.addEventListener('keyup', (event) => keys.delete(event.code));

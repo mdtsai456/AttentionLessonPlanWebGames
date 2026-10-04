@@ -28,6 +28,9 @@
     button.addEventListener('click', close);
     window.addEventListener('keydown', (event) => {
       if (root.hidden) return;
+      if (button.disabled) return;
+      // 聚焦離開鈕時讓瀏覽器啟動按鈕，不能把它當作繼續換關。
+      if (event.target?.id === 'leave-btn') return;
       if (event.code !== 'Enter' && event.code !== 'NumpadEnter' && event.code !== 'Space') return;
       event.preventDefault();
       close();
