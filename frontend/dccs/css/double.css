@@ -287,13 +287,6 @@ select {
   height: 100%;
 }
 
-/* 單人版顯示關卡提示時會把焦點放在按鈕上；雙人版為避免空白鍵誤觸不能真的
-   focus，但保留相同的視覺焦點圈。 */
-.shared-overlay.level-mode .dccs-level-continue {
-  outline: 4px solid rgba(56, 169, 0, 0.25);
-  outline-offset: 4px;
-}
-
 /* 最後成績畫面 */
 
 #final-result {
