@@ -627,6 +627,7 @@ async function leaveGame() {
   } finally {
     window.removeEventListener('beforeunload', blockUnload);
     window.askLeave('../Select/index.html');
+    $('leave-btn').disabled = false;
   }
 }
 
