@@ -6,14 +6,14 @@
 ## 目錄
 
 ```
-backend/                    ← 中介平台（FastAPI）。也負責提供前端，掛在 /app
+backend/                    ← 中介平台（FastAPI）
 tools/build_manifest.py     ← 讀 levels.json + 掃 assets/，產生 manifest.json
-frontend/dccs/              ← 本遊戲（index.html / double.html / js / css / assets）
+DCCS/                       ← 本遊戲（index.html / double.html / js / css / assets）
 ```
 
 ## 1. 產生 manifest.json
 
-關卡的唯一來源是 `frontend/dccs/levels.json`（人工維護的關卡設計表，見
+關卡的唯一來源是 `DCCS/levels.json`（人工維護的關卡設計表，見
 `SPEC.md` 第 5.1 節）；`assets/` 只提供每一關指定的素材。兩者只要有變動，
 都要重新產生一次：
 
@@ -24,9 +24,11 @@ python3 tools/build_manifest.py
 終端會印出各關卡的出題可行性表；不可行的關卡同時會寫進 `manifest.json`
 的 `warnings` 陣列。`manifest.json` 裡每張圖的 `src` 是**相對路徑**
 （例如 `assets/2/xxx.png`，不以 `/` 開頭），實際網址由前端以
-`new URL(src, assetBase)` 算出，`assetBase` 預設是 `frontend/dccs/`。
+`new URL(src, assetBase)` 算出，`assetBase` 預設是 `DCCS/`。
 
 ## 2. 啟動（開發／除錯用）
+
+> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
 
 前端由中介平台後端一併提供，**不需要另外起靜態伺服器**：
 
@@ -36,7 +38,6 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 ```
 
 - 入口 `http://127.0.0.1:5001/app/`（登入頁）
-- 遊戲大廳 `http://127.0.0.1:5001/app/games.html`
 - 本遊戲 `http://127.0.0.1:5001/app/dccs/index.html`
 
 後端只把 `frontend/` 這個目錄掛出去，後端原始碼與 `.env` 不在其中。因為與
@@ -54,6 +55,8 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 
 ## 2b. 從遊戲大廳進場
 
+> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+
 學生在 `frontend/index.html` 登入、於 `frontend/games.html` 點「開始挑戰」
 之後，會被導到 `dccs/index.html`（雙人為 `dccs/double.html`）。
 
@@ -61,12 +64,11 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 （見 `js/lobby.js`）。`currentDay` 由遊戲向中介平台查既有場次推導；推導
 失敗會退回手動表單並把已知欄位填好，不會猜值。玩完自動導回大廳。
 
-要接上新遊戲，在 `frontend/games.html` 的 `GAME_PAGES` 加一行即可。
 詳見 `docs/dccs-lobby-handoff.md`。
 
 ## 3. 其他頁面怎麼呼叫
 
-真正的整合入口是 `frontend/dccs/js/dccs.js` 匯出的 `mountDCCS()`，
+真正的整合入口是 `DCCS/js/dccs.js` 匯出的 `mountDCCS()`，
 `index.html` 只是「不靠其他頁面也能自己跑一場」的殼（見 `SPEC.md` 4.14）。
 
 ```html

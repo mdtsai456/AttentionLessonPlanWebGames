@@ -1,6 +1,6 @@
 # EFT 漂浮泡泡技術備忘
 
-本文適用根目錄的 `EFT_single` 與 `EFT_double` 六關版本；`frontend/EFT_single` 和 `frontend/EFT_double` 的舊版不在此範圍。
+本文適用根目錄的 `EFT_single` 與 `EFT_double` 六關版本。
 
 ## 單／雙人玩家控制器
 

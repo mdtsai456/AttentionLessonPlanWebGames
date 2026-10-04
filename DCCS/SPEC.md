@@ -7,7 +7,7 @@
 
 ## 0. 絕對禁止事項
 
-- **不得修改 `frontend/dccs/assets/`** 底下任何檔案。它只能被讀取。
+- **不得修改 `DCCS/assets/`** 底下任何檔案。它只能被讀取。
 - 中介平台（`AttentionLessonPlanTransferDataPlatform`）的原始碼不在本 repo，
   需要參考時請直接讀取外部那一份，不要複製；真的需要複製時，
   複製品也不得修改。
@@ -85,7 +85,7 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
 
 ### 1.5 關卡
 
-**關卡是遊戲設計，寫在 `frontend/dccs/levels.json`（人工維護的設計表）。**
+**關卡是遊戲設計，寫在 `DCCS/levels.json`（人工維護的設計表）。**
 每一關綁定一組**固定的素材**，整關不換（見 1.7）。
 
 **兩道閥的選項數是各自獨立的**，關卡表要分別指定：
@@ -261,30 +261,29 @@ lane = -direction * off * SLOT_LANE_SPACING                   // SLOT_LANE_SPACI
 ```
 AttentionLessonPlanWebGames/
 ├── backend/                                         ← 中介平台（FastAPI）
-│   └── main.py                                      ← 一併把 frontend/ 掛在 /app
+│   └── main.py
 ├── tools/
 │   └── build_manifest.py                            ← 掃 assets/ 產生 manifest
-└── frontend/
-    └── dccs/
-        ├── SPEC.md                                  ← 本檔
-        ├── README.md                                ← 啟動說明
-        ├── index.html
-        ├── double.html                              ← 雙人模式殼
-        ├── levels.json                              ← 關卡設計表（人工維護，見 5.1）
-        ├── manifest.json                            ← 由 build_manifest.py 產生
-        ├── assets/                                  ← 唯讀，遊戲素材
-        ├── css/{style,double}.css
-        └── js/
-            ├── config.js
-            ├── dccs.js                              ← 公開 API（main 專案的進入點，見 4.15）
-            ├── main.js                              ← 獨立執行用的殼（見 4.14）
-            ├── double.js                            ← 雙人模式殼
-            ├── ui/overlays.js                       ← 遊戲自帶的畫面層（見 4.16）
-            ├── lobby.js                              ← 與中介平台大廳的銜接（見 4.13c）
-            ├── core/{loop,input,assets}.js
-            ├── render/{projection,road,hud}.js
-            ├── game/{valve,target,rules,trialGen,stats,track}.js
-            └── net/{client,apiBase}.js
+└── DCCS/
+    ├── SPEC.md                                      ← 本檔
+    ├── README.md                                    ← 啟動說明
+    ├── index.html
+    ├── double.html                                  ← 雙人模式殼
+    ├── levels.json                                  ← 關卡設計表（人工維護，見 5.1）
+    ├── manifest.json                                ← 由 build_manifest.py 產生
+    ├── assets/                                      ← 唯讀，遊戲素材
+    ├── css/{style,double}.css
+    └── js/
+        ├── config.js
+        ├── dccs.js                                  ← 公開 API（main 專案的進入點，見 4.15）
+        ├── main.js                                  ← 獨立執行用的殼（見 4.14）
+        ├── double.js                                ← 雙人模式殼
+        ├── ui/overlays.js                           ← 遊戲自帶的畫面層（見 4.16）
+        ├── lobby.js                                  ← 與中介平台大廳的銜接（見 4.13c）
+        ├── core/{loop,input,assets}.js
+        ├── render/{projection,road,hud}.js
+        ├── game/{valve,target,rules,trialGen,stats,track}.js
+        └── net/{client,apiBase}.js
 ```
 
 前端使用 **原生 ES modules**（`<script type="module">`），無框架、無打包工具、
@@ -764,8 +763,10 @@ export function resolveSubmitUrl() -> string
 
 1. `window.DCCS_SUBMIT_URL`——整支端點覆寫。
 2. `window.API_BASE_URL`——只換 API 前綴，端點仍是 `<base>/sessions`。
-   與中介平台前端 `frontend/js/api.js` 同名同義。
+   與根目錄前端 `shared/api.js` 同名同義。
 3. 同源：`${window.location.origin}/api`。
+
+> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。下段描述的同源前提已不成立。
 
 第 3 條是關鍵。前端由中介平台後端一併提供（`backend/main.py` 把
 `frontend/` 掛在 `/app`），API 必然與頁面同源，因此**本模組不得出現任何
@@ -780,6 +781,8 @@ export function readLobbySession() -> { mode, players } | null
 export async function resolveCurrentDay(player) -> number
 export function returnToLobby() -> void
 ```
+
+> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。`frontend/games.html` 大廳已不存在。
 
 與中介平台大廳（`frontend/games.html`）的銜接。大廳與本遊戲**同源**，學生
 登入後由 `frontend/js/app.js` 寫進 `sessionStorage` 的資料這裡直接讀得到，
@@ -906,7 +909,7 @@ export function createOverlays(container) -> {
   誤觸的形狀／物件操作鍵必須清掉，不可在按下繼續後補轉。
 - 樣式由本模組注入一個 `<style>`（以 `data-dccs-style` 屬性做只注入一次的
   防護），class 一律 `dccs-` 前綴，**不得使用 id 選擇器**，
-  才不會跟 main 的樣式互撞。`frontend/dccs/css/style.css` 只留殼（body、表單）的樣式。
+  才不會跟 main 的樣式互撞。`DCCS/css/style.css` 只留殼（body、表單）的樣式。
 
 ---
 
@@ -949,7 +952,7 @@ settle 時解除，不得殘留到遊戲中。
 
 ## 5. `manifest.json` 格式
 
-由 `tools/build_manifest.py` 產生，寫到 `frontend/dccs/manifest.json`。
+由 `tools/build_manifest.py` 產生，寫到 `DCCS/manifest.json`。
 
 ```json
 {
@@ -994,7 +997,7 @@ settle 時解除，不得殘留到遊戲中。
 - `categories` 依**類別 id** 排序（字串排序）；`imageCount` 就是 `images.length`。
   類別本身**不帶 `optionCount`** —— 它能支援多大的 `model` 題由 `imageCount`
   決定，與關卡無關（見 1.5）。
-- `levels` **完全照 `frontend/dccs/levels.json` 的順序**，不排序、不去重，
+- `levels` **完全照 `DCCS/levels.json` 的順序**，不排序、不去重，
   並原封不動帶上該關的 `shapeCount`、`objectCount`，以及
   `sourceCategory`（model 關）或 `sourceCategories`（category 關）。
 - `playable` 為 `false` 時 `reason` 說明缺什麼，並在 `warnings` 寫一行
@@ -1004,7 +1007,7 @@ settle 時解除，不得殘留到遊戲中。
   是否 playable），
   不可行的關卡另外把 `WARN:` 那幾行印出來。
 
-### 5.1 `frontend/dccs/levels.json` 格式（人工維護的關卡設計表）
+### 5.1 `DCCS/levels.json` 格式（人工維護的關卡設計表）
 
 **這是關卡的唯一來源**，`build_manifest.py` 讀它，不從素材掃描產生關卡。
 
@@ -1020,7 +1023,7 @@ settle 時解除，不得殘留到遊戲中。
 }
 ```
 
-**這就是 `frontend/dccs/levels.json` 現在的內容**（＝ 1.5 的關卡表），不是範例值。
+**這就是 `DCCS/levels.json` 現在的內容**（＝ 1.5 的關卡表），不是範例值。
 
 - `levelNo` 不寫在檔案裡，由陣列順序決定（第一項就是第 1 關）。
 - `shapeCount` 與 `objectCount` **是兩個獨立的數字**，不要假設相等
@@ -1054,10 +1057,12 @@ payload 的欄位與型別要求見 4.13；遊戲端須完整輸出全部 12 筆
 
 ## 7. 前端怎麼被提供
 
+> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+
 由中介平台後端一併提供，**不另外起靜態伺服器**：`backend/main.py` 結尾把
 repo 的 `frontend/` 以 `StaticFiles(html=True)` 掛在 `/app`。
 
-- 入口 `/app/`（登入頁）；大廳 `/app/games.html`；本遊戲
+- 入口 `/app/`（登入頁）；~~大廳 `/app/games.html`~~；本遊戲
   `/app/dccs/index.html`、`/app/dccs/double.html`。
 - 掛載點固定為 `/app`，**不得改掛在 `/`**：那會遮蔽 `/api/*`、`/health`、
   `/demo`，也會跟日後新增的 API 路由相撞。
@@ -1078,7 +1083,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 ### 基本
 
-- `python3 tools/build_manifest.py` 產出 `frontend/dccs/manifest.json`，可行性表格顯示
+- `python3 tools/build_manifest.py` 產出 `DCCS/manifest.json`，可行性表格顯示
   **五關全部 playable**、`warnings` 為空。
 - `manifest.levels` 的五項依序是（`levelNo`, `shapeCount`, `objectCount`, 規則, 素材）：
   `(1,5,2,model,"2") (2,5,3,model,"3") (3,2,4,category,[2,3,4,5]) (4,2,4,model,"4") (5,2,5,model,"5")`
@@ -1086,7 +1091,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 ### 素材不足時要能優雅降級（不改 `assets/`，用複本驗）
 
-把 `assets/`、`tools/`、`frontend/dccs/levels.json` 複製到暫存目錄，在**複本**裡
+把 `assets/`、`tools/`、`DCCS/levels.json` 複製到暫存目錄，在**複本**裡
 把某一關的 `sourceCategory` 改成不存在的類別（例如 `"9"`），重跑
 `build_manifest.py`：該關要被標成 `playable: false`、寫出
 `WARN: level N unplayable (...)`，其餘關卡照常，且**遊戲跑起來時該關空過、
@@ -1167,7 +1172,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
   兩邊都能各自遊玩、互不影響；其中一個 `destroy()` 之後另一個照常運作。
 - `destroy()` 後：`container` 為空、鍵盤事件不再有任何反應、
   `done` resolve 成 `aborted: true` 且 `submitted` 為 `null`。
-- 把 `frontend/dccs/` 整包放到伺服器的子路徑下（例如 `/sub/frontend/dccs/index.html`）仍然
+- 把 `DCCS/` 整包放到伺服器的子路徑下（例如 `/sub/DCCS/index.html`）仍然
   載得到 manifest 與素材（相對路徑，見 4.4 / 第 5 節）。
   驗證用複製的方式做，**不得移動或改動 `assets/`**（第 0 節）。
 - `sessionSeconds: 60` 跑完一場，`duration` 精確為 `60000`，
@@ -1182,9 +1187,11 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 ### 其他
 
-- 後端啟動後（見第 7 節），瀏覽
+- > **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+
+  後端啟動後（見第 7 節），瀏覽
   `http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`
-  可以進入遊戲並實際遊玩；從 `/app/games.html` 點 DCCS 亦可（見 4.13c）。
+  可以進入遊戲並實際遊玩。
 - 逐題紀錄的每一個 `#` 都恰好有兩列（`shape` 與 `object` 各一），
   且 `object` 那列的規則等於該關設計表的 `objectRule`：
   第 1、2、4、5 關為 `model`，第 3 關為 `category`。
@@ -1193,7 +1200,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - 每題仍要以**出題當下**的關卡固定屬性進行判定（見 4.12）。
 - `frameCorrectCount + frameWrongCount` 等於總題數。
 - 多一個語意類別**不會多出關卡**。驗證時**不得真的去動 `assets/`**
-  （見第 0 節，它是唯讀的）——把 `assets/`、`tools/`、`frontend/dccs/levels.json`
+  （見第 0 節，它是唯讀的）——把 `assets/`、`tools/`、`DCCS/levels.json`
   複製到暫存目錄，在**複本**裡加一個資料夾再跑 `build_manifest.py`，
   確認 `categories` 多一個而 `levels` 數量不變。
 - `projection.js` 與 `rules.js` 可用 `node --test` 或簡單腳本單獨驗證。
