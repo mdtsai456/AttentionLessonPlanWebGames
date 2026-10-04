@@ -589,6 +589,9 @@ export function mountDCCS(options) {
 
         overlays.hideAll();
         levelPromptActive = false;
+        if (choice === 'continue') {
+          emitPhase('playing');
+        }
         return choice;
       }
 
