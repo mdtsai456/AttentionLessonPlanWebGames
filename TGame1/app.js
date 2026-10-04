@@ -139,12 +139,17 @@ async function init() {
   const scenesReady = preloadSceneImages();
   const ok = await loadCsvFromUrl(CSV_URL);
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 等場景與角色圖解碼完才開局；網路太慢時最多等 8 秒，避免卡在載入畫面
-  await Promise.race([scenesReady, wait(PRELOAD_TIMEOUT_MS)]);
-  startGame();
+  // 先排好六關，等場景、角色圖與第 1 關物品圖解碼完才開局；網路太慢時最多等 8 秒
+  const rules = buildStageRules();
+  stageRules = rules;
+  await Promise.race([
+    Promise.all([scenesReady, preloadLevelItems(1)]),
+    wait(PRELOAD_TIMEOUT_MS),
+  ]);
+  startGame(rules);
 }
 
-function startGame() {
+function startGame(rules = buildStageRules()) {
   clearInterval(state.timerId);
   state.score = 0;
   state.wrong = 0;
@@ -152,8 +157,7 @@ function startGame() {
   state.reactionSamples = [];
   state.startedAt = Date.now();
   state.endReason = "";
-  // Rebuild stage rules based on custom themes
-  stageRules = buildStageRules();
+  stageRules = rules;
   nextStageBtn.disabled = false;
   lobbyBtn.disabled = false;
   startLevel(1);

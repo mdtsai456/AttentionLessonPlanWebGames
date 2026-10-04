@@ -208,9 +208,14 @@ async function init() {
   const scenesReady = preloadSceneImages();
   const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV，失敗就用預設題目
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 等場景與角色圖解碼完才開局；網路太慢時最多等 8 秒，避免卡在載入畫面
-  await Promise.race([scenesReady, wait(PRELOAD_TIMEOUT_MS)]);
-  startGame();
+  // 先排好六關，等場景、角色圖與第 1 關物品圖解碼完才開局；網路太慢時最多等 8 秒
+  const rules = buildStageRules();
+  stageRules = rules;
+  await Promise.race([
+    Promise.all([scenesReady, preloadLevelItems(1)]),
+    wait(PRELOAD_TIMEOUT_MS),
+  ]);
+  startGame(rules);
 }
 
 function createPlayer(id) {
@@ -278,12 +283,12 @@ function makePlayerAssets(base) {
   };
 }
 
-function startGame() {
+function startGame(rules = buildStageRules()) {
   clearInterval(session.timerId);
   savedStage = 0;
   session.startedAt = Date.now();
   session.endReason = "";
-  stageRules = buildStageRules();
+  stageRules = rules;
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
   document.getElementById("mid-continue").disabled = false;
@@ -396,6 +401,10 @@ function renderQuestion(player) {
   player.promptEl.textContent = question.prompt;
 }
 
+function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
+
 function renderAllHud() {
   renderPlayerHud(players.p1);
   renderPlayerHud(players.p2);
@@ -403,13 +412,13 @@ function renderAllHud() {
 
 // 與 DAT_double 相同：「第 N 題・剩餘 S 秒（第 X / 6 關）」與直立進度條
 function renderPlayerHud(player) {
-  player.scoreBox.textContent = `${player.score} 分`;
+  setText(player.scoreBox, `${player.score} 分`);
   const levelText = `（第 ${session.level} / ${STAGE_COUNT} 關）`;
   if (!session.timerStarted) {
-    player.roundEl.textContent = `剩餘 ${TIME_LIMIT_SEC} 秒・按鍵開始${levelText}`;
+    setText(player.roundEl, `剩餘 ${TIME_LIMIT_SEC} 秒・按鍵開始${levelText}`);
   } else {
     const left = Math.max(0, Math.ceil((session.levelDeadline - Date.now()) / 1000));
-    player.roundEl.textContent = `第 ${player.questionSeq + 1} 題・剩餘 ${left} 秒${levelText}`;
+    setText(player.roundEl, `第 ${player.questionSeq + 1} 題・剩餘 ${left} 秒${levelText}`);
   }
   const used = session.timerStarted
     ? Math.min(TIME_LIMIT_MS, Date.now() - (session.levelDeadline - TIME_LIMIT_MS))
