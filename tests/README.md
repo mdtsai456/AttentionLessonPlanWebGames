@@ -7,7 +7,7 @@
 ```bash
 cd tests
 npm install        # 只安裝 playwright-core，不會下載瀏覽器
-npm test           # 單元測試 + E2E，約 2 分鐘（機器忙碌時會更久）
+npm test           # 單元測試 + E2E，約 3 分鐘（機器忙碌時會更久）
 npm run test:unit  # 只跑單元測試（不需要瀏覽器）
 npm run test:e2e   # 只跑 E2E
 ```
@@ -65,6 +65,7 @@ CHROME_PATH=/usr/bin/chromium npm run test:e2e
 - `e2e/dat-lifecycle.test.js`：單／雙人練習轉正式、完整六關及第二局、雙人共同編號更新、已存成績離開不重送、HTTP 500 人工重試、網路中斷與逾時。
 - `e2e/dat-checkpoint.test.js`：第三關回大廳存檔失敗時保留中場；重試成功後離開不重送已存成績。
 - `e2e/dat-assets.test.js`：素材 API 懸置／錯誤／壞 JSON、首張及變身圖片 404、圖片懸置、重玩取消舊動畫。確認備援圖片可見且有實際尺寸。
+- `e2e/dat-double-image-retention.test.js`：兔子升級為貓後，下一張圖片404／逾時與之後誤按紅光都保留貓；使用實際貓圖片並確認可見及自然尺寸。
 - `e2e/dat-controls.test.js`：**不修改命中幾何**，驗證實際鍵盤瞄準、滑鼠方向鈕按住／放開、失焦清鍵與同題連按只判定一次；另有單人真實時鐘與 requestAnimationFrame 測試。
 
 完整流程為可重現性使用假時鐘與固定命中；實際鍵鼠測試保留真實命中幾何。所有外部請求被攔截，不會把測試成績寫到正式庫。這些測試不代表已完成正式 API 或實體手柄驗收。

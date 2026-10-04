@@ -85,7 +85,9 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       imgElem.style.opacity = '0.2';
       imgElem.style.transform = 'scale(0.6)';
 
-      window.DatAssets.setImage(imgElem, nextAssetUrl).then(() => {
+      // 升級素材失敗時保留目前可用圖片，避免已變身的貓退回預設兔子。
+      const currentImage = imgElem.getAttribute('src') || 'assets/animals/rabbit.png';
+      window.DatAssets.setImage(imgElem, nextAssetUrl, currentImage).then(() => {
         if (imageGeneration !== animalImageGeneration) return;
         imgElem.style.opacity = '1';
         imgElem.style.transform = 'scale(1)';

@@ -1,6 +1,6 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=6';
+import { createPlayer } from './game.js?v=7';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";

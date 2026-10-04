@@ -309,8 +309,11 @@ export class GameDriver {
       { arg: { seen: this.seenResults, re: RESULT_RE.source } },
     );
     await this.page.evaluate(() => { window.__qa.offTarget = [false, false]; });
-    // 等換圖動畫（150ms）結束
+    // 換圖需等待非同步預載完成；快轉300ms不代表HTTP／圖片解碼已完成。
     await this.page.clock.runFor(300);
+    await this.waitFor(() => [...document.querySelectorAll('#animal-image, [data-ui="animal-image"]')]
+      .every((img) => img.complete && img.naturalWidth > 0 && img.style.opacity !== '0.2'),
+    '動物圖片預載或回退完成', { stepMs: 100, maxMs: 6000 });
 
     const state = await this.page.evaluate(
       ({ seenResults, seenMarks, re }) => seenResults.map((n, p) => ({

@@ -5,10 +5,10 @@ import { startStaticServer, launchBrowser, openGame } from './helpers.js';
 const assetHost = 'https://attention-lesson-plan-assets.zeabur.app';
 const files = ['/uploads/initial.png', '/uploads/evolved.png'];
 
-async function expectRabbit(session, game) {
-  await session.driver.waitFor(() => [...document.querySelectorAll('#animal-image, [data-ui="animal-image"]')]
-    .every((img) => img.complete && img.naturalWidth > 0 && img.src.endsWith('/assets/animals/rabbit.png')),
-  '備援兔子圖片載入', { maxMs: 15000 });
+async function expectAnimal(session, game, expectedPath = '/assets/animals/rabbit.png') {
+  await session.driver.waitFor((expectedPath) => [...document.querySelectorAll('#animal-image, [data-ui="animal-image"]')]
+    .every((img) => img.complete && img.naturalWidth > 0 && img.src.endsWith(expectedPath)),
+  '有效動物圖片載入', { maxMs: 15000, arg: expectedPath });
   const images = await session.page.locator('#animal-image, [data-ui="animal-image"]').evaluateAll((list) => list.map((img) => ({
     width: img.naturalWidth, visibility: getComputedStyle(img).visibility,
     opacity: getComputedStyle(img).opacity,
@@ -73,7 +73,7 @@ describe('DAT 素材錯誤回退', () => {
           },
         });
         try {
-          await expectRabbit(session, game);
+          await expectAnimal(session, game);
           const results = await session.driver.playQuestion(...Array(game === 'double' ? 2 : 1).fill('correct'));
           for (const result of results) assert.match(result.message, /＋1 分/);
         } finally { await session.context.close(); }
@@ -93,7 +93,7 @@ describe('DAT 素材錯誤回退', () => {
         for (let i = 0; i < 5; i++) {
           await session.driver.playQuestion(...Array(game === 'double' ? 2 : 1).fill('correct'));
         }
-        await expectRabbit(session, game);
+        await expectAnimal(session, game, game === 'double' ? files[0] : undefined);
       } finally { await session.context.close(); }
     });
   }
