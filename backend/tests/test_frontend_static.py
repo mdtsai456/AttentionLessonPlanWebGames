@@ -24,8 +24,9 @@ def test_game_lobby_and_dccs_are_served():
     with TestClient(main.app) as client:
         lobby = client.get("/app/games.html")
         game = client.get("/app/dccs/index.html")
-        module = client.get("/app/dccs/js/dccs.js")
+        module = client.get("/app/DCCS/js/dccs.js")
     assert lobby.status_code == 200
+    assert "require-student.js" in lobby.text
     assert game.status_code == 200
     # ES module 必須以 JavaScript 的 content-type 提供，否則瀏覽器拒絕載入。
     assert module.status_code == 200

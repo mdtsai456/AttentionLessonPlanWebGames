@@ -52,6 +52,7 @@ export function createInput(bindings) {
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', clearAll);
+  window.addEventListener('webgame:pause', clearAll);
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   return {
@@ -72,6 +73,7 @@ export function createInput(bindings) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearAll);
+      window.removeEventListener('webgame:pause', clearAll);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       clearAll();
     },

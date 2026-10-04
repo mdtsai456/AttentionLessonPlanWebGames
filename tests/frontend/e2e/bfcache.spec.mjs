@@ -81,3 +81,57 @@ for (const loggedOut of [true, false]) {
     }
   });
 }
+
+for (const path of ['Select/index.html', DCCS_PAGE, 'DAT_double/DAT_double.html', 'Back/index.html']) {
+  test(`${path} bfcache 後端撤銷 token 時回 Home`, async ({ page, request }) => {
+    const { DOUBLE, TEACHER } = await import('./helpers.mjs');
+    const shows = await trackPageshow(page);
+    await loginAs(page, path.startsWith('Back/') ? TEACHER : path.includes('double') ? DOUBLE : STUDENT);
+    await page.goto(path);
+    await expect.poll(() => page.evaluate(() => !!window.WebGameAuth?.active && !!window.WebGameRuntime)).toBe(true);
+    const token = await page.evaluate((double) => sessionStorage.getItem(double ? 'student2_token' : 'token'), path.includes('double'));
+    await page.goto('Home/index.html');
+    await request.get(`/__test/revoke?token=${encodeURIComponent(token)}`);
+    await page.goBack({ waitUntil: 'commit' });
+    await expect.poll(() => shows).toContainEqual({ path: '/' + path, persisted: true });
+    await expect(page).toHaveURL(HOME_URL);
+    expect(await page.evaluate(() => sessionStorage.getItem('token'))).toBeNull();
+  });
+}
+
+test('bfcache 等待後端驗證時凍結輸入、計時與成績，成功後保留狀態', async ({ page }) => {
+  const shows = await trackPageshow(page);
+  await loginAs(page, { ...STUDENT, token: 'delayed', student1_token: 'delayed' });
+  await page.goto('DAT_single/DAT_single.html');
+  await expect.poll(() => page.evaluate(() => !!window.WebGameRuntime && !!window.WebGameApi)).toBe(true);
+  await page.evaluate(() => {
+    window.authProbe = { count: 0, input: 0, time: 0, clicks: 0 };
+    setInterval(() => { authProbe.count++; authProbe.time = WebGameRuntime.now(); }, 20);
+    addEventListener('keydown', () => authProbe.input++);
+    addEventListener('click', () => authProbe.clicks++);
+  });
+  await page.waitForTimeout(100);
+  const snapshot = await page.evaluate(() => ({ ...authProbe }));
+  await page.goto('Home/index.html');
+  await page.waitForTimeout(300);
+  await page.goBack({ waitUntil: 'commit' });
+  await expect.poll(() => shows).toContainEqual({ path: '/DAT_single/DAT_single.html', persisted: true });
+  expect(await page.evaluate(() => document.documentElement.style.visibility)).toBe('hidden');
+  const frozen = await page.evaluate(() => ({ ...authProbe }));
+  await page.keyboard.press('ArrowRight');
+  const blocked = await page.evaluate(async () => {
+    document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    try { await WebGameApi.submitSession({ data: { grade: 'G9', caseId: 'S99', school: 'TEST', mode: 'single' } }); return false; }
+    catch { return true; }
+  });
+  expect(blocked).toBe(true);
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => ({ ...authProbe }))).toEqual(frozen);
+  await expect.poll(() => page.evaluate(() => !!window.WebGameAuth.active)).toBe(true);
+  await page.waitForTimeout(100);
+  const resumed = await page.evaluate(() => ({ ...authProbe }));
+  expect(resumed.count).toBeGreaterThan(snapshot.count);
+  expect(resumed.time - snapshot.time).toBeLessThan(600);
+  expect(resumed.input).toBe(0);
+  expect(resumed.clicks).toBe(0);
+});

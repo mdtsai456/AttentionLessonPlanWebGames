@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
 import queries
 import writes
@@ -26,7 +26,7 @@ from models import (
     TeacherLoginRequest,
     TeacherLoginResponse,
 )
-from routers.identity import extract_bearer_token
+from routers.identity import Identity, extract_bearer_token, get_current_identity
 
 router = APIRouter(tags=["auth"])
 
@@ -100,3 +100,18 @@ def logout(authorization: str | None = Header(default=None)) -> None:
         writes.delete_login_session(token)
     except Exception as exc:
         raise db_error(exc) from exc
+
+
+@router.get("/api/auth/me")
+def auth_me(response: Response, identity: Identity = Depends(get_current_identity)) -> dict:
+    """由有效登入紀錄取得身分，不接受前端宣告角色或學生欄位。"""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    body = {"role": identity.subject_type, "school": identity.school,
+            "expiresAt": identity.expires_at}
+    if identity.subject_type == "student":
+        body.update(grade=identity.grade, caseId=identity.case_id,
+                    studentKey=f"{identity.grade}_{identity.case_id}")
+    else:
+        body.update(teacherId=identity.teacher_id, teacherName=identity.teacher_name)
+    return body

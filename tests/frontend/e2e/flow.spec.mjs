@@ -31,3 +31,19 @@ for (const game of GAMES) {
     }
   });
 }
+
+for (const game of GAMES.filter((game) => game.label !== '指令出擊')) {
+  test(`雙人 Select → ${game.label} 教學 → 遊戲`, async ({ page }) => {
+    const { DOUBLE } = await import('./helpers.mjs');
+    await loginAs(page, DOUBLE);
+    await page.goto('Select/index.html');
+    for (const slot of [1, 2]) {
+      await page.locator(`[data-game-list="${slot}"] [data-select-game]`, { hasText: game.label }).click();
+      await page.click(`[data-enter="${slot}"]`);
+    }
+    await expect(page).toHaveURL(/_double_tutorial.html$/);
+    await page.click('a.btn-green');
+    await expect(page).toHaveURL(game.label === '賽道攔截' ? /DCCS\/double.html$/ : game.label === '瓢蟲追擊令' ? /DAT_double\/DAT_double.html(?:\?.*)?$/ : game.label === '漂浮泡泡' ? /EFT_double\/EFT_double.html$/ : /TGame2\/index.html$/);
+    await expect.poll(() => page.evaluate(() => !!window.WebGameAuth?.active)).toBe(true);
+  });
+}

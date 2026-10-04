@@ -6,7 +6,7 @@
     uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 端點：
-    POST /api/sessions                              ← Unity 用，無驗證
+    POST /api/sessions                              ← 學生 token；雙人另帶搭檔 token
     POST /api/auth/teacher/login
     POST /api/auth/student/login
     POST /api/auth/logout
@@ -19,11 +19,10 @@
     GET /api/teachers/{teacherId}/students            ← 須帶 token（老師本人）
     GET /api/games                                   ← 公開，靜態遊戲清單
     GET /api/attention/me                            ← 學生專用，轉發手錶專心判定
-    GET /demo   ← 開發／驗收用的簡易檢視畫面（非正式前端，帳密登入後會壞掉）
+    GET /demo                                       ← 轉 /app/Back/index.html
 
-靜態前端：正式前端（登入頁、DMS、遊戲大廳與網頁版遊戲）掛在 /app，由本服務
-一併提供，入口是 /app/。因為與 /api/* 同源，瀏覽器端不需要任何 CORS 放行，
-也不必另外起一個靜態伺服器。
+靜態前端：/app 只掛載現行前端目錄白名單，舊網址轉至 Home／Select／Back 與對應遊戲。
+同源 /app 頁面直接使用 /api；靜態外部部署需設定 CORS origin。
 
 CORS：前端若部署在別的網域（不走 /app）才需要放行其 origin。用環境變數
 CORS_ALLOW_ORIGINS 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時
@@ -39,7 +38,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import validate_db_settings
@@ -47,9 +46,7 @@ from routers import attention, auth, directory, sessions, students
 
 load_dotenv()
 
-_DEMO_HTML = Path(__file__).parent / "demo" / "index.html"
-
-# 正式前端在 repo 的 frontend/，與 backend/ 平行。
+# frontend/ 僅保留舊網址轉址殼；現行頁從目錄白名單掛載。
 _FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 # 未設定 CORS_ALLOW_ORIGINS 時放行的本機前端 dev server。
@@ -84,7 +81,7 @@ async def lifespan(_: FastAPI):
 # version 是開發時手動訂的版本號
 app = FastAPI(title="ADHD Game Data API", version="0.3.0", lifespan=lifespan)
 
-# 這支 API 沒有 cookie／session（廠商定調無驗證登入），故 allow_credentials=False。
+# 使用 Bearer token，不使用 cookie，故 allow_credentials=False。
 # 安全邊界是 allow_origins 這份明確清單，不是靠 method／header 限制。
 app.add_middleware(
     CORSMiddleware,
@@ -93,6 +90,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def uncached_identity(request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/api/auth/me":
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 
 app.include_router(sessions.router)
 app.include_router(students.router)
@@ -116,32 +122,51 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/demo", response_class=HTMLResponse, include_in_schema=False)
-def demo() -> str:
-    """開發／驗收用的簡易檢視畫面。
+# 舊前端入口一律轉至現行頁，HTTP 轉址優先於靜態掛載。
+_LEGACY_REDIRECTS = {
+    "/demo": "/app/Back/index.html",
+    "/demo/": "/app/Back/index.html",
+    "/demo/index.html": "/app/Back/index.html",
+    "/app": "/app/Home/index.html",
+    "/app/": "/app/Home/index.html",
+    "/app/index.html": "/app/Home/index.html",
+    "/app/dms.html": "/app/Back/index.html",
+    "/app/games.html": "/app/Select/index.html",
+    "/app/dccs/": "/app/DCCS/index.html",
+    "/app/dccs/index.html": "/app/DCCS/index.html",
+    "/app/dccs/double.html": "/app/DCCS/double.html",
+    "/app/DAT_single/DAT_tutorial.html": "/app/tutorial/DAT_tutorial.html",
+    "/app/bubblegame/": "/app/Select/index.html",
+    "/app/bubblegame/index.html": "/app/Select/index.html",
+}
 
-    讀取同源的 /api/*（不會有 CORS 問題），把「選場域→選老師／學生→看報告」的
-    流程畫出來給人看。**這不是正式前端**（正式前端由另一位組員負責）。
-    """
-    if not _DEMO_HTML.exists():
-        return "<h1>demo/index.html 不存在</h1>"
-    return _DEMO_HTML.read_text(encoding="utf-8")
+
+def legacy_redirect(target: str):
+    def redirect() -> RedirectResponse:
+        return RedirectResponse(target, status_code=307, headers={"Cache-Control": "no-store"})
+    return redirect
 
 
-# 靜態前端掛在最後，路徑固定為 /app，不會遮蔽 /api/*、/health、/demo，
-# 也不會跟日後新增的 API 路由相撞。
-#
-# 只掛 frontend/ 這一個目錄：後端原始碼與 .env 不在其中，沒有外流風險——
-# 這點比先前那支「伺服整個 repo 根、再用黑名單擋掉 backend/」的靜態伺服器
-# 安全，白名單本來就比黑名單可靠。
-#
-# html=True 讓 /app/ 直接吐 frontend/index.html（登入頁）。
+for source, target in _LEGACY_REDIRECTS.items():
+    app.add_api_route(source, legacy_redirect(target), include_in_schema=False)
+
+# 白名單掛載現行功能頁；不提供 repo 根或 backend、.env、.context。
+_SITE_ROOT = Path(__file__).parent.parent
+
+
+@app.get("/app/主題資料.csv", include_in_schema=False)
+def game_questions() -> FileResponse:
+    return FileResponse(_SITE_ROOT / "主題資料.csv", media_type="text/csv")
+
+for directory_name in (
+    "Home", "Select", "Back", "shared", "tutorial", "DCCS", "DAT_single",
+    "DAT_double", "EFT_single", "EFT_double", "IM1", "TGame1", "TGame2",
+):
+    app.mount(f"/app/{directory_name}",
+              StaticFiles(directory=_SITE_ROOT / directory_name, html=True),
+              name=f"site-{directory_name}")
 if _FRONTEND_DIR.is_dir():
-    app.mount(
-        "/app",
-        StaticFiles(directory=_FRONTEND_DIR, html=True),
-        name="frontend",
-    )
+    app.mount("/app", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
 
 
 if __name__ == "__main__":

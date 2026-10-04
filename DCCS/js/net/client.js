@@ -13,7 +13,7 @@ const PENDING_PREFIX = 'dccs_pending_';
 const REJECTED_PREFIX = 'dccs_rejected_';
 
 // 這些 4xx 是暫時性的，仍應重送；其餘 4xx 視為永久拒絕。
-const RETRYABLE_CLIENT_STATUSES = new Set([408, 429]);
+const RETRYABLE_CLIENT_STATUSES = new Set([401, 403, 408, 429]);
 
 function isPermanentRejection(status) {
   if (typeof status !== 'number') return false;
@@ -96,12 +96,8 @@ export function buildPayload({ lessonId, student, summary }) {
  * @param {string} url
  * @returns {Promise<string>} 伺服器回應的原始內容
  */
-async function postPayload(payload, url) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+async function postPayload(payload, url, player) {
+  const res = await window.WebGameApi.submitSession(payload, { url, player });
 
   const text = await res.text().catch(() => '');
 
@@ -123,9 +119,9 @@ async function postPayload(payload, url) {
  * @param {{url?: string}} [opts]
  * @returns {Promise<{ok: boolean, detail: string}>}
  */
-export async function submitResult(payload, { url = resolveSubmitUrl() } = {}) {
+export async function submitResult(payload, { url = resolveSubmitUrl(), player } = {}) {
   try {
-    const detail = await postPayload(payload, url);
+    const detail = await postPayload(payload, url, player);
     return { ok: true, detail };
   } catch (err) {
     const message = err && err.message ? err.message : String(err);
@@ -200,14 +196,17 @@ function collectByPrefix(prefix) {
  * @returns {Promise<{attempted: number, sent: number, failed: number,
  *                    rejected: number}>}
  */
-export async function flushPendingResults({ url = resolveSubmitUrl() } = {}) {
+async function flushPending({ url = resolveSubmitUrl() } = {}) {
   const pending = listPendingResults();
+  let attempted = 0;
   let sent = 0;
   let failed = 0;
 
   let rejected = 0;
 
   for (const { key, payload } of pending) {
+    if (window.WebGameApi.sessionPlayer(payload) < 0) continue;
+    attempted += 1;
     try {
       await postPayload(payload, url);
       try {
@@ -246,7 +245,7 @@ export async function flushPendingResults({ url = resolveSubmitUrl() } = {}) {
     }
   }
 
-  return { attempted: pending.length, sent, failed, rejected };
+  return { attempted, sent, failed, rejected };
 }
 
 /**
@@ -255,4 +254,11 @@ export async function flushPendingResults({ url = resolveSubmitUrl() } = {}) {
  */
 export function listRejectedResults() {
   return collectByPrefix(REJECTED_PREFIX);
+}
+
+// 雙人同時掛載兩個遊戲實例時，共用一次重送，避免同一筆暫存重複寫入。
+let flushing = null;
+export function flushPendingResults(opts) {
+  if (!flushing) flushing = flushPending(opts).finally(() => { flushing = null; });
+  return flushing;
 }

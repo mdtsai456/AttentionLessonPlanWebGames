@@ -138,9 +138,9 @@ function makeDoublePayload(result, pairId) {
   return payload;
 }
 
-async function submitPlayerResult(payload) {
+async function submitPlayerResult(payload, player) {
   const { ok, detail } =
-    await submitResult(payload);
+    await submitResult(payload, { player });
 
   if (!ok) {
     // submitResult 已負責暫存；拋錯讓結算畫面標示送出失敗。
@@ -662,8 +662,8 @@ async function startSession(player1, player2) {
         const payloads = [player1Handle, player2Handle]
           .map((handle) => handle.buildLeavePayload(stage))
           .filter(Boolean);
-        await Promise.all(payloads.map((payload) =>
-          submitPlayerResult(makeDoublePayload({ payload }, pairId)).catch((error) => {
+        await Promise.all(payloads.map((payload, index) =>
+          submitPlayerResult(makeDoublePayload({ payload }, pairId), index + 1).catch((error) => {
             console.error(error);
           })
         ));
@@ -739,8 +739,8 @@ async function startSession(player1, player2) {
 
       const submissions =
         await Promise.allSettled([
-          submitPlayerResult(payload1),
-          submitPlayerResult(payload2),
+          submitPlayerResult(payload1, 1),
+          submitPlayerResult(payload2, 2),
         ]);
 
       const player1Accuracy =

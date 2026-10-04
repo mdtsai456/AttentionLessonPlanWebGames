@@ -22,3 +22,9 @@ export const GUARDED_PAGES = [
   "TGame1/index.html",
   "IM1/index.html",
 ];
+
+export const DOUBLE_PAGES = [
+  'tutorial/DCCS_double_tutorial.html', 'tutorial/DAT_double_tutorial.html',
+  'tutorial/EFT_double_tutorial.html', 'tutorial/TGame_double_tutorial.html',
+  'DCCS/double.html', 'DAT_double/DAT_double.html', 'EFT_double/EFT_double.html', 'TGame2/index.html',
+];

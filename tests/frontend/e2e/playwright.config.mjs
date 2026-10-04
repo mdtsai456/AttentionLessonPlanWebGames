@@ -18,7 +18,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   webServer: {
-    command: `python3 -m http.server ${PORT} --bind 127.0.0.1 --directory "${SITE_ROOT}"`,
+    command: `node "${new URL("../server.mjs", import.meta.url).pathname}"`,
     url: `http://127.0.0.1:${PORT}/Home/index.html`,
     // port 被佔用就直接失敗，不要誤測到別人的伺服器。
     reuseExistingServer: false,

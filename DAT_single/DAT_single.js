@@ -39,7 +39,7 @@ let stageQuestionNo = 0;
 let levelOutcomes = [[]];
 
 function startGame() {
-  gameStartTime = Date.now();
+  gameStartTime = window.WebGameRuntime.now();
   stage = 1;
   stageDeadline = 0;
   stageQuestionNo = 0;
@@ -168,9 +168,9 @@ function updateProgress() {
   }
 
   const left = stageDeadline
-    ? Math.max(0, Math.ceil((stageDeadline - Date.now()) / 1000))
+    ? Math.max(0, Math.ceil((stageDeadline - window.WebGameRuntime.now()) / 1000))
     : STAGE_MS / 1000;
-  const used = stageDeadline ? Math.min(STAGE_MS, Date.now() - (stageDeadline - STAGE_MS)) : 0;
+  const used = stageDeadline ? Math.min(STAGE_MS, window.WebGameRuntime.now() - (stageDeadline - STAGE_MS)) : 0;
   const ratio = ((stage - 1) + used / STAGE_MS) / STAGE_COUNT;
   $('round').textContent = `第 ${Math.max(stageQuestionNo, 1)} 題・剩餘 ${left} 秒（第 ${stage} / ${STAGE_COUNT} 關）`;
   $('progress').setAttribute('aria-valuemax', 100);
@@ -182,7 +182,7 @@ function answerLimitMs() {
   /*
   //修改會在最後一秒跑很多題目的 bug
   if (isPractice || !stageDeadline) return ROUND_MS;
-  return Math.max(0, Math.min(ROUND_MS, stageDeadline - Date.now()));
+  return Math.max(0, Math.min(ROUND_MS, stageDeadline - window.WebGameRuntime.now()));
   */
 }
 
@@ -219,7 +219,7 @@ function isOnAnimal() {
 function showQuestion() {
   if (!isPractice) {
     if (!stageDeadline) {
-      stageDeadline = Date.now() + STAGE_MS;
+      stageDeadline = window.WebGameRuntime.now() + STAGE_MS;
       stageQuestionNo = 0;
     }
     if (!questions[index]) {
@@ -419,7 +419,7 @@ function endQuestion() {
   }
 
   // 修改會在最後一秒跑很多題目的 bug
-  if (stageDeadline && Date.now() >= stageDeadline - 20) {
+  if (stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20) {
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;
@@ -456,7 +456,7 @@ function saveCurrentRun(stage) {
     offTarget: offTarget,
     timedOut: timedOut,
     accuracy: metrics.accuracy,
-    duration: Date.now() - gameStartTime,
+    duration: window.WebGameRuntime.now() - gameStartTime,
     stage: stage,
     levelAccuracy: levelAccuracyText(stage),
     avgReactionMs: metrics.avgReactionMs,
@@ -511,7 +511,7 @@ function finishGame() {
 }
 
 async function saveGameDataToBackend(data) {
-  const url = `${window.WebGameApi.resolveApiBase()}/sessions`;
+
 
   const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade');
   const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case');
@@ -536,7 +536,7 @@ async function saveGameDataToBackend(data) {
       caseId: caseId,
       school: school,
       currentDay: currentDay,
-      startTime: gameStartTime,
+      startTime: window.WebGameRuntime.toWallTime(gameStartTime),
       endTime: Date.now(),
       mode: "single",
       stats: [
@@ -555,13 +555,7 @@ async function saveGameDataToBackend(data) {
   };
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    const res = await window.WebGameApi.submitSession(payload);
 
     if (res.status === 201) {
       const result = await res.json();
@@ -608,7 +602,7 @@ function tick(time) {
       updateClock();
 
       //修改會在最後一秒跑很多題目的 bug
-      const isStageTimeout = !isPractice && stageDeadline && Date.now() >= stageDeadline;
+      const isStageTimeout = !isPractice && stageDeadline && window.WebGameRuntime.now() >= stageDeadline;
       if (elapsed >= answerLimitMs() || isStageTimeout) {
         endQuestion();
       }
@@ -783,3 +777,4 @@ function blockUnload(event) {
   }
 }
 window.addEventListener('beforeunload', blockUnload);
+window.addEventListener("webgame:pause", () => { keys.clear(); pointerDirections.clear(); });
