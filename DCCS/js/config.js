@@ -23,8 +23,10 @@ export const CONFIG = Object.freeze({
   SESSION_SECONDS: 360,
   // 回饋
   TICK_FEEDBACK_SECONDS: 0.6,
-  // HUD：分數條視覺滿格基準（分數沒有固定上限，僅供進度條顯示用）
-  SCORE_BAR_FULL: 60,
+  // HUD：分數條視覺滿格基準（分數沒有固定上限，僅供進度條顯示用）。
+  // 計分改為逐題後一場滿分從 112 掉到約 56，這個值跟著對半砍（原本是 60），
+  // 進度條的填充感才和逐閥計分時代一致。改動計分語意時必須重算。
+  SCORE_BAR_FULL: 30,
   // 迴圈
   FIXED_DT: 1 / 60,
   MAX_FRAME_DT: 0.25,

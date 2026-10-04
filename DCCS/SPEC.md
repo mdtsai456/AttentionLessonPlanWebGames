@@ -311,14 +311,15 @@ export const CONFIG = Object.freeze({
   // 閥
   ROT_SEC_PER_SLOT: 0.30, SLOT_LANE_SPACING: 1.30, SLOT_RENDER_LIMIT: 4.0,
   // 場次
-  SESSION_SECONDS: 600,
+  SESSION_SECONDS: 360,
   // 注意：這裡不包含 LEVEL_SECONDS。每關時長 = SESSION_SECONDS / 關卡數，
   // 由 track.js 依 manifest.levels.length 在執行期推導（見 1.5 / 4.12），
   // 不得在 CONFIG 中寫死。
   // 回饋
   TICK_FEEDBACK_SECONDS: 0.6,
   // HUD：分數條的視覺滿格基準。分數沒有上限，這只影響進度條畫多長。
-  SCORE_BAR_FULL: 60,
+  // 逐題計分下一場滿分約 56，所以砍半成 30（逐閥時代是 60）。
+  SCORE_BAR_FULL: 30,
   // 迴圈
   FIXED_DT: 1 / 60, MAX_FRAME_DT: 0.25,
 });
@@ -438,6 +439,10 @@ export function drawHud(ctx, viewport, state) -> void
 繪製：左上「得分」膠囊 + 進度條 + 分數；左側直立標題「賽道攔截」+ 垂直進度條
 （`elapsed / total`）；`showTick` 為真時右上畫綠色 ✓。
 不使用外部字型，用 system font stack。
+
+分數進度條畫的是 `score / CONFIG.SCORE_BAR_FULL`（夾在 0..1）。這個常數是**視覺滿格
+基準、不是分數上限**，但它跟計分語意綁在一起：逐題計分下一場滿分約 56，改計分方式時
+必須重算（見 4.1）。
 
 ### 4.8 `js/game/valve.js`
 
