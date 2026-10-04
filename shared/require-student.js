@@ -22,9 +22,16 @@
     }
   }
 
-  if (!isStudentLoggedIn()) {
+  function guard() {
+    if (isStudentLoggedIn()) return;
     // 先藏起來，避免跳轉前閃一下頁面內容。
     document.documentElement.style.visibility = "hidden";
     global.location.replace(loginPageHref);
   }
+
+  guard();
+  // 登出後按上一頁，頁面可能從 bfcache 原樣還原、不會重跑 script，要再檢查一次。
+  global.addEventListener("pageshow", function (event) {
+    if (event.persisted) guard();
+  });
 })(window);
