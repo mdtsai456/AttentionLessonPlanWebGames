@@ -299,23 +299,34 @@ function startLevel(level) {
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
 
+  const token = session.roundToken;
   [players.p1, players.p2].forEach((player) => {
-    player.busy = false;
+    player.busy = true;
     player.questionSeq = 0;
     player.currentQuestion = makeQuestion(level, 0);
     player.promptEl.classList.remove("is-hidden");
-    player.itemLeft.classList.remove("is-fading");
-    player.itemRight.classList.remove("is-fading");
+    player.itemLeft.classList.add("is-fading");
+    player.itemRight.classList.add("is-fading");
     resetSceneAndPlayer(player);
     hideFeedback(player);
-    renderQuestion(player);
-    player.questionShownAt = Date.now();
     renderPlayerHud(player);
+    showFirstQuestion(player, token);
   });
+  preloadStageImages(level);
 
   renderLevel();
   renderTimer();
   // 計時不在這裡開始：等任一人第一次按鍵才同時開始（見 startLevelTimer）
+}
+
+// 圖示載入完成才淡入並開放按鍵，避免先閃出上一關的圖示
+async function showFirstQuestion(player, token) {
+  await renderQuestion(player);
+  if (!sameRound(token)) return;
+  player.itemLeft.classList.remove("is-fading");
+  player.itemRight.classList.remove("is-fading");
+  player.questionShownAt = Date.now();
+  player.busy = false;
 }
 
 function startLevelTimer() {
@@ -377,12 +388,16 @@ function currentQuestion(player) {
   return player.currentQuestion;
 }
 
-function renderQuestion(player) {
+// 等兩張圖都載入好才一起換上，避免先閃出上一題的圖示
+async function renderQuestion(player) {
   const question = currentQuestion(player);
   if (!question) return;
-  setItemImage(player.itemLeft, question.leftItem);
-  setItemImage(player.itemRight, question.rightItem);
   player.promptEl.textContent = question.prompt;
+  const [leftSrc, rightSrc] = await preloadQuestionImages(question);
+  if (currentQuestion(player) !== question) return;
+  setItemImage(player.itemLeft, question.leftItem, leftSrc);
+  setItemImage(player.itemRight, question.rightItem, rightSrc);
+  await Promise.allSettled([player.itemLeft.decode(), player.itemRight.decode()]);
 }
 
 function renderPlayerHud(player) {
@@ -432,11 +447,17 @@ async function chooseDirection(player, choice) {
   showFeedback(player, isCorrect);
   renderPlayerHud(player);
 
-  await wait(NEAR_MS);
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
+  // 答對就先決定下一題，趁走路動畫時在背景下載圖示
+  let next = null;
+  if (isCorrect) {
+    player.questionSeq += 1;
+    next = makeQuestion(session.level, player.questionSeq);
+    preloadQuestionImages(next);
   }
+
+  // 回合已換（關卡結束或下一關開始）就直接離開，busy 交給新回合處理
+  await wait(NEAR_MS);
+  if (!sameRound(token)) return;
 
   if (!isCorrect) {
     hideFeedback(player);
@@ -451,25 +472,17 @@ async function chooseDirection(player, choice) {
   player.scene.classList.add("is-turning");
   setSceneBg(player, SCENE_TURN[choice]);
   await wait(TURN_MS);
+  if (!sameRound(token)) return;
 
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
-  }
-
-  player.questionSeq += 1;
-  player.currentQuestion = makeQuestion(session.level, player.questionSeq);
+  player.currentQuestion = next;
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");
-  renderQuestion(player);
-  player.questionShownAt = Date.now();
+  await renderQuestion(player);
+  if (!sameRound(token)) return;
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
   await wait(40);
-  if (!sameRound(token)) {
-    player.busy = false;
-    return;
-  }
+  if (!sameRound(token)) return;
 
   player.playerEl.classList.remove("is-snap");
   player.scene.classList.remove("is-snap");
@@ -477,7 +490,9 @@ async function chooseDirection(player, choice) {
   player.scene.classList.add("is-arrive");
   player.itemLeft.classList.remove("is-fading");
   player.itemRight.classList.remove("is-fading");
+  player.questionShownAt = Date.now();
   await wait(ARRIVE_MS);
+  if (!sameRound(token)) return;
 
   player.busy = false;
 }
@@ -844,15 +859,45 @@ function showToast(message, isError) {
   toastTimer = setTimeout(() => toastEl.classList.remove("is-show"), 4500);
 }
 
-// 項目圖片：找不到 img/items/名稱.png 時，改用文字卡（SVG）
-function setItemImage(el, id) {
+// 項目圖片：先用 Image() 載入並解碼，完成後才換到畫面上。
+// 找不到 img/items/名稱.png 時，改用文字卡（SVG）。成功或失敗都會 resolve。
+const itemImageCache = new Map(); // id -> Promise<可直接用的 src>
+
+function loadItemImage(id) {
+  if (!itemImageCache.has(id)) {
+    itemImageCache.set(id, new Promise((resolve) => {
+      if (missingImages.has(id)) return resolve(labelCard(id));
+      const img = new Image();
+      img.onload = () => {
+        const src = img.src;
+        if (img.decode) img.decode().then(() => resolve(src), () => resolve(src));
+        else resolve(src);
+      };
+      img.onerror = () => {
+        missingImages.add(id);
+        resolve(labelCard(id));
+      };
+      img.src = itemSrc(id);
+    }));
+  }
+  return itemImageCache.get(id);
+}
+
+function preloadQuestionImages(question) {
+  return Promise.all([loadItemImage(question.leftItem), loadItemImage(question.rightItem)]);
+}
+
+// 開新關卡時在背景下載這一關會用到的所有圖示
+function preloadStageImages(level) {
+  const rule = stageRules[level - 1];
+  if (!rule) return;
+  const wrongItems = rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  [...rule.correct, ...wrongItems].forEach(loadItemImage);
+}
+
+function setItemImage(el, id, src) {
   el.alt = id;
-  el.onerror = () => {
-    el.onerror = null;
-    missingImages.add(id);
-    el.src = labelCard(id);
-  };
-  el.src = missingImages.has(id) ? labelCard(id) : itemSrc(id);
+  el.src = src;
 }
 
 function xmlEscape(text) {

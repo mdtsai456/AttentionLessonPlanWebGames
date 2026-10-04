@@ -85,6 +85,7 @@ let customThemes = null; // 由 CSV 自動載入；失敗時維持 null 使用�
 
 const state = {
   level: 1,
+  roundToken: 0,
   questionSeq: 0,
   currentQuestion: null,
   score: 0,
@@ -154,24 +155,35 @@ function startGame() {
   startLevel(1);
 }
 
-function startLevel(level) {
+async function startLevel(level) {
   clearInterval(state.timerId);
+  state.roundToken += 1;
+  const token = state.roundToken;
   state.level = level;
   state.questionSeq = 0;
   state.remaining = TIME_LIMIT_SEC;
-  state.busy = false;
+  state.busy = true;
   state.playing = true;
   state.currentQuestion = makeQuestion(level, 0);
   resultEl.classList.add("is-hidden");
   stageClearModal.classList.add("is-hidden");
   promptEl.classList.remove("is-hidden");
   resetSceneAndPlayer();
+  itemLeft.classList.add("is-fading");
+  itemRight.classList.add("is-fading");
+  hideFeedback();
+  renderHud();
+
+  // 圖示載入完成才淡入、開始計時，載入時間不算在作答時間內。
+  // 先發出這一題的請求，再在背景下載整關的圖示。
+  const shown = renderQuestion();
+  preloadStageImages(level);
+  await shown;
+  if (!sameRound(token)) return;
   itemLeft.classList.remove("is-fading");
   itemRight.classList.remove("is-fading");
-  hideFeedback();
-  renderQuestion();
   state.questionShownAt = Date.now();
-  renderHud();
+  state.busy = false;
   state.timerId = setInterval(tick, 1000);
 }
 
@@ -208,16 +220,16 @@ function makeQuestion(level, seq) {
   };
 }
 
-function renderQuestion() {
+// 等兩張圖都載入好才一起換上，避免先閃出上一題的圖示
+async function renderQuestion() {
   const question = currentQuestion();
   if (!question) return;
-  // itemLeft.src = itemSrc(question.leftItem);
-  // itemRight.src = itemSrc(question.rightItem);
-  // itemLeft.alt = question.leftItem;
-  // itemRight.alt = question.rightItem;
-  setItemImage(itemLeft, question.leftItem);
-  setItemImage(itemRight, question.rightItem);
   promptEl.textContent = question.prompt;
+  const [leftSrc, rightSrc] = await preloadQuestionImages(question);
+  if (currentQuestion() !== question) return;
+  setItemImage(itemLeft, question.leftItem, leftSrc);
+  setItemImage(itemRight, question.rightItem, rightSrc);
+  await Promise.allSettled([itemLeft.decode(), itemRight.decode()]);
 }
 
 function renderHud() {
@@ -230,6 +242,7 @@ async function chooseDirection(choice) {
   const question = currentQuestion();
   if (!question) return;
 
+  const token = state.roundToken;
   state.busy = true;
   state.reactionSamples.push(Math.max(0, Date.now() - state.questionShownAt));
   const isCorrect = choice === question.correct;
@@ -254,11 +267,17 @@ async function chooseDirection(choice) {
   showFeedback(isCorrect);
   renderHud();
 
-  await wait(NEAR_MS);
-  if (!state.playing) {
-    state.busy = false;
-    return;
+  // 答對就先決定下一題，趁走路動畫時在背景下載圖示
+  let next = null;
+  if (isCorrect) {
+    state.questionSeq += 1;
+    next = makeQuestion(state.level, state.questionSeq);
+    preloadQuestionImages(next);
   }
+
+  // 回合已換（暫停或下一關開始）就直接離開，busy 交給新回合處理
+  await wait(NEAR_MS);
+  if (!sameRound(token)) return;
 
   if (!isCorrect) {
     hideFeedback();
@@ -273,34 +292,37 @@ async function chooseDirection(choice) {
   scene.classList.add("is-turning");
   setSceneBg(SCENE_TURN[choice]);
   await wait(TURN_MS);
+  if (!sameRound(token)) return;
 
-  if (!state.playing) {
-    state.busy = false;
-    return;
-  }
-
-  state.questionSeq += 1;
-  state.currentQuestion = makeQuestion(state.level, state.questionSeq);
+  state.currentQuestion = next;
   itemLeft.classList.add("is-fading");
   itemRight.classList.add("is-fading");
-  renderQuestion();
-  state.questionShownAt = Date.now();
+  await renderQuestion();
+  if (!sameRound(token)) return;
   hideFeedback();
   resetSceneAndPlayer(true);
   await wait(40);
+  if (!sameRound(token)) return;
   player.classList.remove("is-snap");
   scene.classList.remove("is-snap");
   player.classList.add("is-arrive");
   scene.classList.add("is-arrive");
   itemLeft.classList.remove("is-fading");
   itemRight.classList.remove("is-fading");
+  state.questionShownAt = Date.now();
   await wait(ARRIVE_MS);
+  if (!sameRound(token)) return;
 
   state.busy = false;
 }
 
+function sameRound(token) {
+  return token === state.roundToken && state.playing;
+}
+
 function pausePlay() {
   state.playing = false;
+  state.roundToken += 1;
   clearInterval(state.timerId);
   hideFeedback();
   resetSceneAndPlayer();
@@ -727,15 +749,45 @@ function showToast(message, isError) {
   toastTimer = setTimeout(() => toastEl.classList.remove("is-show"), 4500);
 }
 
-// 項目圖片：找不到 img/items/名稱.png 時，改用文字卡（SVG）
-function setItemImage(el, id) {
+// 項目圖片：先用 Image() 載入並解碼，完成後才換到畫面上。
+// 找不到 img/items/名稱.png 時，改用文字卡（SVG）。成功或失敗都會 resolve。
+const itemImageCache = new Map(); // id -> Promise<可直接用的 src>
+
+function loadItemImage(id) {
+  if (!itemImageCache.has(id)) {
+    itemImageCache.set(id, new Promise((resolve) => {
+      if (missingImages.has(id)) return resolve(labelCard(id));
+      const img = new Image();
+      img.onload = () => {
+        const src = img.src;
+        if (img.decode) img.decode().then(() => resolve(src), () => resolve(src));
+        else resolve(src);
+      };
+      img.onerror = () => {
+        missingImages.add(id);
+        resolve(labelCard(id));
+      };
+      img.src = itemSrc(id);
+    }));
+  }
+  return itemImageCache.get(id);
+}
+
+function preloadQuestionImages(question) {
+  return Promise.all([loadItemImage(question.leftItem), loadItemImage(question.rightItem)]);
+}
+
+// 開新關卡時在背景下載這一關會用到的所有圖示
+function preloadStageImages(level) {
+  const rule = stageRules[level - 1];
+  if (!rule) return;
+  const wrongItems = rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  [...rule.correct, ...wrongItems].forEach(loadItemImage);
+}
+
+function setItemImage(el, id, src) {
   el.alt = id;
-  el.onerror = () => {
-    el.onerror = null;
-    missingImages.add(id);
-    el.src = labelCard(id);
-  };
-  el.src = missingImages.has(id) ? labelCard(id) : itemSrc(id);
+  el.src = src;
 }
 
 function xmlEscape(text) {
