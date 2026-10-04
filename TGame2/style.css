@@ -163,6 +163,9 @@ body {
   transform-origin: 50% 90%;
   z-index: 4;
   pointer-events: none;
+  /* 陰影放在外層：走路換幀時不必每張圖重算濾鏡 */
+  filter: drop-shadow(0 10px 16px rgba(30, 50, 30, 0.28));
+  will-change: transform;
 }
 
 .lane[data-player="p1"] .player {
@@ -239,7 +242,6 @@ body {
   object-fit: contain;
   transform: scale(1.42);
   transform-origin: 50% 100%;
-  filter: drop-shadow(0 10px 16px rgba(30, 50, 30, 0.28));
 }
 
 .lane[data-player="p2"] .player img {
