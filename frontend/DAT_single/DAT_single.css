@@ -345,20 +345,27 @@ button:disabled {
 .movement {
   position: absolute;
   left: 7%;
-  bottom: 4%;
+  bottom: 8%;
   display: grid;
-  grid-template-columns: repeat(3, 3.5cqw);
-  gap: .35cqw;
+  grid-template-columns: repeat(3, min(3.5cqw, 48px));
+  gap: min(0.35cqw, 6px);
+  z-index: 2;
 }
 
 .movement button {
+  width: 100%;
   aspect-ratio: 1;
-  border: .2cqw solid white;
-  border-radius: .7cqw;
+  border: 2px solid white;
+  border-radius: 0.7cqw;     /* 改回原版的比例圓角，保持方正鍵帽感 */
   background: #fff5e6;
   color: #65462f;
-  font-size: 2cqw;
+  font-size: min(1.8cqw, 20px);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   touch-action: none;
+  box-sizing: border-box;
 }
 
 .movement [data-move="up"] {
