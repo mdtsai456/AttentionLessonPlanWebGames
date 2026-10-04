@@ -6,6 +6,8 @@
 // =============================================================================
 
 const TIME_LIMIT_SEC = 60;
+const TIME_LIMIT_MS = TIME_LIMIT_SEC * 1000;
+const HUD_TICK_MS = 200;
 const STAGE_COUNT = 6;
 const MID_STAGE = 3;
 const WALK_FRAME_MS = 90;
@@ -43,7 +45,6 @@ const DEFAULT_STAGE_RULES = [
 let stageRules = DEFAULT_STAGE_RULES;
 let customThemes = null;
 
-const timerBox = document.getElementById("timer-box");
 const resultEl = document.getElementById("result");
 const resultTitle = document.getElementById("result-title");
 const resultScoreP1 = document.getElementById("result-score-p1");
@@ -52,14 +53,13 @@ const resultHint = document.getElementById("result-hint");
 const replayBtn = document.getElementById("replay-btn");
 const backBtn = document.getElementById("back-btn");
 
-const levelBox = document.getElementById("level-box");
 const midBreakEl = document.getElementById("mid-break");
 const toastEl = document.getElementById("toast");
 
 const session = {
   level: 1,
   roundToken: 0,
-  remaining: TIME_LIMIT_SEC,
+  levelDeadline: 0,
   playing: false,
   startedAt: 0,
   timerId: null,
@@ -219,7 +219,7 @@ function createPlayer(id) {
   const playerPlaceholder = root.querySelector(".player-placeholder");
   const player = {
     id,
-    label: id === "p1" ? "P1" : "P2",
+    label: id === "p1" ? "玩家一" : "玩家二",
     root,
     scene: root.querySelector(".scene"),
     bgLayers: root.querySelectorAll(".bg"),
@@ -229,6 +229,9 @@ function createPlayer(id) {
     itemLeft: root.querySelector(".item-left"),
     itemRight: root.querySelector(".item-right"),
     scoreBox: root.querySelector(".score-box"),
+    roundEl: root.querySelector(".round"),
+    progressEl: root.querySelector(".progress-track"),
+    progressFill: root.querySelector(".progress-fill"),
     promptEl: root.querySelector(".prompt"),
     feedbackEl: root.querySelector(".feedback"),
     assets: makePlayerAssets(PLAYER_BASE[id]),
@@ -300,7 +303,7 @@ function startLevel(level) {
   clearInterval(session.timerId);
   session.roundToken += 1;
   session.level = level;
-  session.remaining = TIME_LIMIT_SEC;
+  session.levelDeadline = 0;
   session.timerStarted = false;
   session.playing = true;
   resultEl.classList.add("is-hidden");
@@ -322,23 +325,22 @@ function startLevel(level) {
     renderPlayerHud(player);
   });
 
-  renderLevel();
-  renderTimer();
   // 計時不在這裡開始：等任一人第一次按鍵才同時開始（見 startLevelTimer）
 }
 
+// 用截止時間戳計算剩餘秒數，不靠每秒減 1，避免計時器延遲累積誤差
 function startLevelTimer() {
   if (session.timerStarted) return;
   session.timerStarted = true;
-  renderTimer();
-  session.timerId = setInterval(tick, 1000);
+  session.levelDeadline = Date.now() + TIME_LIMIT_MS;
+  session.timerId = setInterval(tick, HUD_TICK_MS);
+  renderAllHud();
 }
 
 function tick() {
   if (!session.playing) return;
-  session.remaining -= 1;
-  renderTimer();
-  if (session.remaining <= 0) endLevel();
+  renderAllHud();
+  if (Date.now() >= session.levelDeadline) endLevel();
 }
 
 function endLevel() {
@@ -394,19 +396,27 @@ function renderQuestion(player) {
   player.promptEl.textContent = question.prompt;
 }
 
+function renderAllHud() {
+  renderPlayerHud(players.p1);
+  renderPlayerHud(players.p2);
+}
+
+// 與 DAT_double 相同：「第 N 題・剩餘 S 秒（第 X / 6 關）」與直立進度條
 function renderPlayerHud(player) {
   player.scoreBox.textContent = `${player.score} 分`;
-}
-
-function renderTimer() {
-  const waiting = session.playing && !session.timerStarted;
-  timerBox.textContent = waiting
-    ? `${TIME_LIMIT_SEC} 秒 · 按鍵開始`
-    : `${Math.max(0, session.remaining)} 秒`;
-}
-
-function renderLevel() {
-  levelBox.textContent = `第 ${session.level} / ${STAGE_COUNT} 關`;
+  const levelText = `（第 ${session.level} / ${STAGE_COUNT} 關）`;
+  if (!session.timerStarted) {
+    player.roundEl.textContent = `剩餘 ${TIME_LIMIT_SEC} 秒・按鍵開始${levelText}`;
+  } else {
+    const left = Math.max(0, Math.ceil((session.levelDeadline - Date.now()) / 1000));
+    player.roundEl.textContent = `第 ${player.questionSeq + 1} 題・剩餘 ${left} 秒${levelText}`;
+  }
+  const used = session.timerStarted
+    ? Math.min(TIME_LIMIT_MS, Date.now() - (session.levelDeadline - TIME_LIMIT_MS))
+    : 0;
+  const ratio = (session.level - 1 + used / TIME_LIMIT_MS) / STAGE_COUNT;
+  player.progressEl.setAttribute("aria-valuenow", Math.round(ratio * 100));
+  player.progressFill.style.height = `${Math.min(100, ratio * 100)}%`;
 }
 
 async function chooseDirection(player, choice) {
@@ -522,8 +532,10 @@ function finishGame() {
   });
 
   resultTitle.textContent = "挑戰完成！";
-  resultScoreP1.textContent = `P1：${players.p1.score} / ${Math.max(players.p1.answers.length, 1)} 分`;
-  resultScoreP2.textContent = `P2：${players.p2.score} / ${Math.max(players.p2.answers.length, 1)} 分`;
+  [players.p1, players.p2].forEach((player, index) => {
+    const el = index === 0 ? resultScoreP1 : resultScoreP2;
+    el.textContent = `${player.label}：${player.score} / ${Math.max(player.answers.length, 1)} 分`;
+  });
   resultHint.textContent = "六關都結束了，看看這次的得分";
   resultEl.classList.remove("is-hidden");
   void saveBoth(STAGE_COUNT);

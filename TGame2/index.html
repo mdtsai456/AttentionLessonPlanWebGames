@@ -15,7 +15,13 @@
   <body>
     <main class="stage" aria-label="勇闖迷宮雙人模式">
       <div class="lanes">
-        <section class="lane" data-player="p1" aria-label="Player 1">
+        <section class="lane" data-player="p1" aria-label="玩家一">
+          <aside class="progress-panel">
+            <span class="progress-label">勇闖迷宮</span>
+            <div class="progress-track" role="progressbar" aria-label="關卡進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="progress-fill"></div>
+            </div>
+          </aside>
           <div class="world">
             <div class="scene">
               <div class="bg is-show" data-bg="back"></div>
@@ -42,15 +48,23 @@
           </div>
 
           <div class="hud-score" aria-live="polite">
-            <span class="hud-chip hud-chip-gold">P1</span>
+            <span class="hud-chip hud-chip-gold">玩家一</span>
             <span class="hud-box score-box">0 分</span>
           </div>
+
+          <p class="round">剩餘 60 秒・按鍵開始（第 1 / 6 關）</p>
 
           <p class="prompt">請選擇符合題目的方向</p>
           <p class="feedback" aria-live="assertive"></p>
         </section>
 
-        <section class="lane" data-player="p2" aria-label="Player 2">
+        <section class="lane" data-player="p2" aria-label="玩家二">
+          <aside class="progress-panel">
+            <span class="progress-label">勇闖迷宮</span>
+            <div class="progress-track" role="progressbar" aria-label="關卡進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="progress-fill"></div>
+            </div>
+          </aside>
           <div class="world">
             <div class="scene">
               <div class="bg is-show" data-bg="back"></div>
@@ -77,9 +91,11 @@
           </div>
 
           <div class="hud-score" aria-live="polite">
-            <span class="hud-chip hud-chip-gold">P2</span>
+            <span class="hud-chip hud-chip-gold">玩家二</span>
             <span class="hud-box score-box">0 分</span>
           </div>
+
+          <p class="round">剩餘 60 秒・按鍵開始（第 1 / 6 關）</p>
 
           <p class="prompt">請選擇符合題目的方向</p>
           <p class="feedback" aria-live="assertive"></p>
@@ -90,14 +106,6 @@
         <button type="button" class="btn btn-sky btn-leave" id="leave-btn">離開</button>
     
     <p class="toast" id="toast" role="status" aria-live="polite"></p>
-      <div class="hud-center">
-        <p class="hud-level" id="level-box">第 1 / 6 關</p>
-        <div class="hud-timer" aria-live="polite">
-          <span class="hud-chip hud-chip-sky">剩餘</span>
-          <span class="hud-box" id="timer-box">60 秒</span>
-        </div>
-      </div>
-
       <section class="result is-hidden" id="mid-break" aria-label="第 3 關結束">
         <h1 class="title">挑戰完成！</h1>
         <p class="label">第 3 關已結束<br>要繼續遊玩嗎？</p>
@@ -109,9 +117,9 @@
 
       <section class="result is-hidden" id="result" aria-label="結算">
         <h1 class="title" id="result-title">闖關結束</h1>
-        <p class="result-score" id="result-score-p1">P1：0 分</p>
-        <p class="result-score" id="result-score-p2">P2：0 分</p>
-        <p class="label" id="result-hint">P1 用 A / D，P2 用左右鍵</p>
+        <p class="result-score" id="result-score-p1">玩家一：0 分</p>
+        <p class="result-score" id="result-score-p2">玩家二：0 分</p>
+        <p class="label" id="result-hint">玩家一用 A / D，玩家二用左右鍵</p>
         <div class="btn-row">
           <button type="button" class="btn btn-green" id="replay-btn">
             再玩一次
