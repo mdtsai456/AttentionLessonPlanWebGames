@@ -22,6 +22,8 @@ const PLAYER_BASE = {
   p1: "img/player1",
   p2: "img/player2",
 };
+// 保留預載圖片的參照，避免被 GC 回收後換格時又要重新解碼
+const preloadedImages = [];
 
 const ALL_ITEMS = [
   "apple", "banana", "carrot", "fish",
@@ -200,8 +202,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function init() {
-  preloadSceneImages();
-  const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV，失敗就用預設題目
+  showToast("載入中…");
+  clearTimeout(toastTimer); // 載入時間可能超過提示的自動消失時間，載完再收起
+  const [, result] = await Promise.all([
+    preloadSceneImages(),
+    loadCsvFromUrl(CSV_URL), // 自動讀取 CSV，失敗就用預設題目
+  ]);
+  toastEl.classList.remove("is-show");
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
   startGame();
 }
@@ -588,12 +595,15 @@ function setPlayerSprite(player, src) {
   player.playerImg.src = src;
 }
 
-function preloadSceneImages() {
+// 所有場景與角色圖都下載並解碼完才開始遊戲，第一次換格就不會跳格
+async function preloadSceneImages() {
   const sources = [
+    "img/TGameBack.png",
     "img/TGameNear.png",
     "img/TGameTurnLeft.png",
     "img/TGameTurnRight.png",
     ...[players.p1, players.p2].flatMap((player) => [
+      player.assets.back,
       player.assets.turn.left,
       player.assets.turn.right,
       ...player.assets.walkBack,
@@ -605,7 +615,9 @@ function preloadSceneImages() {
   Array.from(new Set(sources)).forEach((src) => {
     const image = new Image();
     image.src = src;
+    preloadedImages.push(image);
   });
+  await Promise.allSettled(preloadedImages.map((image) => image.decode()));
 }
 
 function showPlayerPlaceholder(player) {
