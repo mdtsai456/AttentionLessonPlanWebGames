@@ -107,6 +107,7 @@ async function saveGameDataToBackend(data) {
         10
     );
 
+    // 資料夾叫 EFT，但後端與後台把漂浮泡泡記為 DAT，所以成績用 DAT 送；素材 API 則讀 EFT。
     const payload = {
         lessonId: '1140908_DAT',
         data: {

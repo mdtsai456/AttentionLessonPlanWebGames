@@ -326,6 +326,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     stageHits = [];
   }
 
+  // 資料夾叫 DAT，但後端把動物追擊令（選單與後台叫瓢蟲追擊令）記為 EFT，所以成績用 EFT 送；素材 API 則讀 DAT。
   function eftStats(stage, durationMs) {
     const metrics = sessionMetrics();
     return [

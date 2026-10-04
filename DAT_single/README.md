@@ -28,4 +28,9 @@ const DEFAULT_ANIMAL_POOL = [
 # 檔案用途
 - DAT_single.：遊戲畫面
 - DAT_tutorial.：遊戲說明
-- 
+
+### 遊戲代號（10/04）
+- 這個資料夾叫 `DAT`，但後端與後台把動物追擊令記為 `EFT`。
+- 成績送 `lessonId: 1140908_EFT`，`stats[].apiname` 用 `EFT_*` 前綴，選單與後台顯示成「瓢蟲追擊令」。
+- 素材 API 讀的是 `DAT.assets.files`，沿用資料夾命名。
+- 漂浮泡泡（`EFT_*` 資料夾）剛好相反，送 `1140908_DAT` 與 `DAT_*`。兩邊都是正確的，不要改成跟資料夾同名。

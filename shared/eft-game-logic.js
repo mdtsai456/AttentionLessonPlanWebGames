@@ -41,6 +41,7 @@ export function levelAccuracyText(levelAccuracies, stageCount) {
     .join(',');
 }
 
+// 漂浮泡泡（EFT_* 資料夾）的成績；後端把這款記為 DAT，所以前綴是 DAT_。
 export function buildDatStats(data) {
   return [
     { apiname: 'DAT_correct', value: data.score },
