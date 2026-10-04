@@ -655,10 +655,11 @@ export function createStats() -> {
   例如 `"1,2,3,4,5"`
 - `record()` 收到的 `level` 欄位即**關卡序號**（`levelNo`），由 `track.js` 傳入
 
-> **計分語意變更（2026-10-04）**：在這之前的 `dccs_result` 資料，
-> `correct_count`／`wrong_count`／`accuracy` 是逐閥（判定次數）計算；在這之後是
-> 逐題計算（兩道閥都對才算對）。以 `assessment_result.start_time` 作為分界，
-> 兩者不能直接比較。`question_count` 可作為輔助判別：完整一場（`duration`
+> **計分語意變更（待正式部署時確認實際生效時間）**：新版本正式部署生效前的
+> `dccs_result` 資料，`correct_count`／`wrong_count`／`accuracy` 是逐閥
+> （判定次數）計算；生效後是逐題計算（兩道閥都對才算對）。部署時須補上實際
+> 生效時間，再以 `assessment_result.start_time` 作為分界，兩者不能直接比較。
+> `question_count` 可作為輔助判別：完整一場（`duration`
 > 為 360000）逐閥時期是 112、逐題之後是 56；為 NULL 的是 2026-09-29 以前、
 > 還沒有這個欄位的逐閥資料。中斷的場次不適用。部署初期瀏覽器可能仍快取舊版
 > 計分程式，分界附近的資料以 `question_count` 判別為準。

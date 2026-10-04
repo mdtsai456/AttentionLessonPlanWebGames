@@ -14,7 +14,7 @@
 - **pair(雙人局)** — 一台裝置上兩個小孩一起玩的一場雙人遊戲,產生**兩筆** Session(各一位學生),兩筆共用同一個 **`pair_id`**(UUID 字串,由 Unity 開局時產生,後端只存不生;`single` 時為 `NULL`)。
 - **五款遊戲** — 每一款在專屬明細表有一列,以 `(grade, case_id, school, uuid)` 外鍵掛在 Session 底下:
   - **DCCS** → `dccs_result`
-    - `correct_count`/`wrong_count`/`accuracy` 自 2026-10-04 起以「題」為單位(一題兩道閥都對才算對),在這之前以「判定次數」為單位,以 `start_time` 區分。`question_count` 可輔助判別:完整一場(`duration` 360000)逐閥時期是 112、逐題之後是 56;NULL 是 2026-09-29 以前還沒有這個欄位的逐閥資料;中斷的場次不適用。部署初期瀏覽器可能仍快取舊版計分程式,分界附近以 `question_count` 為準。
+    - `correct_count`/`wrong_count`/`accuracy` 在新版本正式部署生效後以「題」為單位(一題兩道閥都對才算對),生效前以「判定次數」為單位。實際生效時間待正式部署時確認並補上,再以 `start_time` 區分。`question_count` 可輔助判別:完整一場(`duration` 360000)逐閥時期是 112、逐題之後是 56;NULL 是 2026-09-29 以前還沒有這個欄位的逐閥資料;中斷的場次不適用。部署初期瀏覽器可能仍快取舊版計分程式,分界附近以 `question_count` 為準。
   - **DAT** → `dat_result`
   - **EFT** → `eft_result`
   - **IM** → `im_result`
