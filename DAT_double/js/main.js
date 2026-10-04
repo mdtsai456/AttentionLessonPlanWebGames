@@ -1,6 +1,6 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=4';
+import { createPlayer } from './game.js?v=6';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -68,9 +68,14 @@ let playMode = new URLSearchParams(window.location.search).get('mode') === 'game
 
 document.getElementById('leave-btn').addEventListener('click', async () => {
   const completed = Math.min(...players.map((player) => player.completedStages()));
-  const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
-  if (playMode === 'game' && stage) {
-    await Promise.all(players.map((player) => player.saveRun(stage)));
+  // 六關已完成時 finishGame 已負責存檔，等它寫完再離開，避免重複存檔與瀏覽器離開確認
+  if (completed >= 6) {
+    await Promise.all(players.map((player) => player.whenSaved()));
+    safeNavigateTo('../Select/index.html');
+    return;
+  }
+  if (playMode === 'game' && completed >= 3) {
+    await Promise.all(players.map((player) => player.saveRun(3)));
   }
   window.askLeave('../Select/index.html');
 });
@@ -81,7 +86,7 @@ function beginSession() {
   const formalButton = document.getElementById('enter-formal-btn');
   if (playMode === 'game') {
     if (formalButton) formalButton.hidden = true;
-    document.querySelectorAll('[data-ui="pause"], [data-ui="back-home"]').forEach((button) => {
+    document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
     players.forEach((player) => player.startGame());
@@ -96,7 +101,7 @@ if (enterFormalButton) {
   enterFormalButton.addEventListener('click', () => {
     enterFormalButton.hidden = true;
     playMode = 'game';
-    document.querySelectorAll('[data-ui="pause"], [data-ui="back-home"]').forEach((button) => {
+    document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
     currentGamePairId = generateUUID();
@@ -127,14 +132,6 @@ export function safeNavigateTo(url) {
   window.onbeforeunload = null;
   window.location.href = url;
 }
-
-document.querySelectorAll('[data-ui="back-home"]').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    safeNavigateTo('../Select/index.html');
-  });
-});
 
 const midContinue = document.getElementById('mid-continue');
 const midLobby = document.getElementById('mid-lobby');
