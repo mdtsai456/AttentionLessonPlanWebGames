@@ -67,7 +67,9 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
 - 複合題共產生 2 次判定
 
 **答錯不中斷遊戲、不扣分、沒有錯誤動畫，只記錄。**
-答對時畫面右上顯示綠色 ✓ 約 0.6 秒，得分 +1。
+每道閥照舊各判定一次並逐列記錄，但**兩道都對才算答對這一題**。
+✓ 與得分 +1 只在第二次判定（物件閥）之後、整題都對時給一次：畫面右上顯示
+綠色 ✓ 約 0.6 秒。只對一半不給 ✓、不加分；通過形狀閥時不給任何回饋。
 
 ### 1.4 規則（規則不顯示給玩家，要自己從畫面推）
 
@@ -600,7 +602,9 @@ export function createTrialGenerator(manifest, rng) -> {
 export function createStats() -> {
   record({ trialIndex, level, optionCount, valveKind, rule, targetId, answerId,
            correct, settleMs, firstInputMs, slotsRotated }): void,
+  recordTrial({ trialIndex, level, correct }): void,
   rows(): Array<Row>,
+  trials(): Array<{ trialIndex, level, correct }>,
   summary(): Summary,
   setDuration(ms): void,
 }
@@ -627,9 +631,14 @@ export function createStats() -> {
 }
 ```
 
-- `correct_count = frameCorrectCount + categoryCorrectCount + modelCorrectCount`
-- `wrong_count` 同理
+- `record()` 逐閥記錄；`recordTrial()` 由 `track.js` 在一題兩道閥都判定完後
+  呼叫一次，`correct` 為「兩道都對」。
+- `frame/category/model` 的 `CorrectCount`／`WrongCount` 以**閥**為單位（來自 `record()`）
+- `correct_count` 為已結算的題中答對的題數，`wrong_count` 為答錯的題數，
+  兩者以**題**為單位（來自 `recordTrial()`）
 - `accuracy = correct_count / (correct_count + wrong_count)`，分母為 0 時給 `0`
+- `levelAccuracy`、`questionCount` 同樣以**題**為單位；場次結束時只通過形狀閥、
+  還沒通過物件閥的題目不算入題數（它的形狀閥那一列照樣保留在 `rows()`）
 - `duration` 毫秒（整數）。**本場的模擬遊玩時間**，算式必須是
   `Math.round(Math.min(track.elapsed, sessionSeconds) * 1000)` —— 兩個部分都
   是必要的：**(a) 不可用牆上時鐘**（分頁切到背景的時間會被算進這個理應為常數
@@ -640,6 +649,11 @@ export function createStats() -> {
 - `levelsPlayed` 為走過的**關卡序號**由小到大排序、去重、逗號連接，
   例如 `"1,2,3,4,5"`
 - `record()` 收到的 `level` 欄位即**關卡序號**（`levelNo`），由 `track.js` 傳入
+
+> **計分語意變更（<部署日期 YYYY-MM-DD>）**：在這之前的 `dccs_result` 資料，
+> `correct_count`／`wrong_count`／`accuracy` 是逐閥（判定次數）計算；在這之後是
+> 逐題計算（兩道閥都對才算對）。以 `assessment_result.start_time` 作為分界，
+> 兩者不能直接比較。
 
 > `stage` 是**關卡序號**、不是選項數（選項數 2/3/4/4/5 不嚴格遞增，用它會讓
 > 第 3、4 關算出同一個值）。資料庫欄位型別不變，只是填進去的語意是關卡序號。
@@ -687,7 +701,8 @@ export class Track {
 Track 負責：關卡推進（每 `sessionSeconds / manifest.levels.length` 秒到達
 切關門檻；若當時有題目飛行中，須等該題完整離開才正式進下一關，走完最後一關
 後停在最後一關）、出題、目標移動、兩道閥的旋轉與判定、✓ 回饋計時、把每次
-判定交給 `stats.record()`。
+判定交給 `stats.record()`、每題兩道閥都判定完後呼叫 `stats.recordTrial()`，
+並據此給分與 ✓。
 
 `backgroundKey` 是要從 `images` 取哪一張背景（對應 `manifest.backgrounds` 的
 key）。單人模式一律 `'single'`；留這個參數是為了雙人版能改用 `'double'`，
@@ -1191,7 +1206,8 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - 關卡時間門檻落在題目飛行途中時，須先完成該題的 shape/object 兩列紀錄，
   等目標離開後才切關；下一關提示按下「繼續」後不得出現上一關最後一題。
 - 每題仍要以**出題當下**的關卡固定屬性進行判定（見 4.12）。
-- `frameCorrectCount + frameWrongCount` 等於總題數。
+- `frameCorrectCount + frameWrongCount` 等於已結算題數（`questionCount`），
+  或最多多 1（場次結束時最後一題只通過形狀閥）。
 - 多一個語意類別**不會多出關卡**。驗證時**不得真的去動 `assets/`**
   （見第 0 節，它是唯讀的）——把 `assets/`、`tools/`、`frontend/dccs/levels.json`
   複製到暫存目錄，在**複本**裡加一個資料夾再跑 `build_manifest.py`，

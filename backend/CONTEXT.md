@@ -14,6 +14,7 @@
 - **pair(雙人局)** — 一台裝置上兩個小孩一起玩的一場雙人遊戲,產生**兩筆** Session(各一位學生),兩筆共用同一個 **`pair_id`**(UUID 字串,由 Unity 開局時產生,後端只存不生;`single` 時為 `NULL`)。
 - **五款遊戲** — 每一款在專屬明細表有一列,以 `(grade, case_id, school, uuid)` 外鍵掛在 Session 底下:
   - **DCCS** → `dccs_result`
+    - `correct_count`/`wrong_count`/`accuracy` 自 <部署日期 YYYY-MM-DD> 起以「題」為單位(一題兩道閥都對才算對),在這之前以「判定次數」為單位,以 `start_time` 區分。
   - **DAT** → `dat_result`
   - **EFT** → `eft_result`
   - **IM** → `im_result`
