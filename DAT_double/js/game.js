@@ -1,5 +1,5 @@
 import { sendSessionToApi } from './api.js';
-import { generateQuestionSet } from './questions.js';
+import { generateQuestionSet } from './questions.js?v=2';
 
 export const ROUND_MS = 10000;
 export const AIM_SPEED = 45;
@@ -9,6 +9,7 @@ const STAGE_MS = 60000;
 const PRACTICE_STAGES = 1;
 const PRACTICE_QUESTIONS = 2;
 const GAME_QUESTIONS = 3;
+const STREAK_TO_EVOLVE = 5; // 連續成功幾題升級一次動物
 
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
@@ -94,16 +95,6 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     if (currentAssetIndex < animalAssetList.length - 1) {
       currentAssetIndex++;
       console.log(`🎉 [P${playerIndex + 1} 升級] 切換至素材 (${currentAssetIndex + 1}/${animalAssetList.length}): ${animalAssetList[currentAssetIndex]}`);
-      updateAnimalImage(animalAssetList[currentAssetIndex]);
-    }
-  }
-
-  // 降級：退回上一個動物素材（直到 index = 0）
-  function switchToPrevAnimal() {
-    if (!animalAssetList || animalAssetList.length <= 1) return;
-    if (currentAssetIndex > 0) {
-      currentAssetIndex--;
-      console.log(`💔 [P${playerIndex + 1} 降級] 退回至素材 (${currentAssetIndex + 1}/${animalAssetList.length}): ${animalAssetList[currentAssetIndex]}`);
       updateAnimalImage(animalAssetList[currentAssetIndex]);
     }
   }
@@ -277,6 +268,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     const correct = pressed === questions[index].answer;
     const onTarget = isOnAnimal();
     const isSuccess = correct && onTarget;
+    const hadStreak = consecutiveCorrect > 0;
     let message;
     reactionSamples.push(elapsed);
 
@@ -285,22 +277,20 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       score++;
       message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
 
-      // 🔥 連續答對 5 題：觸發升級彩蛋（達最大值不再循環，直接維持）
-      if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
+      // 🔥 連續答對 STREAK_TO_EVOLVE 題：觸發升級彩蛋（達最大值不再循環，直接維持）
+      if (consecutiveCorrect % STREAK_TO_EVOLVE === 0) {
         if (currentAssetIndex < animalAssetList.length - 1) {
           message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
           switchToNextAnimal();
         } else {
           message += ` 🎉 連續答對 ${consecutiveCorrect} 題！維持最高級動物狀態！`;
         }
+      } else if (currentAssetIndex < animalAssetList.length - 1) {
+        message += `（再連續答對 ${STREAK_TO_EVOLVE - consecutiveCorrect % STREAK_TO_EVOLVE} 題變身）`;
       }
     } else {
-      consecutiveCorrect = 0; // 重置連擊計數器
-
-      // 💔 答錯、未瞄準或漏答：觸發降級退回上一張動物（最低退至第 0 張）
-      if (currentAssetIndex > 0) {
-        switchToPrevAnimal();
-      }
+      // 失敗只歸零連擊，已變身的動物保留
+      consecutiveCorrect = 0;
 
       if (!pressed && !correct) {
         timedOut++;
@@ -311,6 +301,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       } else if (!onTarget) {
         offTarget++; message = '判斷正確，但準心未對到動物，不計分';
       }
+      if (hadStreak) message += '（連擊歸零）';
     }
 
     $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';

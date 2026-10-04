@@ -29,6 +29,7 @@ let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 let animalAssetList = [];       // 儲存該學生所有可用的動物圖片 URL
 let currentAssetIndex = 0;     // 目前顯示的圖片索引
 let consecutiveCorrect = 0;    // 連續答對且瞄準成功計數器
+const STREAK_TO_EVOLVE = 5;    // 連續成功幾題升級一次動物
 
 const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
@@ -249,7 +250,7 @@ function answer() {
   enableAnswers(false);
 }
 
-// 彩蛋動物切換邏輯 (level up and down) 
+// 彩蛋動物切換邏輯 (level up)
 // 🎨 統一切換圖片與動畫處理
 function updateAnimalImage(newIndex, isUpgrade = true) {
   if (!animalAssetList || animalAssetList.length <= 1) return;
@@ -282,7 +283,7 @@ function updateAnimalImage(newIndex, isUpgrade = true) {
   }
 }
 
-// 🎉 連續答對 5 題：升級 (最大封頂，不循環回 0)
+// 🎉 連續答對 STREAK_TO_EVOLVE 題：升級 (最大封頂，不循環回 0)
 function switchToNextAnimal() {
   if (currentAssetIndex < animalAssetList.length - 1) {
     updateAnimalImage(currentAssetIndex + 1, true);
@@ -291,18 +292,12 @@ function switchToNextAnimal() {
   }
 }
 
-// 💔 答錯 / 未瞄準 / 漏答：降級 (最低退回 0)
-function switchToPrevAnimal() {
-  if (currentAssetIndex > 0) {
-    updateAnimalImage(currentAssetIndex - 1, false);
-  }
-}
-
 // 紀錄答題結果
 function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
   const isSuccess = correct && onTarget;
+  const hadStreak = consecutiveCorrect > 0;
   let message;
   reactionSamples.push(elapsed);
 
@@ -311,22 +306,20 @@ function recordResult(pressed) {
     score++;
     message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
 
-    // 連續答對 5 題：觸發升級彩蛋
-    if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
+    // 連續答對 STREAK_TO_EVOLVE 題：觸發升級彩蛋
+    if (consecutiveCorrect % STREAK_TO_EVOLVE === 0) {
       if (currentAssetIndex < animalAssetList.length - 1) {
         message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
         switchToNextAnimal();
       } else {
         message += ` 🎉 連續答對 ${consecutiveCorrect} 題！維持最高級動物狀態！`;
       }
+    } else if (currentAssetIndex < animalAssetList.length - 1) {
+      message += `（再連續答對 ${STREAK_TO_EVOLVE - consecutiveCorrect % STREAK_TO_EVOLVE} 題變身）`;
     }
   } else {
-    consecutiveCorrect = 0; // 重置連擊
-
-    // 💔 答錯、未瞄準或漏答：觸發降級退回上一張
-    if (currentAssetIndex > 0) {
-      switchToPrevAnimal();
-    }
+    // 失敗只歸零連擊，已變身的動物保留
+    consecutiveCorrect = 0;
 
     if (!pressed && !correct) {
       timedOut++;
@@ -339,6 +332,7 @@ function recordResult(pressed) {
       offTarget++;
       message = '判斷正確，但準心未對到動物，不計分';
     }
+    if (hadStreak) message += '（連擊歸零）';
   }
 
   $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';

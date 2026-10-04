@@ -56,7 +56,10 @@ export const QUESTION_KINDS = [
 export function generateQuestionSet(count, practice = false) {
   const list = [];
   for (let i = 0; i < count; i++) {
-    const kind = QUESTION_KINDS[i % QUESTION_KINDS.length];
+    // 練習模式固定顏色、數學各一題；正式模式每題隨機
+    const kind = practice
+      ? QUESTION_KINDS[i % QUESTION_KINDS.length]
+      : pickRandom(QUESTION_KINDS);
     const question = kind.generate();
     const prefix = practice ? `【練習 ${i + 1}/${count}】` : '';
     list.push({ type: `${prefix}${kind.label}`, ...question });
