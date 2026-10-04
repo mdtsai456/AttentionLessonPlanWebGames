@@ -1,6 +1,6 @@
 // 獨立執行殼。學生資料只來自 Home 登入，這裡不再顯示選單。
 
-import { mountDCCS } from './dccs.js?v=3';
+import { mountDCCS } from './dccs.js?v=4';
 import { readLobbySession, returnToLobby } from './lobby.js';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 

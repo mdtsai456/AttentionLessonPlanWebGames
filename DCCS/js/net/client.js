@@ -3,6 +3,7 @@
 import { resolveSubmitUrl } from './apiBase.js';
 
 const STATS_PREFIX = 'DCCS_';
+const SUBMIT_TIMEOUT_MS = 15_000;
 
 // 送出失敗的 payload 暫存在 localStorage，key 前綴固定，供下次開場時重送。
 const PENDING_PREFIX = 'dccs_pending_';
@@ -97,24 +98,33 @@ export function buildPayload({ lessonId, student, summary }) {
  * @returns {Promise<string>} 伺服器回應的原始內容
  */
 async function postPayload(payload, url) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
 
-  const text = await res.text().catch(() => '');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const error = new Error(
-      `server responded ${res.status}${text ? `: ${text}` : ''}`
-    );
-    // 讓呼叫端能分辨「暫時送不出去」與「這筆永遠不會被接受」。
-    error.status = res.status;
-    throw error;
+    const text = await res.text();
+
+    if (!res.ok) {
+      const error = new Error(
+        `server responded ${res.status}${text ? `: ${text}` : ''}`
+      );
+      // 讓呼叫端能分辨「暫時送不出去」與「這筆永遠不會被接受」。
+      error.status = res.status;
+      throw error;
+    }
+
+    return text;
+  } finally {
+    // 包含回應本文的讀取，避免只收到 headers 就永遠停在送出中。
+    clearTimeout(timeout);
   }
-
-  return text;
 }
 
 /**

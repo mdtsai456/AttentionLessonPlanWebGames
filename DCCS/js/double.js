@@ -1,7 +1,7 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=3';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=4';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
-import { submitResult } from './net/client.js';
+import { submitResult } from './net/client.js?v=2';
 import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
