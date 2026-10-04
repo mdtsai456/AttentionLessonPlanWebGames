@@ -74,6 +74,9 @@ export class Track {
 
     this._trialCounter = -1;
     this._currentTrialIndex = null;
+    // 一題兩道閥都對才算答對；判定逐閥記錄，得分與 ✓ 逐題結算。
+    this._trialAllCorrect = true;
+    this._trialFinalized = false;
 
     // 每關只建立一次固定素材組。
     this._levelDeck =
@@ -126,6 +129,8 @@ export class Track {
     const trial = level ? this.trialGen.next(level, this._levelDeck) : null;
 
     this._resetPressTracking();
+    this._trialAllCorrect = true;
+    this._trialFinalized = false;
 
     if (!trial) {
       if (!this._warnedNoTrial) {
@@ -204,6 +209,21 @@ export class Track {
       slotsRotated,
     });
 
+    if (!correct) this._trialAllCorrect = false;
+  }
+
+  /** 這一題的閥都判定完後結算一次：全對才得分並顯示 ✓。 */
+  _finishTrialIfJudged(target) {
+    if (this._trialFinalized) return;
+    if (this._valveShape && !target.passedShape) return;
+    if (this._valveObject && !target.passedObject) return;
+    this._trialFinalized = true;
+    const correct = this._trialAllCorrect;
+    this.stats.recordTrial({
+      trialIndex: this._currentTrialIndex,
+      level: this._trialLevelNo,
+      correct,
+    });
     if (correct) {
       this._score += 1;
       this._showTick = true;
@@ -294,6 +314,8 @@ export class Track {
       target.passedObject = true;
       this._judge(this._valveObject, target);
     }
+
+    this._finishTrialIfJudged(target);
 
     if (this._valveShape && shapePresses > 0) this._valveShape.step(shapePresses);
     if (this._valveObject && objectPresses > 0) this._valveObject.step(objectPresses);
