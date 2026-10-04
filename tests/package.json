@@ -1,0 +1,14 @@
+{
+  "name": "webgames-tests",
+  "private": true,
+  "type": "module",
+  "description": "動物追擊令（DAT）自動化測試：單元測試 + 瀏覽器 E2E",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"unit/*.test.js\" \"e2e/*.test.js\"",
+    "test:unit": "node --test \"unit/*.test.js\"",
+    "test:e2e": "node --test --test-concurrency=1 \"e2e/*.test.js\""
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}

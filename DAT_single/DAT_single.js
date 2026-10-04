@@ -217,7 +217,7 @@ function isOnAnimal() {
   return RABBIT_HIT_MASK[y][x] === '1';
 }
 
-function showQuestion() {
+function showQuestion(previousFeedback = '') {
   if (!isPractice) {
     if (!stageDeadline) {
       stageDeadline = Date.now() + STAGE_MS;
@@ -233,7 +233,10 @@ function showQuestion() {
   $('question-type').textContent = q.type;
   $('question-text').textContent = q.text;
   $('question-text').style.color = q.color;
-  $('animal').dataset.result = '';$('feedback').textContent = '題目正確就瞄準按空白鍵；不正確則不按';
+  $('animal').dataset.result = '';
+  $('feedback').textContent = previousFeedback
+    ? `上一題：${previousFeedback}`
+    : '題目正確就瞄準按空白鍵；不正確則不按';
   enableAnswers(true); updateClock(); updateProgress();
 }
 
@@ -252,21 +255,21 @@ function answer() {
 
 // 彩蛋動物切換邏輯 (level up)
 // 🎨 統一切換圖片與動畫處理
-function updateAnimalImage(newIndex, isUpgrade = true) {
+function updateAnimalImage(newIndex) {
   if (!animalAssetList || animalAssetList.length <= 1) return;
   if (newIndex === currentAssetIndex) return; // 索引未改變則不更新
 
   currentAssetIndex = newIndex;
   const targetAssetUrl = animalAssetList[currentAssetIndex];
 
-  console.log(`${isUpgrade ? '🎉 [彩蛋升級]' : '💔 [彩蛋降級]'} 切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${targetAssetUrl}`);
+  console.log(`🎉 [彩蛋升級] 切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${targetAssetUrl}`);
 
   const animalImgElem = document.getElementById('animal-image') || $('animal-image');
   if (animalImgElem) {
     animalImgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
     animalImgElem.style.opacity = '0.2';
-    // 升級時縮放、降級時微放大的視覺效果區隔
-    animalImgElem.style.transform = isUpgrade ? 'scale(0.6)' : 'scale(1.2)';
+    // 升級時先縮小再彈回原尺寸的視覺效果
+    animalImgElem.style.transform = 'scale(0.6)';
 
     setTimeout(() => {
       animalImgElem.src = targetAssetUrl;
@@ -286,7 +289,7 @@ function updateAnimalImage(newIndex, isUpgrade = true) {
 // 🎉 連續答對 STREAK_TO_EVOLVE 題：升級 (最大封頂，不循環回 0)
 function switchToNextAnimal() {
   if (currentAssetIndex < animalAssetList.length - 1) {
-    updateAnimalImage(currentAssetIndex + 1, true);
+    updateAnimalImage(currentAssetIndex + 1);
   } else {
     console.log(`ℹ️ 已達最大素材頁面 (${currentAssetIndex + 1}/${animalAssetList.length})，保持最高級狀態。`);
   }
@@ -400,6 +403,7 @@ function endQuestion() {
   if (phase !== 'answer') return;
   phase = 'resolving';
   if (!submitted) recordResult(false);
+  const previousFeedback = $('feedback').textContent;
   if (!isPractice) {
     if (!levelOutcomes[stage - 1]) levelOutcomes[stage - 1] = [];
     levelOutcomes[stage - 1].push(Boolean(outcomes[outcomes.length - 1]));
@@ -407,7 +411,7 @@ function endQuestion() {
   index++;
 
   if (isPractice) {
-    if (index < questions.length) showQuestion();
+    if (index < questions.length) showQuestion(previousFeedback);
     else finishGame();
     return;
   }
@@ -418,7 +422,7 @@ function endQuestion() {
     else showStageClearModal(stage);
     return;
   }
-  showQuestion();
+  showQuestion(previousFeedback);
 }
 
 function answeredCount() {
