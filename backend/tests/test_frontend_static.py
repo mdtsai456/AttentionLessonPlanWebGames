@@ -20,16 +20,24 @@ def test_app_root_serves_login_page():
     assert "<title>" in response.text
 
 
-def test_game_lobby_and_dccs_are_served():
+def test_dms_and_dccs_are_served():
     with TestClient(main.app) as client:
-        lobby = client.get("/app/games.html")
+        dashboard = client.get("/app/dms.html")
         game = client.get("/app/dccs/index.html")
         module = client.get("/app/dccs/js/dccs.js")
-    assert lobby.status_code == 200
+    assert dashboard.status_code == 200
+    assert "text/html" in dashboard.headers["content-type"]
     assert game.status_code == 200
     # ES module 必須以 JavaScript 的 content-type 提供，否則瀏覽器拒絕載入。
     assert module.status_code == 200
     assert "javascript" in module.headers["content-type"]
+
+
+def test_retired_game_lobby_is_not_served():
+    """舊 games.html 已刪除；遊戲選單改由獨立前端的 Select 頁提供。"""
+    with TestClient(main.app) as client:
+        response = client.get("/app/games.html")
+    assert response.status_code == 404
 
 
 def test_api_routes_are_not_shadowed_by_the_mount():
