@@ -1,0 +1,59 @@
+name: DAT double browser tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'DAT_double/**'
+      - 'shared/**'
+      - 'Select/**'
+      - 'Home/fonts/**'
+      - 'e2e/**'
+      - '.github/workflows/dat-double-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'DAT_double/**'
+      - 'shared/**'
+      - 'Select/**'
+      - 'Home/fonts/**'
+      - 'e2e/**'
+      - '.github/workflows/dat-double-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dat-double-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Test gameplay and saves
+        run: npm test -- --reporter=list,html
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: dat-double-browser-results
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

@@ -1,10 +1,11 @@
 import { sendSessionToApi } from './api.js';
-import { generateQuestionSet } from './questions.js';
+import { generateQuestionSet } from './questions.js?v=2';
 
 export const ROUND_MS = 10000;
 export const AIM_SPEED = 45;
 export const ANIMAL_SPEED = 4;
 export const TOTAL_STAGES = 6;
+export const MID_STAGE = 3;
 const STAGE_MS = 60000;
 const PRACTICE_STAGES = 1;
 const PRACTICE_QUESTIONS = 2;
@@ -12,15 +13,6 @@ const GAME_QUESTIONS = 3;
 
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
-
-  const backHomeBtn = $('back-home');
-  if (backHomeBtn) {
-    backHomeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      getState().safeNavigateTo('../Select/index.html');
-    });
-  }
 
   $('pause').addEventListener('click', () => {
     if (getState().playMode === 'game') return;
@@ -56,6 +48,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let activeMs = 0;
   let focusMs = 0;
   let clearedMidBreak = false;
+  let saveState = { stage: 0, pending: Promise.resolve() };
   let stageDeadline = 0;
 
   // 雙人彩蛋機制變數與切換函式
@@ -139,6 +132,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     questionsPerStage = GAME_QUESTIONS;
     currentStage = 1;
     clearedMidBreak = false;
+    // 每局持有獨立的存檔狀態，舊請求的回應不能回退新局的已存關卡。
+    saveState = { stage: 0, pending: Promise.resolve() };
     startTimeMs = Date.now();
     
     score = wrong = offTarget = timedOut = elapsed = 0;
@@ -405,7 +400,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     if (isPractice) {
       finishPractice();
     } else if (currentStage < stageCount) {
-      if (currentStage === 3 && !clearedMidBreak) {
+      if (currentStage === MID_STAGE && !clearedMidBreak) {
         phase = 'mid_break';
         enableAnswers(false);
         $('feedback').textContent = '第 3 關已結束，等待另一位玩家';
@@ -442,7 +437,6 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
     const answered = Math.max(score + wrong + offTarget, 1);
     const accuracyValue = parseFloat((score / answered).toFixed(2));
-    const durationMs = endTimeMs - startTimeMs;
 
     $('pause').disabled = true;
     $('final-score').textContent = `${score} / ${answered} 分`;
@@ -450,38 +444,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    const isP1 = (playerIndex === 0);
-    const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || "";
-    const schoolKey  = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
-    const gradeKey   = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
-    const caseId =
-      sessionStorage.getItem(isP1 ? "student1_case" : "student2_case") ||
-      (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey) ||
-      (isP1 ? "S01" : "S02");
-    const currentDay = parseInt(
-      sessionStorage.getItem(isP1 ? "student1_day" : "student2_day")
-        || (isP1 ? sessionStorage.getItem("current_day") : "")
-        || "1",
-      10
-    );
-
-    const payload = {
-      lessonId: "1140908_EFT",
-      data: {
-        grade: gradeKey,
-        caseId: caseId,
-        school: schoolKey,
-        currentDay: currentDay,
-        startTime: startTimeMs,
-        endTime: endTimeMs,
-        mode: "double",
-        pairId: getState().currentGamePairId,
-        stats: eftStats(stageCount, durationMs)
-      }
-    };
-
-    console.log(`[Player ${playerIndex + 1}] 正在存檔中...`, payload);
-    await sendSessionToApi(payload);
+    await saveRun(stageCount, endTimeMs);
   }
 
   function move(delta) {
@@ -539,6 +502,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       event.preventDefault(); keys.add(event.code);
     }
     if (answerCodes.includes(event.code)) {
+      // 返回按鈕使用瀏覽器原生的 Space／Enter 操作，不攔截成遊戲作答。
+      if (event.target?.dataset?.ui === 'back-home') return;
       event.preventDefault();
       if (!event.repeat) {
         if (phase === 'finished' && event.target === $('restart')) startGame();
@@ -567,7 +532,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     return Math.max(0, currentStage - 1);
   }
 
-  async function saveRun(stage) {
+  // 同一關或更前面的關卡已經存過（或正在存）就不重送，回傳那次請求讓呼叫端等它送完再導頁；
+  // 存檔失敗就還原該局的已存關卡，下次離開時會再送一次
+  function saveRun(stage, endTime = Date.now()) {
+    const runSave = saveState;
+    if (stage <= runSave.stage) return runSave.pending;
+    const previousStage = runSave.stage;
+    runSave.stage = stage;
     const isP1 = playerIndex === 0;
     const studentKey = sessionStorage.getItem(isP1 ? 'student1_key' : 'student2_key') || '';
     const schoolKey = sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school') || 'KMU';
@@ -582,20 +553,26 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         || '1',
       10
     );
-    await sendSessionToApi({
+    const payload = {
       lessonId: '1140908_EFT',
       data: {
         grade: gradeKey,
         caseId,
         school: schoolKey,
         currentDay,
-        startTime: startTimeMs || Date.now(),
-        endTime: Date.now(),
+        startTime: startTimeMs || endTime,
+        endTime,
         mode: 'double',
         pairId: getState().currentGamePairId,
-        stats: eftStats(stage, Date.now() - (startTimeMs || Date.now())),
+        stats: eftStats(stage, endTime - (startTimeMs || endTime)),
       },
+    };
+    console.log(`[Player ${playerIndex + 1}] 正在存檔中...`, payload);
+    runSave.pending = sendSessionToApi(payload).then((result) => {
+      if (!result.success && runSave.stage === stage) runSave.stage = previousStage;
+      return result;
     });
+    return runSave.pending;
   }
 
   return {

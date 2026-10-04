@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attention Lesson Plan - 動物追擊令・雙人版</title>
-  <link rel="stylesheet" href="DAT_double.css?v=5">
+  <link rel="stylesheet" href="DAT_double.css?v=6">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
@@ -13,7 +13,7 @@
 <script src="../shared/session-timeout.js"></script>
 <script src="../shared/leave-confirm.js"></script>
 <script src="../shared/stage-clear.js" defer></script>
-<script type="module" src="js/main.js?v=5" defer></script>
+<script type="module" src="js/main.js?v=9" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
@@ -62,6 +62,7 @@
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
+        <button class="secondary" data-ui="back-home" type="button">返回遊戲大廳</button>
       </section>
     </div>
     </section>
@@ -110,7 +111,7 @@
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
-        <button class="secondary" data-ui="back-home" type="button">返回首頁</button> <!-- 導回首頁按鈕 -->
+        <button class="secondary" data-ui="back-home" type="button">返回遊戲大廳</button>
       </section>
     </div>
       </section>
@@ -134,6 +135,7 @@
           <button class="secondary" id="btn-cancel-leave" type="button">繼續遊玩</button>
           <button class="danger" id="btn-confirm-leave" type="button">確定離開 (數據不保存)</button>
         </div>
+      </section>
     </div>
   </main>
 </body>

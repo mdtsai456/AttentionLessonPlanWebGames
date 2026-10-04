@@ -1,6 +1,6 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=4';
+import { createPlayer, TOTAL_STAGES, MID_STAGE } from './game.js?v=8';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -49,7 +49,6 @@ const state = {
   get currentGamePairId() { return currentGamePairId; },
   get players() { return players; },
   get playMode() { return playMode; },
-  safeNavigateTo,
   syncStart,
   waitForMidBreak,
   waitForStageClear
@@ -66,14 +65,27 @@ let playMode = new URLSearchParams(window.location.search).get('mode') === 'game
   ? 'game'
   : 'practice';
 
-document.getElementById('leave-btn').addEventListener('click', async () => {
+// 依兩位玩家都已完成的關卡數存 checkpoint（TOTAL_STAGES 或 MID_STAGE）；每局已存過同一關或更後面的關卡就不再存
+async function saveCheckpoint() {
   const completed = Math.min(...players.map((player) => player.completedStages()));
-  const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+  const stage = completed >= TOTAL_STAGES ? TOTAL_STAGES : completed >= MID_STAGE ? MID_STAGE : 0;
   if (playMode === 'game' && stage) {
     await Promise.all(players.map((player) => player.saveRun(stage)));
   }
-  window.askLeave('../Select/index.html');
-});
+  return completed;
+}
+
+// 兩位玩家都玩完六關才直接回大廳；否則照舊跳確認框
+async function leaveToLobby() {
+  const completed = await saveCheckpoint();
+  if (playMode === 'game' && completed >= TOTAL_STAGES) {
+    safeNavigateTo('../Select/index.html');
+  } else {
+    window.askLeave('../Select/index.html');
+  }
+}
+
+document.getElementById('leave-btn').addEventListener('click', leaveToLobby);
 
 function beginSession() {
   clearMidBreak();
@@ -81,7 +93,7 @@ function beginSession() {
   const formalButton = document.getElementById('enter-formal-btn');
   if (playMode === 'game') {
     if (formalButton) formalButton.hidden = true;
-    document.querySelectorAll('[data-ui="pause"], [data-ui="back-home"]').forEach((button) => {
+    document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
     players.forEach((player) => player.startGame());
@@ -96,7 +108,7 @@ if (enterFormalButton) {
   enterFormalButton.addEventListener('click', () => {
     enterFormalButton.hidden = true;
     playMode = 'game';
-    document.querySelectorAll('[data-ui="pause"], [data-ui="back-home"]').forEach((button) => {
+    document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
     currentGamePairId = generateUUID();
@@ -125,14 +137,17 @@ window.addEventListener('beforeunload', preventLeaveHandler);
 export function safeNavigateTo(url) {
   window.removeEventListener('beforeunload', preventLeaveHandler);
   window.onbeforeunload = null;
+  // askLeave() 設過的旗標要清掉，否則在確認框選「留在此頁」之後，
+  // 之後每次導頁都還會被 leave-confirm.js 攔下再跳一次確認框
+  window.__askLeave = false;
   window.location.href = url;
 }
 
 document.querySelectorAll('[data-ui="back-home"]').forEach(btn => {
-  btn.addEventListener('click', (e) => {
+  btn.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    safeNavigateTo('../Select/index.html');
+    await leaveToLobby();
   });
 });
 
@@ -146,7 +161,11 @@ if (midContinue) {
   });
 }
 if (midLobby) {
-  midLobby.addEventListener('click', () => {
+  midLobby.addEventListener('click', async () => {
+    // 存檔期間鎖住中場按鈕，避免又按「繼續遊玩」後被導回大廳
+    midLobby.disabled = true;
+    if (midContinue) midContinue.disabled = true;
+    await saveCheckpoint();
     safeNavigateTo('../Select/index.html');
   });
 }

@@ -65,3 +65,19 @@ CORS_ALLOW_ORIGINS=https://attention-webgames.zeabur.app
 ## Data Management System Page
 
 
+
+## 瀏覽器測試（e2e）
+
+`e2e/` 用 Playwright 在 Chromium、Firefox、WebKit 實際開遊戲頁面測試，目前涵蓋 DAT 雙人版的鍵盤／畫面按鈕瞄準與作答、離開與存檔流程、正式與練習題型，以及返回按鈕的 Space／Enter／數字鍵盤 Enter 操作。測試會自己用 `python3 -m http.server` 提供 repo 根目錄、攔下存檔 API（不會寫進資料庫）。練習遊玩測試保留每題 10 秒計時，存檔流程測試則快轉 `Date.now` 跳過每關 60 秒。
+
+```bash
+cd e2e
+npm install
+npx playwright install chromium firefox webkit   # 第一次才需要
+npm test
+# 只跑其中一種瀏覽器：npm test -- --project=chromium
+```
+
+預設使用 port 18431、2 個 worker，可用 `E2E_PORT`、`E2E_WORKERS` 調整。`E2E_ROOT` 可指向另一份程式碼（例如舊版）來比較。
+
+相關檔案的 PR 與推送至 `main` 會由 GitHub Actions 自動執行三種瀏覽器的測試，並保留報告與失敗追蹤 7 天。測試攔截 API 與素材服務，因此通過代表前端流程通過驗證，實際後端存檔與正式環境素材仍需部署後確認。
