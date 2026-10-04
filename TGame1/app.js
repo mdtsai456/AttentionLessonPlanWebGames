@@ -12,6 +12,7 @@ const TURN_WALK_FRAME_MS = 130;
 const NEAR_MS = 1080;
 const TURN_MS = 650;
 const ARRIVE_MS = 320;
+const PRELOAD_TIMEOUT_MS = 10000; // 某張圖卡住時最多等這麼久，避免永遠停在載入中
 const PLAYER_BACK = "img/playerBack.png";
 const PLAYER_TURN = {
   left: "img/playerTurnLeft.png",
@@ -499,7 +500,10 @@ async function preloadSceneImages() {
     image.src = src;
     preloadedImages.push(image);
   });
-  await Promise.allSettled(preloadedImages.map((image) => image.decode()));
+  await Promise.race([
+    Promise.allSettled(preloadedImages.map((image) => image.decode())),
+    wait(PRELOAD_TIMEOUT_MS),
+  ]);
 }
 
 function showPlayerPlaceholder() {
