@@ -72,10 +72,11 @@ export async function launchBrowser() {
 const FRAME_MS = Number(process.env.FRAME_MS || 100);
 
 // 在頁面腳本執行前注入的觀測鉤子
-function installProbes(frameMs) {
+function installProbes({ frameMs, realAim, realClock, randomValue }) {
+  if (typeof randomValue === 'number') Math.random = () => randomValue;
   // 以假時鐘的 setTimeout 驅動 requestAnimationFrame，降低畫格頻率
-  window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), frameMs);
-  window.cancelAnimationFrame = (id) => clearTimeout(id);
+  if (!realClock) window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), frameMs);
+  if (!realClock) window.cancelAnimationFrame = (id) => clearTimeout(id);
 
   const qa = {
     feedback: [[], []],      // 每位玩家回饋文字的每一次設定
@@ -103,7 +104,7 @@ function installProbes(frameMs) {
 
   // 準心永遠對準動物（offTarget 為 true 時改成永遠沒對準），讓測試只取決於作答
   const rectOf = Element.prototype.getBoundingClientRect;
-  Element.prototype.getBoundingClientRect = function () {
+  if (!realAim) Element.prototype.getBoundingClientRect = function () {
     if (is(this, 'animal') || is(this, 'animal-image')) {
       const p = playerOf(this);
       const root = p === 1 ? document.querySelector('.player-2') : (document.querySelector('.player-1') || document);
@@ -141,14 +142,15 @@ function installProbes(frameMs) {
  * @param {'game'|'practice'} opts.mode
  * @param {string[]|null} opts.assetFiles 素材 API 回傳的檔案清單；null 代表沒有素材（使用預設兔、貓、狗、鳥）
  */
-export async function openGame(browser, origin, { game, mode = 'game', assetFiles = null }) {
+export async function openGame(browser, origin, { game, mode = 'game', assetFiles = null, routeOverride, realAim = false, realClock = false, randomValue }) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const errors = [];
+  const pageErrors = [];
   const sessionPosts = [];
   const blocked = [];
 
-  page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`));
+  page.on('pageerror', (err) => { pageErrors.push(err.message); errors.push(`pageerror: ${err.message}`); });
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
   });
@@ -157,6 +159,8 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   await context.route('**/*', async (route) => {
     const req = route.request();
     const url = req.url();
+    if (/\/api\/sessions$/.test(new URL(url).pathname) && req.method() === 'POST') sessionPosts.push(req.postDataJSON());
+    if (routeOverride && await routeOverride({ route, request: req, url, origin, sessionPosts, placeholderPng })) return;
     if (url.startsWith(origin)) return route.continue();
     if (url.startsWith(`${ASSET_HOST}/api/students/`)) {
       return route.fulfill({
@@ -171,7 +175,6 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
       return route.fulfill({ status: 200, contentType: 'image/png', body: placeholderPng });
     }
     if (/\/api\/sessions$/.test(new URL(url).pathname) && req.method() === 'POST') {
-      sessionPosts.push(req.postDataJSON());
       return route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -186,16 +189,19 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
 
   // 假時鐘在載入前就暫停，之後只靠 runFor 推進，讓每次執行的流程一致
   const start = new Date('2026-10-04T09:00:00+08:00').getTime();
-  await page.clock.install({ time: start });
-  await page.clock.pauseAt(start + 1000);
-  await page.addInitScript(installProbes, FRAME_MS);
+  if (!realClock) {
+    await page.clock.install({ time: start });
+    await page.clock.pauseAt(start + 1000);
+  }
+  await page.addInitScript(installProbes, { frameMs: FRAME_MS, realAim, realClock, randomValue });
   const file = game === 'double' ? 'DAT_double/DAT_double.html' : 'DAT_single/DAT_single.html';
-  await page.goto(`${origin}/${file}?mode=${mode}`);
+  await page.goto(`${origin}/${file}?mode=${mode}`, { waitUntil: 'domcontentloaded' });
 
   const players = game === 'double' ? [0, 1] : [0];
   const driver = new GameDriver(page, game, players);
-  await driver.waitFor(() => window.__qa.feedback[0].some((t) => /動物身上/.test(t)), '遊戲載入完成');
-  return { page, context, driver, errors, sessionPosts, blocked };
+  if (realClock) await page.waitForFunction(() => window.__qa.feedback[0].some((t) => /動物身上/.test(t)));
+  else await driver.waitFor(() => window.__qa.feedback[0].some((t) => /動物身上/.test(t)), '遊戲載入完成');
+  return { page, context, driver, errors, pageErrors, sessionPosts, blocked };
 }
 
 export class GameDriver {

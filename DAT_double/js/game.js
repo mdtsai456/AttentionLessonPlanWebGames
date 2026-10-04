@@ -1,4 +1,3 @@
-import { sendSessionToApi } from './api.js';
 import { generateQuestionSet } from './questions.js?v=2';
 
 export const ROUND_MS = 10000;
@@ -62,14 +61,18 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   // 雙人彩蛋機制變數與切換函式
   let animalAssetList = [];
   let currentAssetIndex = 0;
+  let animalImageGeneration = 0;
   let consecutiveCorrect = 0;
 
-  function setAnimalAssets(list) {
+  async function setAnimalAssets(list) {
     animalAssetList = list;
     currentAssetIndex = 0;
     const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
     if (imgElem && animalAssetList.length > 0) {
-      imgElem.src = animalAssetList[0];
+      animalImageGeneration++;
+      imgElem.style.opacity = '1';
+      imgElem.style.transform = 'scale(1)';
+      await window.DatAssets.setImage(imgElem, animalAssetList[0]);
     }
   }
 
@@ -77,15 +80,16 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   function updateAnimalImage(nextAssetUrl) {
     const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
     if (imgElem) {
+      const imageGeneration = ++animalImageGeneration;
       imgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
       imgElem.style.opacity = '0.2';
       imgElem.style.transform = 'scale(0.6)';
 
-      setTimeout(() => {
-        imgElem.src = nextAssetUrl;
+      window.DatAssets.setImage(imgElem, nextAssetUrl).then(() => {
+        if (imageGeneration !== animalImageGeneration) return;
         imgElem.style.opacity = '1';
         imgElem.style.transform = 'scale(1)';
-      }, 150);
+      });
     }
   }
 
@@ -124,7 +128,20 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     updateProgress(); renderPositions();
   }
 
+  let saver;
+  function showSaveStatus({ status, message, retryable }) {
+    $('save-status').textContent = message;
+    $('retry-save').hidden = !retryable;
+    $('retry-save').disabled = status === 'saving';
+    getState().refreshSaveControls();
+  }
+  $('retry-save').addEventListener('click', () => saver.retry());
+
   function startGame() {
+    saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
+    $('save-status').textContent = '';
+    $('retry-save').hidden = true;
+
     isPractice = false;
     stageCount = TOTAL_STAGES;
     questionsPerStage = GAME_QUESTIONS;
@@ -170,7 +187,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       currentAssetIndex = 0;
       if (animalAssetList.length > 0) {
         const imgElem = element.querySelector('#animal-image, [data-ui="animal-image"], .animal-image');
-        if (imgElem) imgElem.src = animalAssetList[0];
+        if (imgElem) {
+          animalImageGeneration++;
+          imgElem.style.opacity = '1';
+          imgElem.style.transform = 'scale(1)';
+          window.DatAssets.setImage(imgElem, animalAssetList[0]);
+        }
       }
     }
 
@@ -433,7 +455,6 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
     const answered = Math.max(score + wrong + offTarget, 1);
     const accuracyValue = parseFloat((score / answered).toFixed(2));
-    const durationMs = endTimeMs - startTimeMs;
 
     $('pause').disabled = true;
     $('final-score').textContent = `${score} / ${answered} 分`;
@@ -441,38 +462,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    const isP1 = (playerIndex === 0);
-    const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || "";
-    const schoolKey  = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
-    const gradeKey   = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
-    const caseId =
-      sessionStorage.getItem(isP1 ? "student1_case" : "student2_case") ||
-      (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey) ||
-      (isP1 ? "S01" : "S02");
-    const currentDay = parseInt(
-      sessionStorage.getItem(isP1 ? "student1_day" : "student2_day")
-        || (isP1 ? sessionStorage.getItem("current_day") : "")
-        || "1",
-      10
-    );
-
-    const payload = {
-      lessonId: "1140908_EFT",
-      data: {
-        grade: gradeKey,
-        caseId: caseId,
-        school: schoolKey,
-        currentDay: currentDay,
-        startTime: startTimeMs,
-        endTime: endTimeMs,
-        mode: "double",
-        pairId: getState().currentGamePairId,
-        stats: eftStats(stageCount, durationMs)
-      }
-    };
-
-    console.log(`[Player ${playerIndex + 1}] 正在存檔中...`, payload);
-    await sendSessionToApi(payload);
+    await saveRun(stageCount);
   }
 
   function move(delta) {
@@ -519,7 +509,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     requestAnimationFrame(tick);
   }
 
-  $('answer-true').addEventListener('click', answer);$('restart').addEventListener('click', startGame);
+  $('answer-true').addEventListener('click', answer);$('restart').addEventListener('click', () => getState().restartSession());
 
   function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
   window.addEventListener('blur', clearInput);
@@ -532,7 +522,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     if (answerCodes.includes(event.code)) {
       event.preventDefault();
       if (!event.repeat) {
-        if (phase === 'finished' && event.target === $('restart')) startGame();
+        if (phase === 'finished' && event.target === $('restart')) getState().restartSession();
         else answer();
       }
     }
@@ -573,7 +563,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         || '1',
       10
     );
-    await sendSessionToApi({
+    return saver.save(stage, {
       lessonId: '1140908_EFT',
       data: {
         grade: gradeKey,
@@ -595,6 +585,9 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
+    canRestart: () => phase === 'finished' && saver?.canRestart(),
+    saveStatus: () => saver?.status || 'idle',
+    retrySave: () => saver?.retry(),
     // 由 main.js 呼叫：若本玩家還在瞄準階段，就一起開始出題
     forceStart: () => { if (phase === 'aiming' && !paused) showQuestion(); },
     setAnimalAssets,

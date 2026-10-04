@@ -21,10 +21,9 @@ describe('DAT_single 單人版', () => {
   });
 
   test('正式模式：正確等待後，下一題仍顯示上一題的連擊提示', async () => {
-    const session = await openGame(browser, server.origin, { game: 'single', mode: 'game' });
+    const session = await openGame(browser, server.origin, { game: 'single', mode: 'game', randomValue: 0.75 });
     try {
-      // 固定亂數讓遊戲產生不成立的算式，必須不按鍵等待逾時才能答對。
-      await session.page.evaluate(() => { Math.random = () => 0.75; });
+      // 載入前固定亂數，讓遊戲產生不成立的算式，必須不按鍵等待逾時才能答對。
       const [result] = await session.driver.playQuestion('correct');
       assert.equal(result.visibleFeedback, '上一題：正確等待且保持瞄準！＋1 分（再連續答對 4 題變身）');
       const state = await session.page.evaluate(() => ({ index, score, phase }));
@@ -36,10 +35,9 @@ describe('DAT_single 單人版', () => {
   });
 
   test('正式模式：漏答後，下一題仍顯示上一題的連擊歸零提示', async () => {
-    const session = await openGame(browser, server.origin, { game: 'single', mode: 'game' });
+    const session = await openGame(browser, server.origin, { game: 'single', mode: 'game', randomValue: 0.25 });
     try {
-      // 固定亂數讓遊戲產生正確的顏色題，先答對建立連擊，再漏答。
-      await session.page.evaluate(() => { Math.random = () => 0.25; });
+      // 載入前固定亂數，讓遊戲產生正確的顏色題，先答對建立連擊，再漏答。
       await session.driver.playQuestion('correct');
       const [result] = await session.driver.playQuestion('miss');
       assert.equal(result.visibleFeedback, '上一題：漏答：正確的題目要按 空白鍵（連擊歸零）');

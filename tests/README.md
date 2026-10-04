@@ -1,13 +1,13 @@
 # 自動化測試
 
-目前涵蓋「動物追擊令」（`DAT_double/`、`DAT_single/`）的彩蛋規則與出題邏輯。
+目前涵蓋「動物追擊令」（`DAT_double/`、`DAT_single/`）的彩蛋規則、完整六關流程、桌面鍵鼠操作、素材容錯與存檔狀態。
 
 ## 執行
 
 ```bash
 cd tests
 npm install        # 只安裝 playwright-core，不會下載瀏覽器
-npm test           # 單元測試 + E2E，約 30 秒（機器忙碌時會更久）
+npm test           # 單元測試 + E2E，約 2 分鐘（機器忙碌時會更久）
 npm run test:unit  # 只跑單元測試（不需要瀏覽器）
 npm run test:e2e   # 只跑 E2E
 ```
@@ -56,3 +56,26 @@ CHROME_PATH=/usr/bin/chromium npm run test:e2e
 - 使用 Playwright 假時鐘快轉時間，每題 10 秒的流程不必真的等待。
 - 攔截所有對外請求：素材 API 回傳測試指定的清單，成績 API 只記錄、不會送出，Google Fonts 回傳空內容。
 - 準心判定改為永遠對準動物（「沒瞄準」情境則改為永遠沒對準），讓結果只取決於作答。
+
+
+### 完整流程與穩定性
+
+- `unit/dat-assets.test.js`：素材 URL 篩選、API/body/圖片逾時回退及取消舊圖片請求。
+- `unit/dat-save.test.js`：同關卡去重、成功才標記、人工重試保留原始成績、未知結果不重送。
+- `e2e/dat-lifecycle.test.js`：單／雙人練習轉正式、完整六關及第二局、雙人共同編號更新、已存成績離開不重送、HTTP 500 人工重試、網路中斷與逾時。
+- `e2e/dat-checkpoint.test.js`：第三關回大廳存檔失敗時保留中場；重試成功後離開不重送已存成績。
+- `e2e/dat-assets.test.js`：素材 API 懸置／錯誤／壞 JSON、首張及變身圖片 404、圖片懸置、重玩取消舊動畫。確認備援圖片可見且有實際尺寸。
+- `e2e/dat-controls.test.js`：**不修改命中幾何**，驗證實際鍵盤瞄準、滑鼠方向鈕按住／放開、失焦清鍵與同題連按只判定一次；另有單人真實時鐘與 requestAnimationFrame 測試。
+
+完整流程為可重現性使用假時鐘與固定命中；實際鍵鼠測試保留真實命中幾何。所有外部請求被攔截，不會把測試成績寫到正式庫。這些測試不代表已完成正式 API 或實體手柄驗收。
+
+後端無資料庫契約驗證：
+
+```bash
+cd backend
+env -u TEST_DB_NAME uv run pytest tests/test_dat_webgame_contract.py -q
+```
+
+兩個案例透過 FastAPI TestClient 執行真實路由，把資料寫入函式替換為記錄器，驗證六關 EFT 統計及雙人 pairId。`DAT_*` 目錄的動物追擊令網頁版沿用 EFT 資料分類；不要以目錄名稱推斷應改為 DAT。
+
+評估依據及未驗證範圍見 [EVALUATION.md](EVALUATION.md)。
