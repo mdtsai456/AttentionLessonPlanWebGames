@@ -30,6 +30,8 @@ CORS_ALLOW_ORIGINS=https://attention-webgames.zeabur.app
 
 網址裡的學生 ID 用後端個案編號 `caseId` 補成三位數。例如登入的是 `S01`，實際打 `S001`。目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`，不會改成三位數。沒有客製圖時用本機 `assets/animals/` 的預設圖。
 
+`DAT.assets.files` 的陣列順序就是彩蛋升級順序：index 0 是第一張，連續答對 5 題升一張，答錯、漏答或未瞄準退一張；到最後一張後維持不變，不循環。素材平台如何決定這個順序，見 `mdtsai456/AttentionLessonPlan` 的 README。只有 1 張素材時，會在後面補上預設動物圖（`DAT_single/DAT_single.js`、`DAT_double/js/main.js`）。
+
 ### Single
 
 - `DAT_single/DAT_single.js` 的 `assetStudentId()` 把 `caseId` 補成三位數後呼叫素材 API。
@@ -50,13 +52,17 @@ CORS_ALLOW_ORIGINS=https://attention-webgames.zeabur.app
 
 ## EFT
 
+箭頭素材同樣向素材平台抓取，學生 ID 的補位規則與 DAT 相同（`shared/eft-assets.js`）。
+
+箭頭清單是 `[箭頭00, ...EFT.assets.files]`：第一階固定是本機預設的 `箭頭00.png`，之後依 `EFT.assets.files` 的陣列順序升階。連續答對 5 題升一階，答錯或漏答降一階；到最後一階後維持不變，不循環（`shared/eft-player.js`）。有上傳素材時，預設的 `箭頭01–03` 不會出現在清單裡；只有某張上傳圖預載失敗時，該階才換成本機預設箭頭（依清單位置循環對應 `箭頭00–03`，例如第 2 階換成 `箭頭01.png`）。API 清單為空或請求失敗時，才使用 `箭頭00` 至 `箭頭03` 的完整預設序列。
+
 ### Single
 
-- 
+- 細節見 `EFT_single/README.md`。
 
 ### Double
 
-- 
+- 兩位玩家各自依自己的個案編號載入素材，連擊數與箭頭階數互相獨立。
 
 ## Login Page
 
