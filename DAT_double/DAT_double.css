@@ -496,7 +496,7 @@ button:disabled {
 .enter-formal {
   position: absolute;
   right: 2%;
-  bottom: 2.4%;
+  bottom: calc(3% + 3.4rem);
   z-index: 6;
   width: max-content;
   padding: 0.55em 1.15em;
@@ -673,3 +673,21 @@ button.danger {
 
 button.secondary:hover { background: #65462f; }
 button.danger:hover { background: #c9302c; }
+
+
+/* 存檔尚未完成時保留結果，讓重玩及離開的停用狀態可辨識。 */
+.result-card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-notice {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  max-width: calc(100vw - 2rem);
+  padding: 1rem;
+  border: 2px solid #65462f;
+  background: #fff8e8;
+  z-index: 10000;
+}

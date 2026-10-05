@@ -4,16 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attention Lesson Plan - 動物追擊令・雙人版</title>
-  <link rel="stylesheet" href="DAT_double.css?v=5">
+  <link rel="stylesheet" href="DAT_double.css?v=6">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <!-- 修改前：<script src="DAT_double.js" defer></script> -->
 <!-- 修改後： -->
 <!-- <script type="module" src="DAT_double.js" defer></script> -->
 <script src="../shared/api.js"></script>
+  <script src="../shared/dat-assets.js?v=1"></script>
+  <script src="../shared/dat-save.js?v=1"></script>
 <script src="../shared/session-timeout.js"></script>
 <script src="../shared/leave-confirm.js"></script>
 <script src="../shared/stage-clear.js" defer></script>
-<script type="module" src="js/main.js?v=5" defer></script>
+<script type="module" src="js/main.js?v=8" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
@@ -61,6 +63,8 @@
         <strong data-ui="final-score"></strong>
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
+        <p data-ui="save-status" role="status" aria-live="polite"></p>
+        <button data-ui="retry-save" class="primary" type="button" hidden>重試儲存</button>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
       </section>
     </div>
@@ -109,6 +113,8 @@
         <strong data-ui="final-score"></strong>
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
+        <p data-ui="save-status" role="status" aria-live="polite"></p>
+        <button data-ui="retry-save" class="primary" type="button" hidden>重試儲存</button>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
         <button class="secondary" data-ui="back-home" type="button">返回首頁</button> <!-- 導回首頁按鈕 -->
       </section>
@@ -136,5 +142,6 @@
         </div>
     </div>
   </main>
+<aside id="save-notice" hidden class="save-notice"><p id="checkpoint-save-status" role="status"></p><button id="checkpoint-retry-save" type="button" hidden>重試儲存</button></aside>
 </body>
 </html>
