@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""依 frontend/dccs/levels.json 與唯讀 frontend/dccs/assets/ 產生 frontend/dccs/manifest.json。
+"""依 DCCS/levels.json 與唯讀 DCCS/assets/ 產生 DCCS/manifest.json。
 
 只使用標準函式庫。設定錯誤會終止；素材不足則將關卡標為不可玩。
 
@@ -14,9 +14,9 @@ from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
-GAME_DIR = ROOT / "frontend" / "dccs"
-# 素材與遊戲同在 frontend/dccs/ 底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
-# 前綴、相對於 assetBase（= frontend/dccs/）解析。
+GAME_DIR = ROOT / "DCCS"
+# 素材與遊戲同在 DCCS/ 底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
+# 前綴、相對於 assetBase（= DCCS/）解析。
 ASSET_DIR_NAME = "assets"
 MATERIAL_DIR = GAME_DIR / ASSET_DIR_NAME
 LEVELS_CONFIG_PATH = GAME_DIR / "levels.json"
@@ -101,7 +101,7 @@ def build_categories(category_dirs: list[Path]) -> list[dict]:
 
 
 def load_levels_config() -> list[dict] | None:
-    """讀 frontend/dccs/levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
+    """讀 DCCS/levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
 
     SPEC 5.1：這裡驗證的是「設定本身合不合法」（缺欄位、型別錯、長度對不
     上），跟「素材有沒有補齊」是兩回事——後者是 compute_feasibility() 的

@@ -34,16 +34,15 @@ const DEFAULT_ANIMAL_POOL = [
 const API_BASE_URL = "http://127.0.0.1:5002";
 改為 const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
 
-cd frontend/DAT_double
+cd DAT_double
 python local_sqlite_server.py
 
 cd "\backend"
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
-cd "\frontend"
-python -m http.server 5500
+在 repo 根目錄執行 `python -m http.server 5500`
 
-## 開 http://127.0.0.1:5500/games.html
+## 開 http://127.0.0.1:5500/Home/index.html
 
 ctrl+F12 console
 sessionStorage.setItem('game_mode', 'double');
