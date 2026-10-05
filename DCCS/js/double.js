@@ -1,7 +1,7 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=2';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=4';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
-import { submitResult } from './net/client.js';
+import { submitResult } from './net/client.js?v=2';
 import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
@@ -297,6 +297,7 @@ async function startSession(player1, player2) {
     // 教學已取得開始意圖，兩側載入後直接進入第 1 關提示。
     let bothPlayersReady = true;
     let continueLocked = false;
+    let lobbyChosen = false;
 
     let spaceDown = false;
     let canContinueWithSpace = false;
@@ -372,6 +373,10 @@ async function startSession(player1, player2) {
     }
 
     function chooseBreak(choice) {
+      if (lobbyChosen) {
+        return;
+      }
+
       const buttons = doubleGame.querySelectorAll(
         `.game-root [data-break="${choice}"]`
       );
@@ -381,6 +386,16 @@ async function startSession(player1, player2) {
       }
 
       canContinueWithSpace = false;
+
+      // 返回大廳要等兩筆成績送出才導頁，先切到送出中畫面，避免看起來沒反應。
+      if (choice === 'lobby') {
+        lobbyChosen = true;
+        sharedLoading.querySelector('h1').textContent =
+          '正在送出成績…';
+        sharedLoading.querySelector('p').textContent =
+          '完成後會自動返回遊戲大廳';
+        showSharedScreen(sharedLoading);
+      }
 
       for (const button of buttons) {
         button.click();
