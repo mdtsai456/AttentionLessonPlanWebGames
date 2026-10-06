@@ -145,7 +145,7 @@ function startGame() {
   state.wrong = 0;
   state.answers = [];
   state.reactionSamples = [];
-  state.startedAt = Date.now();
+  state.startedAt = window.WebGameRuntime.now();
   state.endReason = "";
   // Rebuild stage rules based on custom themes
   stageRules = buildStageRules();
@@ -170,7 +170,7 @@ function startLevel(level) {
   itemRight.classList.remove("is-fading");
   hideFeedback();
   renderQuestion();
-  state.questionShownAt = Date.now();
+  state.questionShownAt = window.WebGameRuntime.now();
   renderHud();
   state.timerId = setInterval(tick, 1000);
 }
@@ -231,7 +231,7 @@ async function chooseDirection(choice) {
   if (!question) return;
 
   state.busy = true;
-  state.reactionSamples.push(Math.max(0, Date.now() - state.questionShownAt));
+  state.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - state.questionShownAt));
   const isCorrect = choice === question.correct;
   if (isCorrect) state.score += 1;
   else state.wrong += 1;
@@ -263,7 +263,7 @@ async function chooseDirection(choice) {
   if (!isCorrect) {
     hideFeedback();
     resetSceneAndPlayer();
-    state.questionShownAt = Date.now();
+    state.questionShownAt = window.WebGameRuntime.now();
     state.busy = false;
     return;
   }
@@ -284,7 +284,7 @@ async function chooseDirection(choice) {
   itemLeft.classList.add("is-fading");
   itemRight.classList.add("is-fading");
   renderQuestion();
-  state.questionShownAt = Date.now();
+  state.questionShownAt = window.WebGameRuntime.now();
   hideFeedback();
   resetSceneAndPlayer(true);
   await wait(40);
@@ -382,7 +382,7 @@ function saveCurrentRun(stage) {
     score: state.score,
     wrong: state.wrong,
     accuracy: Math.round(state.score / total * 100),
-    duration: Date.now() - state.startedAt,
+    duration: window.WebGameRuntime.now() - state.startedAt,
     stage,
     levelAccuracy: levelAccuracyText(stage),
     avgReactionMs: average(state.reactionSamples),
@@ -775,10 +775,15 @@ function wait(ms) {
 }
 
 async function submitResult(data) {
-  const url = `${window.WebGameApi.resolveApiBase()}/sessions`;
-  const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade") || "G1";
-  const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case") || "S03";
-  const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school") || "KMU";
+
+  const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade");
+  const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case");
+  const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school");
+  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
+  if (!grade || !caseId || !school) {
+    console.warn("找不到登入學生資料，成績不送出");
+    return;
+  }
   const currentDay = parseInt(
     sessionStorage.getItem("currentDay")
       || sessionStorage.getItem("student1_day")
@@ -794,7 +799,7 @@ async function submitResult(data) {
       caseId,
       school,
       currentDay,
-      startTime: state.startedAt,
+      startTime: window.WebGameRuntime.toWallTime(state.startedAt),
       endTime: Date.now(),
       mode: "single",
       stats: [
@@ -811,11 +816,7 @@ async function submitResult(data) {
   };
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await window.WebGameApi.submitSession(payload);
     if (res.status !== 201) {
       const errData = await res.json().catch(() => ({}));
       console.error(`成績送出失敗 ${res.status}:`, errData.detail || "寫入失敗");

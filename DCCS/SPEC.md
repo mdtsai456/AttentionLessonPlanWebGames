@@ -766,7 +766,7 @@ export function resolveSubmitUrl() -> string
    與根目錄前端 `shared/api.js` 同名同義。
 3. 同源：`${window.location.origin}/api`。
 
-> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。下段描述的同源前提已不成立。
+> **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。下段描述的同源前提已不成立。
 
 第 3 條是關鍵。前端由中介平台後端一併提供（`backend/main.py` 把
 `frontend/` 掛在 `/app`），API 必然與頁面同源，因此**本模組不得出現任何
@@ -782,7 +782,7 @@ export async function resolveCurrentDay(player) -> number
 export function returnToLobby() -> void
 ```
 
-> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。`frontend/games.html` 大廳已不存在。
+> **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。`frontend/games.html` 大廳已不存在。
 
 與中介平台大廳（`frontend/games.html`）的銜接。大廳與本遊戲**同源**，學生
 登入後由 `frontend/js/app.js` 寫進 `sessionStorage` 的資料這裡直接讀得到，
@@ -1057,7 +1057,7 @@ payload 的欄位與型別要求見 4.13；遊戲端須完整輸出全部 12 筆
 
 ## 7. 前端怎麼被提供
 
-> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+> **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。
 
 由中介平台後端一併提供，**不另外起靜態伺服器**：`backend/main.py` 結尾把
 repo 的 `frontend/` 以 `StaticFiles(html=True)` 掛在 `/app`。
@@ -1187,7 +1187,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 ### 其他
 
-- > **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+- > **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。
 
   後端啟動後（見第 7 節），瀏覽
   `http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&currentDay=1&seed=42`

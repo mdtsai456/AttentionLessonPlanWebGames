@@ -35,6 +35,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   const answerButtons = [$('answer-true')];
   const keys = new Set();
   const pointerDirections = new Map();
+  window.addEventListener("webgame:pause", () => { keys.clear(); pointerDirections.clear(); });
 
   let phase = 'loading', paused = false, lastTime, elapsed = 0;
   let submitted = false;
@@ -149,7 +150,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     questionsPerStage = GAME_QUESTIONS;
     currentStage = 1;
     clearedMidBreak = false;
-    startTimeMs = Date.now();
+    startTimeMs = window.WebGameRuntime.now();
     
     score = wrong = offTarget = timedOut = elapsed = 0;
     stageHits = [];
@@ -216,9 +217,9 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       return;
     }
     const left = stageDeadline
-      ? Math.max(0, Math.ceil((stageDeadline - Date.now()) / 1000))
+      ? Math.max(0, Math.ceil((stageDeadline - window.WebGameRuntime.now()) / 1000))
       : STAGE_MS / 1000;
-    const used = stageDeadline ? Math.min(STAGE_MS, Date.now() - (stageDeadline - STAGE_MS)) : 0;
+    const used = stageDeadline ? Math.min(STAGE_MS, window.WebGameRuntime.now() - (stageDeadline - STAGE_MS)) : 0;
     const ratio = ((currentStage - 1) + used / STAGE_MS) / stageCount;
     $('round').textContent = `第 ${index + 1} 題・剩餘 ${left} 秒（第 ${currentStage} / ${stageCount} 關）`;
     $('progress').setAttribute('aria-valuemax', 100);
@@ -265,7 +266,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   function showQuestion() {
-    if (!isPractice && !stageDeadline) stageDeadline = Date.now() + STAGE_MS;
+    if (!isPractice && !stageDeadline) stageDeadline = window.WebGameRuntime.now() + STAGE_MS;
     phase = 'answer'; elapsed = 0; submitted = false;
     const q = questions[index];
     $('question-type').textContent = q.type;
@@ -404,7 +405,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     index++;
     updateProgress();
 
-    const stageOver = !isPractice && stageDeadline && Date.now() >= stageDeadline - 20;
+    const stageOver = !isPractice && stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20;
     if (!stageOver && (isPractice ? index < questions.length : true)) {
       if (!isPractice && index >= questions.length) {
         questions.push(...generateQuestionSet(1, false));
@@ -452,7 +453,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   async function finishGame() {
     phase = 'finished';
-    endTimeMs = Date.now();
+    endTimeMs = window.WebGameRuntime.now();
     keys.clear(); pointerDirections.clear();
 
     const answered = Math.max(score + wrong + offTarget, 1);
@@ -501,7 +502,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         
 
         // 修改會在每關最後一秒跑很多題目的問題
-        const isStageTimeout = !isPractice && stageDeadline && Date.now() >= stageDeadline;
+        const isStageTimeout = !isPractice && stageDeadline && window.WebGameRuntime.now() >= stageDeadline;
         if (elapsed >= answerLimitMs() || isStageTimeout) {
           endQuestion();
         }
@@ -553,12 +554,15 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   async function saveRun(stage) {
     const isP1 = playerIndex === 0;
     const studentKey = sessionStorage.getItem(isP1 ? 'student1_key' : 'student2_key') || '';
-    const schoolKey = sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school') || 'KMU';
-    const gradeKey = sessionStorage.getItem(isP1 ? 'student1_grade' : 'student2_grade') || 'G1';
+    const schoolKey = sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school');
+    const gradeKey = sessionStorage.getItem(isP1 ? 'student1_grade' : 'student2_grade');
     const caseId =
       sessionStorage.getItem(isP1 ? 'student1_case' : 'student2_case') ||
-      (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
-      (isP1 ? 'S01' : 'S02');
+      (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey);
+    if (!gradeKey || !caseId || !schoolKey) {
+      console.warn('找不到登入學生資料，成績不送出');
+      return;
+    }
     const currentDay = parseInt(
       sessionStorage.getItem(isP1 ? 'student1_day' : 'student2_day')
         || (isP1 ? sessionStorage.getItem('current_day') : '')
@@ -572,13 +576,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         caseId,
         school: schoolKey,
         currentDay,
-        startTime: startTimeMs || Date.now(),
+        startTime: window.WebGameRuntime.toWallTime(startTimeMs || window.WebGameRuntime.now()),
         endTime: Date.now(),
         mode: 'double',
         pairId: getState().currentGamePairId,
-        stats: eftStats(stage, Date.now() - (startTimeMs || Date.now())),
+        stats: eftStats(stage, window.WebGameRuntime.now() - (startTimeMs || window.WebGameRuntime.now())),
       },
-    });
+    }, playerIndex + 1);
   }
 
   return {

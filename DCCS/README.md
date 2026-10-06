@@ -28,7 +28,7 @@ python3 tools/build_manifest.py
 
 ## 2. 啟動（開發／除錯用）
 
-> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+> **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。
 
 前端由中介平台後端一併提供，**不需要另外起靜態伺服器**：
 
@@ -55,7 +55,7 @@ http://127.0.0.1:5001/app/dccs/index.html?grade=G1&caseId=S03&school=KMU&current
 
 ## 2b. 從遊戲大廳進場
 
-> **（已過時）** 後端已不提供 /app 掛載，正式前端為 repo 根目錄靜態部署，見根目錄 README.md。
+> **（已過時）** 下列舊版大廳路徑已移除。正式前端是 repo 根目錄；後端 /app 以目錄白名單提供現行頁。
 
 學生在 `frontend/index.html` 登入、於 `frontend/games.html` 點「開始挑戰」
 之後，會被導到 `dccs/index.html`（雙人為 `dccs/double.html`）。

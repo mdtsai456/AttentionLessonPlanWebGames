@@ -159,7 +159,32 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   await context.route('**/*', async (route) => {
     const req = route.request();
     const url = req.url();
-    if (/\/api\/sessions$/.test(new URL(url).pathname) && req.method() === 'POST') sessionPosts.push(req.postDataJSON());
+    const pathname = new URL(url).pathname;
+    if (pathname === '/api/auth/me') {
+      const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Authorization',
+        'Access-Control-Allow-Methods': 'GET',
+        'Cache-Control': 'no-store',
+      };
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      const token = (req.headers().authorization || '').replace(/^Bearer\s+/i, '');
+      const caseId = token.split('-').pop() || 'S03';
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers,
+        body: JSON.stringify({
+          role: 'student',
+          grade: 'G1',
+          caseId,
+          school: 'KMU',
+          studentKey: `G1_${caseId}`,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        }),
+      });
+    }
+    if (/\/api\/sessions$/.test(pathname) && req.method() === 'POST') sessionPosts.push(req.postDataJSON());
     if (routeOverride && await routeOverride({ route, request: req, url, origin, sessionPosts, placeholderPng })) return;
     if (url.startsWith(origin)) return route.continue();
     if (url.startsWith(`${ASSET_HOST}/api/students/`)) {
@@ -194,6 +219,29 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
     await page.clock.pauseAt(start + 1000);
   }
   await page.addInitScript(installProbes, { frameMs: FRAME_MS, realAim, realClock, randomValue });
+  await page.addInitScript((mode) => {
+    const players = mode === 'double'
+      ? [{ slot: 1, caseId: 'S01' }, { slot: 2, caseId: 'S02' }]
+      : [{ slot: 1, caseId: 'S03' }];
+    sessionStorage.setItem('user_role', 'student');
+    sessionStorage.setItem('game_mode', mode);
+    for (const player of players) {
+      sessionStorage.setItem(`student${player.slot}_token`, `student-${player.caseId}`);
+      sessionStorage.setItem(`student${player.slot}_key`, `G1_${player.caseId}`);
+      sessionStorage.setItem(`student${player.slot}_case`, player.caseId);
+      sessionStorage.setItem(`student${player.slot}_grade`, 'G1');
+      sessionStorage.setItem(`student${player.slot}_school`, 'KMU');
+      sessionStorage.setItem(`student${player.slot}_day`, '1');
+    }
+    if (mode === 'single') {
+      sessionStorage.setItem('token', 'student-S03');
+      sessionStorage.setItem('grade', 'G1');
+      sessionStorage.setItem('caseId', 'S03');
+      sessionStorage.setItem('school', 'KMU');
+      sessionStorage.setItem('currentDay', '1');
+      sessionStorage.setItem('current_day', '1');
+    }
+  }, game);
   const file = game === 'double' ? 'DAT_double/DAT_double.html' : 'DAT_single/DAT_single.html';
   await page.goto(`${origin}/${file}?mode=${mode}`, { waitUntil: 'domcontentloaded' });
 

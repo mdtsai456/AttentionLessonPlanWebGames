@@ -44,22 +44,22 @@ function splitStudentKey(studentKey) {
  */
 export function readLobbyPlayer(slot) {
   const studentKey = readKey(`student${slot}_key`);
-  const school = readKey(`student${slot}_school`) || readKey("school");
+  const school = readKey(`student${slot}_school`) || (slot === 1 ? readKey("school") : null);
   const grade = readKey(`student${slot}_grade`);
   const caseId = readKey(`student${slot}_case`);
   const parts = splitStudentKey(studentKey);
   const resolvedGrade = grade || (parts && parts.grade);
   const resolvedCase = caseId || (parts && parts.caseId);
-  if (!resolvedCase || !school) return null;
+  if (!resolvedGrade || !resolvedCase || !school) return null;
 
   return {
-    grade: resolvedGrade || "G1",
+    grade: resolvedGrade,
     caseId: resolvedCase,
     school,
-    studentKey: studentKey || `${resolvedGrade || "G1"}_${resolvedCase}`,
+    studentKey: studentKey || `${resolvedGrade}_${resolvedCase}`,
     currentDay: Number(readKey(`student${slot}_day`)) || readStoredCurrentDay(),
     // 單人另有共用 token；雙人第二位只有 student2_token。
-    token: readKey(`student${slot}_token`) || readKey("token"),
+    token: readKey(`student${slot}_token`) || (slot === 1 ? readKey("token") : null),
   };
 }
 

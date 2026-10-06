@@ -1,4 +1,8 @@
 /**
+ * DAT_double 資料庫 API 溝通模組
+ */
+
+/**
  * 產生符合 GUID 規範的 UUID v4 供雙人局 pairId 使用
  */
 export function generateUUID() {

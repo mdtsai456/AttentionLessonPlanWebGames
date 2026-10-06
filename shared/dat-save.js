@@ -8,16 +8,19 @@
     unknown: '存檔結果未確認，請先確認紀錄，避免重複送出',
   };
 
-  async function request(url, body, timeoutMs) {
+  async function request(url, body, timeoutMs, player) {
     const controller = new AbortController();
     let timer;
+    const payload = JSON.parse(body);
     try {
       return await Promise.race([
         (async () => {
-          const response = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body, signal: controller.signal,
-          });
+          const response = window.WebGameApi?.submitSession
+            ? await window.WebGameApi.submitSession(payload, { url, player, signal: controller.signal })
+            : await fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body, signal: controller.signal,
+            });
           if (!response.ok) {
             // 代理層可能在後端完成寫入後才回傳錯誤。
             if (response.status === 408 || response.status >= 502) return 'unknown';
@@ -49,7 +52,7 @@
     function send(stage, record) {
       record.status = 'saving';
       publish('saving');
-      record.pending = request(url, record.body, timeoutMs).then((result) => {
+      record.pending = request(url, record.body, timeoutMs, record.player).then((result) => {
         record.status = result;
         record.pending = null;
         if (result === 'saved') savedStage = Math.max(savedStage, stage);
@@ -62,16 +65,16 @@
       get status() { return status; },
       get savedStage() { return savedStage; },
       canRestart: () => status === 'idle' || status === 'saved',
-      save(stage, payload) {
+      save(stage, payload, player) {
         if (savedStage >= stage) return Promise.resolve(true);
         const existing = records.get(stage);
         if (existing) return existing.pending || Promise.resolve(existing.status === 'saved');
         // 序列化同局寫入，避免 checkpoint 與最終成績同時送出。
         const pending = [...records.values()].find((record) => record.pending);
-        if (pending) return pending.pending.then(() => this.save(stage, payload));
+        if (pending) return pending.pending.then(() => this.save(stage, payload, player));
         if ([...records.values()].some((record) => record.status === 'unknown')) return Promise.resolve(false);
         latestStage = stage;
-        const record = { body: JSON.stringify(payload), status: 'idle', pending: null };
+        const record = { body: JSON.stringify(payload), player, status: 'idle', pending: null };
         records.set(stage, record);
         return send(stage, record);
       },
