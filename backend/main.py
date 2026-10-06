@@ -23,8 +23,8 @@
 
 前端：正式前端是 repo 根目錄，由 Zeabur 以靜態網站部署（zbpack.json），
 透過 shared/api.js 跨網域呼叫本服務的 /api/*。
-/app 另外以目錄白名單提供同一批現行頁，舊網址轉至 Home／Select／Back 與對應遊戲。
-不再掛載已移除的 frontend/。
+/app 只在這些目錄真的在本機時才掛載。Zeabur 的 API 服務若只有 backend/，
+缺少的目錄會略過，API 仍可啟動。不再掛載已移除的 frontend/。
 
 CORS：前端部署在別的網域，需在 CORS_ALLOW_ORIGINS 放行其 origin。用環境變數
 CORS_ALLOW_ORIGINS 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時
@@ -151,19 +151,31 @@ for source, target in _LEGACY_REDIRECTS.items():
 
 # 白名單掛載現行功能頁；不提供 repo 根、backend、.env 或已移除的 frontend/。
 _SITE_ROOT = Path(__file__).parent.parent
+_SITE_DIRECTORIES = (
+    "Home", "Select", "Back", "shared", "tutorial", "DCCS", "DAT_single",
+    "DAT_double", "EFT_single", "EFT_double", "IM1", "TGame1", "TGame2",
+)
+
+
+def mount_site_directories(application: FastAPI, site_root: Path) -> None:
+    """只掛存在的目錄。StaticFiles 在目錄缺失時會在啟動當下拋出。"""
+    for directory_name in _SITE_DIRECTORIES:
+        directory = site_root / directory_name
+        if not directory.is_dir():
+            continue
+        application.mount(
+            f"/app/{directory_name}",
+            StaticFiles(directory=directory, html=True),
+            name=f"site-{directory_name}",
+        )
 
 
 @app.get("/app/主題資料.csv", include_in_schema=False)
 def game_questions() -> FileResponse:
     return FileResponse(_SITE_ROOT / "主題資料.csv", media_type="text/csv")
 
-for directory_name in (
-    "Home", "Select", "Back", "shared", "tutorial", "DCCS", "DAT_single",
-    "DAT_double", "EFT_single", "EFT_double", "IM1", "TGame1", "TGame2",
-):
-    app.mount(f"/app/{directory_name}",
-              StaticFiles(directory=_SITE_ROOT / directory_name, html=True),
-              name=f"site-{directory_name}")
+
+mount_site_directories(app, _SITE_ROOT)
 
 
 if __name__ == "__main__":
