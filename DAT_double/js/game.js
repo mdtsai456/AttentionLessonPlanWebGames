@@ -15,9 +15,12 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   const backHomeBtn = $('back-home');
   if (backHomeBtn) {
-    backHomeBtn.addEventListener('click', (e) => {
+    backHomeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      // 離開會中斷還在飛的存檔請求，先等兩位玩家都寫入完成
+      backHomeBtn.disabled = true;
+      await Promise.all(getState().players.map((player) => player.whenSaved()));
       getState().safeNavigateTo('../Select/index.html');
     });
   }
@@ -58,6 +61,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let focusMs = 0;
   let clearedMidBreak = false;
   let stageDeadline = 0;
+  let pendingSave = null;
 
   // 雙人彩蛋機制變數與切換函式
   let animalAssetList = [];
@@ -465,7 +469,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    await saveRun(stageCount);
+    pendingSave = saveRun(stageCount);
+    await pendingSave;
   }
 
   function move(delta) {
@@ -523,6 +528,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       event.preventDefault(); keys.add(event.code);
     }
     if (answerCodes.includes(event.code)) {
+      // 讓結算畫面的「返回遊戲大廳」能用鍵盤觸發，不要吃掉按鍵
+      if (event.target?.dataset?.ui === 'back-home') return;
       event.preventDefault();
       if (!event.repeat) {
         if (phase === 'finished' && event.target === $('restart')) getState().restartSession();
@@ -591,6 +598,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
+    // 供離開流程等待 finishGame() 的存檔請求結束
+    whenSaved: () => pendingSave || Promise.resolve(),
     canRestart: () => phase === 'finished' && saver?.canRestart(),
     saveStatus: () => saver?.status || 'idle',
     retrySave: () => saver?.retry(),
