@@ -74,6 +74,7 @@
     if (global.WebGameApi && global.WebGameApi.resolveApiBase) {
       return global.WebGameApi.resolveApiBase();
     }
+    if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
     const hostname = global.location.hostname;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
       return global.location.protocol + "//" + hostname + ":5001/api";
