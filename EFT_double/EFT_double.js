@@ -58,6 +58,7 @@ function buildPlayerStats(player, state, stage) {
     });
 }
 
+// 資料夾叫 EFT，但後端與後台把漂浮泡泡記為 DAT，所以成績用 DAT 送；素材 API 則讀 EFT。
 async function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();
@@ -65,7 +66,7 @@ async function savePlayerRun(player, playerIndex, stage) {
             lessonId: '1140908_DAT',
             data: {
                 ...identity,
-                startTime: Date.now(),
+                startTime: state.startTimeMs,
                 endTime: Date.now(),
                 mode: 'double',
                 pairId,

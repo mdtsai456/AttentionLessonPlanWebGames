@@ -25,3 +25,7 @@ API 預期提供一般氣泡、發光氣泡、反向提示及箭頭素材。箭�
 Fallback 順序：API 空清單或請求失敗時使用 `assets/arrow/箭頭00.png` 至 `箭頭03.png`；某個 API URL 無法載入時，只替換該位置，改用本地 `DEFAULT_ARROW_STYLE[索引 % 4]`（例如清單第 2 階載入失敗會顯示 `箭頭01.png`，第 5 階會顯示 `箭頭00.png`）。記憶目標使用 `assets/arrow/目標泡泡.png`，非目標與答案底圖使用 `assets/arrow/空泡泡.png`，反向題疊加 `assets/arrow/反向提示.png`。
 
 整合時應以穩定的素材名稱／manifest 作為 API 與 renderer 間的契約，處理載入失敗及快取；所有素材在遊戲開始前載入，不要在每題期間才發出素材請求。現行實作使用 DOM 疊圖，未來若改用 Canvas 再處理高 DPI 繪製。
+
+## 遊戲代號
+
+這兩個資料夾叫 `EFT`，但後端與後台把漂浮泡泡記為 `DAT`。成績送 `lessonId: 1140908_DAT`，`stats[].apiname` 由 `shared/eft-game-logic.js` 的 `buildDatStats()` 產生 `DAT_*` 前綴，後台顯示在「漂浮泡泡」底下。素材 API 讀的是 `EFT.assets.files`，沿用資料夾命名。動物追擊令（`DAT_*` 資料夾）剛好相反，送 `1140908_EFT` 與 `EFT_*`。兩邊都是正確的，不要改成跟資料夾同名。

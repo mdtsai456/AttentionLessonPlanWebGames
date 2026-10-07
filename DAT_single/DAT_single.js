@@ -540,6 +540,7 @@ async function saveGameDataToBackend(data) {
     10
   );
 
+  // 資料夾叫 DAT，但後端把動物追擊令（選單與後台叫瓢蟲追擊令）記為 EFT，所以成績用 EFT 送；素材 API 則讀 DAT。
   const payload = {
     lessonId: "1140908_EFT",
     data: {
