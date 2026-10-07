@@ -15,13 +15,10 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   const backHomeBtn = $('back-home');
   if (backHomeBtn) {
-    backHomeBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // 離開會中斷還在飛的存檔請求，先等兩位玩家都寫入完成
-      backHomeBtn.disabled = true;
-      await Promise.all(getState().players.map((player) => player.whenSaved()));
-      getState().safeNavigateTo('../Select/index.html');
+    backHomeBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      getState().exitGame();
     });
   }
 
@@ -525,12 +522,13 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   document.addEventListener('visibilitychange', clearInput);
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+    if (event.target?.disabled) return;
     if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
       event.preventDefault(); keys.add(event.code);
     }
     if (answerCodes.includes(event.code)) {
-      // 讓結算畫面的「返回遊戲大廳」能用鍵盤觸發，不要吃掉按鍵
-      if (event.target?.dataset?.ui === 'back-home') return;
+      // 返回與離開使用瀏覽器原生的 Space／Enter，不攔截成遊戲作答。
+      if (event.target?.dataset?.ui === 'back-home' || event.target?.id === 'leave-btn') return;
       event.preventDefault();
       if (!event.repeat) {
         if (phase === 'finished' && event.target === $('restart')) getState().restartSession();

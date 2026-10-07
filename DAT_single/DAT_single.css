@@ -133,10 +133,10 @@ button:focus-visible {
 }
 
 .btn-leave {
-  position: absolute;
+  position: fixed;
   top: 3%;
   right: 2%;
-  z-index: 6;
+  z-index: 201;
   appearance: none;
   border: none;
   border-radius: 999px;

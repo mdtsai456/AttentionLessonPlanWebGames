@@ -411,11 +411,7 @@ function continueNextStage() {
 
 $('btn-next-stage').addEventListener('click', continueNextStage);
 
-$('btn-lobby').addEventListener('click', async () => {$('btn-lobby').disabled = true;
-  $('btn-next-stage').disabled = true;
-  if (await saveCurrentRun(MID_STAGE)) returnToLobby();
-  else { $('btn-lobby').disabled = false; $('btn-next-stage').disabled = false; }
-});
+$('btn-lobby').addEventListener('click', () => { returnToLobby(); });
 
 function endQuestion() {
   if (phase !== 'answer') return;
@@ -480,10 +476,38 @@ function saveCurrentRun(stage) {
   });
 }
 
-function returnToLobby() {
-  if (saver && !saver.canRestart()) return;
-  window.removeEventListener('beforeunload', blockUnload);
-  window.location.href = '../Select/index.html';
+let exitPending = false;
+
+async function withExitLock(action) {
+  if (exitPending) return;
+  exitPending = true;
+  const buttons = [...document.querySelectorAll('#leave-btn, #restart, #btn-start-game, #btn-lobby, #btn-next-stage, .shared-stage-clear-btn')];
+  const disabled = buttons.map((button) => button.disabled);
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await action();
+  } finally {
+    buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+    exitPending = false;
+  }
+}
+
+function checkpointStage() {
+  if (isPractice) return 0;
+  const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
+  if (completed >= STAGE_COUNT) return STAGE_COUNT;
+  if (completed >= MID_STAGE) return MID_STAGE;
+  return 0;
+}
+
+async function returnToLobby() {
+  await withExitLock(async () => {
+    const checkpoint = checkpointStage();
+    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
+    window.removeEventListener('beforeunload', blockUnload);
+    window.__askLeave = false;
+    window.location.href = '../Select/index.html';
+  });
 }
 
 function finishGame() {
@@ -616,18 +640,16 @@ $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', () => { if (phase === 'finished') startGame(); });$('leave-btn').addEventListener('click', leaveGame);
 
 async function leaveGame() {
-  if ($('leave-btn').disabled) return;
-  $('leave-btn').disabled = true;
-  if (!isPractice) {
-    const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
-    const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-    if (checkpoint && !(await saveCurrentRun(checkpoint))) {
-      $('leave-btn').disabled = false;
-      return;
-    }
+  if (phase === 'finished') {
+    await returnToLobby();
+    return;
   }
-  window.removeEventListener('beforeunload', blockUnload);
-  window.askLeave('../Select/index.html');
+  await withExitLock(async () => {
+    const checkpoint = checkpointStage();
+    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
+    window.removeEventListener('beforeunload', blockUnload);
+    window.askLeave('../Select/index.html');
+  });
 }
 $('retry-save').addEventListener('click', () => saver.retry());
 $('checkpoint-retry-save').addEventListener('click', () => saver.retry());
@@ -637,15 +659,23 @@ window.addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', clearInput);
 document.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+  if (event.target?.disabled) return;
+  if (!$('results').hidden && event.key === 'Tab') {
+    const buttons = [...$('results').querySelectorAll('button:not([hidden]):not(:disabled)')];
+    if (!buttons.length) return;
+    event.preventDefault();
+    const current = buttons.indexOf(document.activeElement);
+    const next = current < 0 ? (event.shiftKey ? buttons.length - 1 : 0)
+      : (current + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+    return;
+  }
   if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
     event.preventDefault(); keys.add(event.code);
   }
-  if (event.code === 'Space' && phase === 'answer' && !paused && event.target !== $('leave-btn')) {
+  if (event.code === 'Space' && phase === 'answer' && !paused && event.target?.id !== 'leave-btn') {
     event.preventDefault();
     if (!event.repeat) answer();
-  }
-  if (!$('results').hidden && event.key === 'Tab') {
-    event.preventDefault();
   }
 });
 document.addEventListener('keyup', (event) => keys.delete(event.code));

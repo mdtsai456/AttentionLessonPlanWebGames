@@ -1,12 +1,46 @@
 // js/main.js
 import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=8';
+import { createPlayer } from './game.js?v=9';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
 
 const midWait = [false, false];
 const midResume = [null, null];
+let exitPending = false;
+
+async function withExitLock(action) {
+  if (exitPending) return;
+  exitPending = true;
+  const buttons = [...document.querySelectorAll('#leave-btn, #enter-formal-btn, #mid-continue, #mid-lobby, [data-ui="restart"], [data-ui="back-home"], .shared-stage-clear-btn')];
+  const disabled = buttons.map((button) => button.disabled);
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await action();
+  } finally {
+    buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+    exitPending = false;
+  }
+}
+
+async function exitGame(confirmLeave = true) {
+  await withExitLock(async () => {
+    const completed = Math.min(...players.map((player) => player.completedStages()));
+    if (completed >= 6) {
+      const saved = await Promise.all(players.map((player) => player.whenSaved()));
+      if (saved.some((result) => result === false)) return;
+      safeNavigateTo('../Select/index.html');
+      return;
+    }
+    const stage = completed >= 3 ? 3 : 0;
+    if (playMode === 'game' && stage) {
+      const results = await Promise.all(players.map((player) => player.saveRun(stage)));
+      if (!results.every(Boolean)) return;
+    }
+    if (confirmLeave) window.askLeave('../Select/index.html');
+    else safeNavigateTo('../Select/index.html');
+  });
+}
 
 function waitForMidBreak(playerIndex, resume) {
   midWait[playerIndex] = true;
@@ -54,7 +88,8 @@ const state = {
   waitForMidBreak,
   waitForStageClear,
   restartSession,
-  refreshSaveControls
+  refreshSaveControls,
+  exitGame,
 };
 
 export const players = [
@@ -68,26 +103,7 @@ let playMode = new URLSearchParams(window.location.search).get('mode') === 'game
   ? 'game'
   : 'practice';
 
-async function saveBeforeLeaving(stage) {
-  const button = document.getElementById('leave-btn');
-  if (button.disabled) return false;
-  button.disabled = true;
-  const results = await Promise.all(players.map((player) => player.saveRun(stage)));
-  button.disabled = false;
-  return results.every(Boolean);
-}
-document.getElementById('leave-btn').addEventListener('click', async () => {
-  const completed = Math.min(...players.map((player) => player.completedStages()));
-  // 六關已完成時 finishGame 已負責存檔，等它寫完再離開，避免重複存檔與瀏覽器離開確認
-  if (completed >= 6) {
-    await Promise.all(players.map((player) => player.whenSaved()));
-    safeNavigateTo('../Select/index.html');
-    return;
-  }
-  const stage = completed >= 3 ? 3 : 0;
-  if (playMode === 'game' && stage && !(await saveBeforeLeaving(stage))) return;
-  window.askLeave('../Select/index.html');
-});
+document.getElementById('leave-btn').addEventListener('click', () => { exitGame(); });
 
 function refreshSaveControls() {
   const restartable = players.every((player) => player.canRestart());
@@ -104,6 +120,7 @@ document.getElementById('checkpoint-retry-save').addEventListener('click', () =>
 });
 
 function restartSession() {
+  if (exitPending) return;
   if (!players.every((player) => player.canRestart())) return;
   beginSession();
 }
@@ -160,6 +177,7 @@ function preventLeaveHandler(event) {
 window.addEventListener('beforeunload', preventLeaveHandler);
 
 export function safeNavigateTo(url) {
+  window.__askLeave = false;
   window.removeEventListener('beforeunload', preventLeaveHandler);
   window.onbeforeunload = null;
   window.location.href = url;
@@ -175,12 +193,7 @@ if (midContinue) {
   });
 }
 if (midLobby) {
-  midLobby.addEventListener('click', async () => {
-    midLobby.disabled = true;
-    midContinue.disabled = true;
-    if (await saveBeforeLeaving(3)) safeNavigateTo('../Select/index.html');
-    else { midLobby.disabled = false; midContinue.disabled = false; }
-  });
+  midLobby.addEventListener('click', () => { exitGame(false); });
 }
 
 const btnConfirmLeave = document.getElementById('btn-confirm-leave');

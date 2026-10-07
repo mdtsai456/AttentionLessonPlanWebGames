@@ -28,6 +28,8 @@
     button.addEventListener('click', close);
     window.addEventListener('keydown', (event) => {
       if (root.hidden) return;
+      if (button.disabled) return;
+      if (event.target?.id === 'leave-btn') return;
       if (event.code !== 'Enter' && event.code !== 'NumpadEnter' && event.code !== 'Space') return;
       event.preventDefault();
       close();
