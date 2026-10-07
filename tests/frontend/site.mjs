@@ -1,0 +1,30 @@
+// 測試共用：受測網站根目錄與頁面清單。
+// SITE_ROOT 可指向別的 checkout（例如修正前的版本），用來確認測試抓得到 bug。
+import path from "node:path";
+
+export const SITE_ROOT = path.resolve(
+  process.env.SITE_ROOT || path.join(import.meta.dirname, "..", "..")
+);
+
+export const DCCS_PAGE = "DCCS/index.html";
+
+// 010 範圍：全部 11 個學生單人頁共用相同登入守門。
+export const GUARDED_PAGES = [
+  "Select/index.html",
+  "tutorial/DCCS_tutorial.html",
+  "tutorial/DAT_tutorial.html",
+  "tutorial/EFT_tutorial.html",
+  "tutorial/TGame_tutorial.html",
+  "tutorial/InstructionGame_tutorial.html",
+  DCCS_PAGE,
+  "DAT_single/DAT_single.html",
+  "EFT_single/EFT_single.html",
+  "TGame1/index.html",
+  "IM1/index.html",
+];
+
+export const DOUBLE_PAGES = [
+  'tutorial/DCCS_double_tutorial.html', 'tutorial/DAT_double_tutorial.html',
+  'tutorial/EFT_double_tutorial.html', 'tutorial/TGame_double_tutorial.html',
+  'DCCS/double.html', 'DAT_double/DAT_double.html', 'EFT_double/EFT_double.html', 'TGame2/index.html',
+];

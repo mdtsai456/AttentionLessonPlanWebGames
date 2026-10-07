@@ -17,16 +17,15 @@
 
 | 環境 | Base URL |
 |---|---|
-| 正式（Zeabur） | `https://attention-lesson-plan-transfer-data.zeabur.app` |
+| 正式（Zeabur） | `https://attention-lesson-plan-data.zeabur.app` |
 | 本機後端 | `http://127.0.0.1:5001` |
 
 存活檢查：`GET {BASE_URL}/health` → `{"status":"ok"}`。
 互動式 API 文件（Swagger UI）：`{BASE_URL}/docs`。
 
-**參考用的簡易畫面**：`{BASE_URL}/demo` —— 後端組員做的驗收畫面，把「選場域→選老師／
-學生→看報告」的流程用最陽春的方式畫出來，資料是真的。**這不是要你照抄的設計**，
-只是讓你看 API 串起來長什麼樣、資料形狀對不對。原始碼在 `demo/index.html`（單一檔案，
-vanilla JS，可當串接範例）。
+`/demo` 已轉至 `/app/Back/index.html`。現行登入入口為 `/app/Home/index.html`，
+舊 `/app/index.html`、`/app/dms.html`、`/app/games.html` 及遊戲入口統一轉至新版。
+跨網域不搬移 token，須重新登入。
 
 ### 0.2 帳密登入（2026-09-11 起，取代原本的「選單式免密碼」）
 
@@ -639,3 +638,18 @@ Windows PowerShell 環境用 curl 傳中文/JSON body 容易被殼層引號吃�
 | 學生密碼怎麼實際發放給小朋友 | 中 —— 影響學生端能不能真的開始用 | 後端能設密碼（`manage_passwords.py`），但「紙本？email？」這個流程還沒跟廠商定案 |
 | 遊戲大廳點卡片後要導去哪 | 中 —— 目前只顯示「即將推出」 | 等 Unity 遊戲組的實際網址/整合方式 |
 | `/demo` 驗收頁 | 低，非正式前端 | 帳密登入上線後會壞（沒登入態），暫不修 |
+
+## 功能頁與成績寫入授權
+
+`GET /api/auth/me` 帶 `Authorization: Bearer <token>`，回傳 `role`、`school`、`expiresAt`。
+學生另有 `grade`、`caseId`、`studentKey`；老師另有 `teacherId`、`teacherName`。
+成功與失敗回應皆 `Cache-Control: no-store`。無效、過期或撤銷 token 回 401。
+功能頁驗證成功後才載入原有腳本；雙人驗證兩個學生，老師頁僅接受老師。
+模式不符回 Select（DCCS 單人入口保留雙人轉址）。
+5 秒內無法驗證回 Home 提示重試；401 清除本機登入。bfcache 返回時重新驗證並暫停遊戲排程及輸入。
+
+`POST /api/sessions` 必須帶本人學生 Authorization；`data.grade`／`caseId`／`school` 與本人一致。
+雙人每筆另帶 `X-Partner-Authorization: Bearer <另一位學生 token>`，兩人都有效才可寫入。
+缺少或無效 token 回 401；角色或成績身分不符回 403；任何拒絕都不寫入。
+成功維持 201 和 `{sessionId,message}`。可跨場域或使用同帳號，不新增限制。
+詳見 [Unity 串接指南](unity-integration-guide.md)。

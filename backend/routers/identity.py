@@ -30,6 +30,7 @@ class Identity:
     grade: str | None = None
     case_id: str | None = None
     school: str | None = None
+    expires_at: datetime | None = None
 
 
 def extract_bearer_token(authorization: str | None) -> str | None:
@@ -55,7 +56,7 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
     expires_at = row["expires_at"]
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
+    if expires_at <= datetime.now(timezone.utc):
         raise _NOT_AUTHENTICATED
 
     if row["subject_type"] == "teacher":
@@ -70,10 +71,14 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
             teacher_id=teacher["teacher_id"],
             teacher_name=teacher["name"],
             school=teacher["school"],
+            expires_at=expires_at,
         )
 
+    if row["subject_type"] != "student" or not all(row.get(key) for key in ("grade", "case_id", "school")):
+        raise _NOT_AUTHENTICATED
     return Identity(
-        subject_type="student", grade=row["grade"], case_id=row["case_id"], school=row["school"]
+        subject_type="student", grade=row["grade"], case_id=row["case_id"],
+        school=row["school"], expires_at=expires_at,
     )
 
 

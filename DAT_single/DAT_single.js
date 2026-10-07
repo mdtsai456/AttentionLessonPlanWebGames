@@ -29,6 +29,7 @@ let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 let animalAssetList = [];       // 儲存該學生所有可用的動物圖片 URL
 let currentAssetIndex = 0;     // 目前顯示的圖片索引
 let consecutiveCorrect = 0;    // 連續答對且瞄準成功計數器
+const STREAK_TO_EVOLVE = 5;    // 連續成功幾題升級一次動物
 
 const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
@@ -38,8 +39,27 @@ let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
 
+let saver;
+function showSaveStatus({ status, message, retryable }) {
+  $('save-status').textContent = message;
+  $('retry-save').hidden = !retryable;
+  $('retry-save').disabled = status === 'saving';
+  $('restart').disabled = !saver?.canRestart();
+  if (!isPractice && $('btn-start-game')) $('btn-start-game').disabled = !saver?.canRestart();
+  $('checkpoint-save-status').textContent = message;
+  $('checkpoint-retry-save').hidden = !retryable;
+  $('save-notice').hidden = phase === 'finished' || status === 'idle' || status === 'saved';
+}
+
 function startGame() {
-  gameStartTime = Date.now();
+  if (phase === 'finished' && saver && !saver.canRestart()) return;
+  saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
+  $('save-status').textContent = '';
+  $('retry-save').hidden = true;
+  $('save-notice').hidden = true;
+  $('restart').disabled = false;
+  $('btn-start-game').disabled = false;
+  gameStartTime = window.WebGameRuntime.now();
   stage = 1;
   stageDeadline = 0;
   stageQuestionNo = 0;
@@ -64,7 +84,12 @@ function startGame() {
   if (animalAssetList.length > 0) {
     currentAssetIndex = 0;
     const animalImgElem = $('animal-image');
-    if (animalImgElem) animalImgElem.src = animalAssetList[0];
+    if (animalImgElem) {
+      animalImageGeneration++;
+      animalImgElem.style.opacity = '1';
+      animalImgElem.style.transform = 'scale(1)';
+      window.DatAssets.setImage(animalImgElem, animalAssetList[0]);
+    }
   }
 
   $('results').hidden = true;
@@ -168,9 +193,9 @@ function updateProgress() {
   }
 
   const left = stageDeadline
-    ? Math.max(0, Math.ceil((stageDeadline - Date.now()) / 1000))
+    ? Math.max(0, Math.ceil((stageDeadline - window.WebGameRuntime.now()) / 1000))
     : STAGE_MS / 1000;
-  const used = stageDeadline ? Math.min(STAGE_MS, Date.now() - (stageDeadline - STAGE_MS)) : 0;
+  const used = stageDeadline ? Math.min(STAGE_MS, window.WebGameRuntime.now() - (stageDeadline - STAGE_MS)) : 0;
   const ratio = ((stage - 1) + used / STAGE_MS) / STAGE_COUNT;
   $('round').textContent = `第 ${Math.max(stageQuestionNo, 1)} 題・剩餘 ${left} 秒（第 ${stage} / ${STAGE_COUNT} 關）`;
   $('progress').setAttribute('aria-valuemax', 100);
@@ -182,7 +207,7 @@ function answerLimitMs() {
   /*
   //修改會在最後一秒跑很多題目的 bug
   if (isPractice || !stageDeadline) return ROUND_MS;
-  return Math.max(0, Math.min(ROUND_MS, stageDeadline - Date.now()));
+  return Math.max(0, Math.min(ROUND_MS, stageDeadline - window.WebGameRuntime.now()));
   */
 }
 
@@ -216,10 +241,10 @@ function isOnAnimal() {
   return RABBIT_HIT_MASK[y][x] === '1';
 }
 
-function showQuestion() {
+function showQuestion(previousFeedback = '') {
   if (!isPractice) {
     if (!stageDeadline) {
-      stageDeadline = Date.now() + STAGE_MS;
+      stageDeadline = window.WebGameRuntime.now() + STAGE_MS;
       stageQuestionNo = 0;
     }
     if (!questions[index]) {
@@ -232,7 +257,10 @@ function showQuestion() {
   $('question-type').textContent = q.type;
   $('question-text').textContent = q.text;
   $('question-text').style.color = q.color;
-  $('animal').dataset.result = '';$('feedback').textContent = '題目正確就瞄準按空白鍵；不正確則不按';
+  $('animal').dataset.result = '';
+  $('feedback').textContent = previousFeedback
+    ? `上一題：${previousFeedback}`
+    : '題目正確就瞄準按空白鍵；不正確則不按';
   enableAnswers(true); updateClock(); updateProgress();
 }
 
@@ -249,52 +277,39 @@ function answer() {
   enableAnswers(false);
 }
 
-// 彩蛋動物切換邏輯 (level up and down) 
+// 彩蛋動物切換邏輯 (level up)
 // 🎨 統一切換圖片與動畫處理
-function updateAnimalImage(newIndex, isUpgrade = true) {
+function updateAnimalImage(newIndex) {
   if (!animalAssetList || animalAssetList.length <= 1) return;
   if (newIndex === currentAssetIndex) return; // 索引未改變則不更新
 
   currentAssetIndex = newIndex;
   const targetAssetUrl = animalAssetList[currentAssetIndex];
 
-  console.log(`${isUpgrade ? '🎉 [彩蛋升級]' : '💔 [彩蛋降級]'} 切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${targetAssetUrl}`);
+  console.log(`🎉 [彩蛋升級] 切換至第 ${currentAssetIndex + 1} / ${animalAssetList.length} 張素材: ${targetAssetUrl}`);
 
   const animalImgElem = document.getElementById('animal-image') || $('animal-image');
   if (animalImgElem) {
+    const imageGeneration = ++animalImageGeneration;
     animalImgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
     animalImgElem.style.opacity = '0.2';
-    // 升級時縮放、降級時微放大的視覺效果區隔
-    animalImgElem.style.transform = isUpgrade ? 'scale(0.6)' : 'scale(1.2)';
+    // 升級時先縮小再彈回原尺寸的視覺效果
+    animalImgElem.style.transform = 'scale(0.6)';
 
-    setTimeout(() => {
-      animalImgElem.src = targetAssetUrl;
-
-      // 載入失敗容錯
-      animalImgElem.onerror = () => {
-        console.warn(`⚠️ 圖片載入失敗，退回預設圖檔`);
-        animalImgElem.src = DEFAULT_ANIMAL_PATH;
-      };
-
+    window.DatAssets.setImage(animalImgElem, targetAssetUrl).then(() => {
+      if (imageGeneration !== animalImageGeneration) return;
       animalImgElem.style.opacity = '1';
       animalImgElem.style.transform = 'scale(1)';
-    }, 150);
+    });
   }
 }
 
-// 🎉 連續答對 5 題：升級 (最大封頂，不循環回 0)
+// 🎉 連續答對 STREAK_TO_EVOLVE 題：升級 (最大封頂，不循環回 0)
 function switchToNextAnimal() {
   if (currentAssetIndex < animalAssetList.length - 1) {
-    updateAnimalImage(currentAssetIndex + 1, true);
+    updateAnimalImage(currentAssetIndex + 1);
   } else {
     console.log(`ℹ️ 已達最大素材頁面 (${currentAssetIndex + 1}/${animalAssetList.length})，保持最高級狀態。`);
-  }
-}
-
-// 💔 答錯 / 未瞄準 / 漏答：降級 (最低退回 0)
-function switchToPrevAnimal() {
-  if (currentAssetIndex > 0) {
-    updateAnimalImage(currentAssetIndex - 1, false);
   }
 }
 
@@ -303,6 +318,7 @@ function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
   const isSuccess = correct && onTarget;
+  const hadStreak = consecutiveCorrect > 0;
   let message;
   reactionSamples.push(elapsed);
 
@@ -311,22 +327,20 @@ function recordResult(pressed) {
     score++;
     message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
 
-    // 連續答對 5 題：觸發升級彩蛋
-    if (consecutiveCorrect > 0 && consecutiveCorrect % 5 === 0) {
+    // 連續答對 STREAK_TO_EVOLVE 題：觸發升級彩蛋
+    if (consecutiveCorrect % STREAK_TO_EVOLVE === 0) {
       if (currentAssetIndex < animalAssetList.length - 1) {
         message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
         switchToNextAnimal();
       } else {
         message += ` 🎉 連續答對 ${consecutiveCorrect} 題！維持最高級動物狀態！`;
       }
+    } else if (currentAssetIndex < animalAssetList.length - 1) {
+      message += `（再連續答對 ${STREAK_TO_EVOLVE - consecutiveCorrect % STREAK_TO_EVOLVE} 題變身）`;
     }
   } else {
-    consecutiveCorrect = 0; // 重置連擊
-
-    // 💔 答錯、未瞄準或漏答：觸發降級退回上一張
-    if (currentAssetIndex > 0) {
-      switchToPrevAnimal();
-    }
+    // 失敗只歸零連擊，已變身的動物保留
+    consecutiveCorrect = 0;
 
     if (!pressed && !correct) {
       timedOut++;
@@ -339,6 +353,7 @@ function recordResult(pressed) {
       offTarget++;
       message = '判斷正確，但準心未對到動物，不計分';
     }
+    if (hadStreak) message += '（連擊歸零）';
   }
 
   $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
@@ -398,14 +413,15 @@ $('btn-next-stage').addEventListener('click', continueNextStage);
 
 $('btn-lobby').addEventListener('click', async () => {$('btn-lobby').disabled = true;
   $('btn-next-stage').disabled = true;
-  await saveCurrentRun(MID_STAGE);
-  returnToLobby();
+  if (await saveCurrentRun(MID_STAGE)) returnToLobby();
+  else { $('btn-lobby').disabled = false; $('btn-next-stage').disabled = false; }
 });
 
 function endQuestion() {
   if (phase !== 'answer') return;
   phase = 'resolving';
   if (!submitted) recordResult(false);
+  const previousFeedback = $('feedback').textContent;
   if (!isPractice) {
     if (!levelOutcomes[stage - 1]) levelOutcomes[stage - 1] = [];
     levelOutcomes[stage - 1].push(Boolean(outcomes[outcomes.length - 1]));
@@ -413,25 +429,24 @@ function endQuestion() {
   index++;
 
   if (isPractice) {
-    if (index < questions.length) showQuestion();
+    if (index < questions.length) showQuestion(previousFeedback);
     else finishGame();
     return;
   }
 
   // 修改會在最後一秒跑很多題目的 bug
-  if (stageDeadline && Date.now() >= stageDeadline - 20) {
+  if (stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20) {
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;
   }
-  showQuestion();
+  showQuestion(previousFeedback);
 }
 
 function answeredCount() {
   return Math.max(index, 1);
 }
 
-let savedStage = 0;
 
 function sessionMetrics() {
   const questionCount = score + wrong + offTarget;
@@ -448,7 +463,6 @@ function sessionMetrics() {
 }
 
 function saveCurrentRun(stage) {
-  savedStage = stage;
   const metrics = sessionMetrics();
   return saveGameDataToBackend({
     score: score,
@@ -456,7 +470,7 @@ function saveCurrentRun(stage) {
     offTarget: offTarget,
     timedOut: timedOut,
     accuracy: metrics.accuracy,
-    duration: Date.now() - gameStartTime,
+    duration: window.WebGameRuntime.now() - gameStartTime,
     stage: stage,
     levelAccuracy: levelAccuracyText(stage),
     avgReactionMs: metrics.avgReactionMs,
@@ -467,6 +481,7 @@ function saveCurrentRun(stage) {
 }
 
 function returnToLobby() {
+  if (saver && !saver.canRestart()) return;
   window.removeEventListener('beforeunload', blockUnload);
   window.location.href = '../Select/index.html';
 }
@@ -486,7 +501,6 @@ function finishGame() {
   if (isPractice) {
     $('result-title').textContent = '練習結束';
     $('restart').textContent = '再練習一次';
-    $('restart').onclick = startGame;
 
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '進入正式遊戲';
@@ -497,7 +511,6 @@ function finishGame() {
   } else {
     $('result-title').textContent = '挑戰完成！';
     $('restart').textContent = '再玩一次';
-    $('restart').onclick = startGame;
 
     if ($startGameBtn) {$startGameBtn.hidden = false;
       $startGameBtn.textContent = '返回遊戲大廳';
@@ -511,11 +524,14 @@ function finishGame() {
 }
 
 async function saveGameDataToBackend(data) {
-  const url = `${window.WebGameApi.resolveApiBase()}/sessions`;
-
-  const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade') || 'G1';
-  const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S03';
-  const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school') || 'KMU';
+  const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade');
+  const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case');
+  const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school');
+  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
+  if (!grade || !caseId || !school) {
+    console.warn('找不到登入學生資料，成績不送出');
+    return;
+  }
   const currentDay = parseInt(
     sessionStorage.getItem('currentDay')
       || sessionStorage.getItem('student1_day')
@@ -531,7 +547,7 @@ async function saveGameDataToBackend(data) {
       caseId: caseId,
       school: school,
       currentDay: currentDay,
-      startTime: gameStartTime,
+      startTime: window.WebGameRuntime.toWallTime(gameStartTime),
       endTime: Date.now(),
       mode: "single",
       stats: [
@@ -549,25 +565,7 @@ async function saveGameDataToBackend(data) {
     }
   };
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.status === 201) {
-      const result = await res.json();
-      console.log('✅ [API 成功] 資料已成功寫入資料庫！Session ID:', result.sessionId);
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      console.error(`❌ [API 錯誤 ${res.status}]:`, errData.detail || '寫入失敗');
-    }
-  } catch (err) {
-    console.error('❌ [API 網路連線異常]:', err);
-  }
+  return saver.save(data.stage, payload);
 }
 
 function move(delta) {
@@ -603,7 +601,7 @@ function tick(time) {
       updateClock();
 
       //修改會在最後一秒跑很多題目的 bug
-      const isStageTimeout = !isPractice && stageDeadline && Date.now() >= stageDeadline;
+      const isStageTimeout = !isPractice && stageDeadline && window.WebGameRuntime.now() >= stageDeadline;
       if (elapsed >= answerLimitMs() || isStageTimeout) {
         endQuestion();
       }
@@ -614,22 +612,24 @@ function tick(time) {
 }
 
 $('answer-true').addEventListener('click', answer);
-$('restart').addEventListener('click', startGame);$('leave-btn').addEventListener('click', leaveGame);
+$('restart').addEventListener('click', () => { if (phase === 'finished') startGame(); });$('leave-btn').addEventListener('click', leaveGame);
 
 async function leaveGame() {
+  if ($('leave-btn').disabled) return;
   $('leave-btn').disabled = true;
-  try {
-    if (!isPractice) {
-      const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
-      const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-      if (checkpoint && checkpoint !== savedStage) await saveCurrentRun(checkpoint);
+  if (!isPractice) {
+    const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
+    const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+    if (checkpoint && !(await saveCurrentRun(checkpoint))) {
+      $('leave-btn').disabled = false;
+      return;
     }
-  } finally {
-    window.removeEventListener('beforeunload', blockUnload);
-    window.askLeave('../Select/index.html');
-    $('leave-btn').disabled = false;
   }
+  window.removeEventListener('beforeunload', blockUnload);
+  window.askLeave('../Select/index.html');
 }
+$('retry-save').addEventListener('click', () => saver.retry());
+$('checkpoint-retry-save').addEventListener('click', () => saver.retry());
 
 function clearInput() { keys.clear(); pointerDirections.clear(); lastTime = undefined; }
 window.addEventListener('blur', clearInput);
@@ -663,6 +663,7 @@ document.querySelectorAll('[data-move]').forEach((button) => {
 // 動態載入學生素材與彩蛋清單
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+let animalImageGeneration = 0;
 const DEFAULT_ANIMAL_POOL = [
   'assets/animals/rabbit.png',
   'assets/animals/cat.png',
@@ -685,56 +686,11 @@ async function fetchStudentAssets() {
   const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
   console.log(`[流程 1] 遊戲 Call API: GET ${apiUrl}`);
 
-  try {
-    const res = await fetch(apiUrl);
-    if (res.ok) {
-      const data = await res.json();
-      console.log('[流程 2] API 回傳結構:', data);
-
-      const files = data?.DAT?.assets?.files;
-
-      if (Array.isArray(files) && files.length > 0) {
-        animalAssetList = files.map((relativePath) =>
-          relativePath.startsWith('http')
-            ? relativePath
-            : `${ASSET_SERVER_HOST}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
-        );
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️ API 請求異常，開啟預設素材容錯:', err);
-  }
-
-  // 自動補齊 4 種動物：若沒有素材或只有 1 張素材，自動加入預設圖庫
-  if (!animalAssetList || animalAssetList.length === 0) {
-    animalAssetList = [...DEFAULT_ANIMAL_POOL];
-  } else if (animalAssetList.length === 1) {
-    const remainingDefaults = DEFAULT_ANIMAL_POOL.filter(p => p !== animalAssetList[0]);
-    animalAssetList = [...animalAssetList, ...remainingDefaults];
-  }
+  animalAssetList = await window.DatAssets.fetchAssetList(apiUrl, DEFAULT_ANIMAL_POOL);
 
   currentAssetIndex = 0;
   console.log(`[素材載入完成] 最終素材清單共有 ${animalAssetList.length} 張圖:`, animalAssetList);
   return animalAssetList[0];
-}
-
-//下載圖片並檢查是否存在，若不存在則回傳預設素材
-function downloadImage(src) {
-  return new Promise((resolve) => {
-    console.log(`[下載圖片] 開始下載: ${src}`);
-    const img = new Image();
-
-    img.onload = () => {
-      resolve(src);
-    };
-
-    img.onerror = () => {
-      console.warn(`⚠️ 圖片下載失敗 (404)，切換為預設素材: ${src}`);
-      resolve(DEFAULT_ANIMAL_PATH);
-    };
-
-    img.src = src;
-  });
 }
 
 async function initGameWorkflow() {
@@ -749,15 +705,16 @@ async function initGameWorkflow() {
   const animalAssetUrl = await fetchStudentAssets();
 
   // 2. 並行預載背景圖、準心圖與動物圖
-  const [bgSrc, crosshairSrc, finalAnimalSrc] = await Promise.all([
-    downloadImage('assets/background.png'),
-    downloadImage('assets/crosshair.png'),
-    downloadImage(animalAssetUrl)
+  const [, , finalAnimalSrc] = await Promise.all([
+    window.DatAssets.loadImage('assets/background.png', 'assets/background.png'),
+    window.DatAssets.loadImage('assets/crosshair.png', 'assets/crosshair.png'),
+    window.DatAssets.loadImage(animalAssetUrl)
   ]);
+  animalAssetList[0] = finalAnimalSrc;
 
   const animalImgElem = $('animal-image');
   if (animalImgElem) {
-    animalImgElem.src = finalAnimalSrc;
+    await window.DatAssets.setImage(animalImgElem, finalAnimalSrc);
     console.log(`[DOM 更新] 套用初始動物素材: ${finalAnimalSrc}`);
   }
 
@@ -779,3 +736,4 @@ function blockUnload(event) {
   }
 }
 window.addEventListener('beforeunload', blockUnload);
+window.addEventListener("webgame:pause", () => { keys.clear(); pointerDirections.clear(); });
