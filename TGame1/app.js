@@ -12,7 +12,8 @@ const TURN_WALK_FRAME_MS = 130;
 const NEAR_MS = 1080;
 const TURN_MS = 650;
 const ARRIVE_MS = 320;
-const PRELOAD_TIMEOUT_MS = 10000; // 某張圖卡住時最多等這麼久，避免永遠停在載入中
+const PRELOAD_TIMEOUT_MS = 8000;
+const ITEM_SWAP_MAX_WAIT_MS = 300;
 const PLAYER_BACK = "img/playerBack.png";
 const PLAYER_TURN = {
   left: "img/playerTurnLeft.png",
@@ -34,8 +35,6 @@ const PLAYER_WALK_TURN = {
       `img/walkRight/playerTurnRightWalk${String(index + 1).padStart(2, "0")}.png`
   ),
 };
-// 保留預載圖片的參照，避免被 GC 回收後換格時又要重新解碼
-const preloadedImages = [];
 const SCENE_TURN = {
   left: "turn-left",
   right: "turn-right",
@@ -89,20 +88,24 @@ let customThemes = null; // 由 CSV 自動載入；失敗時維持 null 使用�
 const state = {
   level: 1,
   roundToken: 0,
+  levelDeadline: 0,
   questionSeq: 0,
   currentQuestion: null,
   score: 0,
   wrong: 0,
   remaining: TIME_LIMIT_SEC,
   busy: false,
-  loading: false,
+  ready: false,
+  pendingCorrect: false,
   playing: false,
+  paused: false,
+  pausedRemainingMs: 0,
+  pausedReactionMs: 0,
   answers: [],
   reactionSamples: [],
   questionShownAt: 0,
   startedAt: 0,
   timerId: null,
-  timerLastTickAt: 0,
   walkTimer: null,
   walkFrame: 0,
   endReason: "",
@@ -127,7 +130,7 @@ lobbyBtn.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (!state.playing || state.busy) return;
+  if (event.repeat || !state.playing || state.paused || state.busy) return;
 
   if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -139,15 +142,21 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function init() {
-  showToast("載入中…");
-  clearTimeout(toastTimer); // 載入時間可能超過提示的自動消失時間，載完再收起
-  const [, ok] = await Promise.all([preloadSceneImages(), loadCsvFromUrl(CSV_URL)]);
-  toastEl.classList.remove("is-show");
+  promptEl.textContent = "圖片載入中…";
+  const scenesReady = preloadSceneImages();
+  const ok = await loadCsvFromUrl(CSV_URL);
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  startGame();
+  // 先排好六關，等場景、角色圖與第 1 關物品圖解碼完才開局；網路太慢時最多等 8 秒
+  const rules = buildStageRules();
+  stageRules = rules;
+  await Promise.race([
+    Promise.all([scenesReady, preloadLevelItems(1)]),
+    wait(PRELOAD_TIMEOUT_MS),
+  ]);
+  startGame(rules);
 }
 
-function startGame() {
+function startGame(rules = buildStageRules()) {
   clearInterval(state.timerId);
   state.score = 0;
   state.wrong = 0;
@@ -155,55 +164,46 @@ function startGame() {
   state.reactionSamples = [];
   state.startedAt = window.WebGameRuntime.now();
   state.endReason = "";
-  // Rebuild stage rules based on custom themes
-  stageRules = buildStageRules();
+  savedStage = 0;
+  stageRules = rules;
   nextStageBtn.disabled = false;
   lobbyBtn.disabled = false;
   startLevel(1);
 }
 
-async function startLevel(level) {
+function startLevel(level) {
   clearInterval(state.timerId);
   state.roundToken += 1;
-  const token = state.roundToken;
   state.level = level;
+  state.levelDeadline = window.WebGameRuntime.now() + TIME_LIMIT_SEC * 1000;
   state.questionSeq = 0;
   state.remaining = TIME_LIMIT_SEC;
-  state.busy = true;
-  state.loading = true;
+  state.busy = false;
+  state.pendingCorrect = false;
   state.playing = true;
+  state.paused = false;
+  viewportGuard.hide();
+  state.pausedReactionMs = 0;
   state.currentQuestion = makeQuestion(level, 0);
+  preloadLevelItems(level);
+  if (level < STAGE_COUNT) preloadLevelItems(level + 1);
   resultEl.classList.add("is-hidden");
   stageClearModal.classList.add("is-hidden");
   promptEl.classList.remove("is-hidden");
   resetSceneAndPlayer();
-  hideItemsNow(itemLeft, itemRight);
-  hideFeedback();
-  renderHud();
-
-  // 圖示載入完成才淡入、開始計時，載入時間不算在作答時間內。
-  // 先發出這一題的請求，再在背景下載整關的圖示。
-  const shown = renderQuestion();
-  preloadStageImages(level);
-  await shown;
-  if (!sameRound(token)) return;
   itemLeft.classList.remove("is-fading");
   itemRight.classList.remove("is-fading");
+  hideFeedback();
+  renderQuestion();
   state.questionShownAt = window.WebGameRuntime.now();
-  state.timerLastTickAt = state.questionShownAt;
-  state.busy = false;
-  state.loading = false;
   renderHud();
   state.timerId = setInterval(tick, 1000);
+  viewportGuard.update();
 }
 
 function tick() {
-  if (!state.playing) return;
-  // 還在等題目圖示就不扣時間，載入時間不計入關卡時間
-  if (state.loading) return;
-  const now = window.WebGameRuntime.now();
-  state.remaining = Math.max(0, state.remaining - Math.max(0, now - state.timerLastTickAt) / 1000);
-  state.timerLastTickAt = now;
+  if (!state.playing || state.paused) return;
+  state.remaining = Math.max(0, Math.ceil((state.levelDeadline - window.WebGameRuntime.now()) / 1000));
   renderHud();
   if (state.remaining <= 0) {
     endLevel();
@@ -218,15 +218,12 @@ function pick(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function wrongItemsFor(rule) {
-  return rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
-}
-
 function makeQuestion(level, seq) {
   // const rule = STAGE_RULES[level - 1];
   const rule = stageRules[level - 1];
+  const wrongItems =  rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
   const correctItem = pick(rule.correct);
-  const wrongItem = pick(wrongItemsFor(rule));
+  const wrongItem = pick(wrongItems);
   const correctSide = Math.random() < 0.5 ? "left" : "right";
   return {
     id: `s${level}-${seq}`,
@@ -237,40 +234,45 @@ function makeQuestion(level, seq) {
   };
 }
 
-// 等兩張圖都載入好才一起換上，避免先閃出上一題的圖示
 async function renderQuestion() {
   const question = currentQuestion();
-  if (!question) return;
+  if (!question) return false;
+  const token = state.roundToken;
+  const isCurrent = () => token === state.roundToken && state.currentQuestion === question;
+  state.ready = false;
+  itemLeft.classList.add("is-fading");
+  itemRight.classList.add("is-fading");
+  setItemImage(itemLeft, question.leftItem);
+  setItemImage(itemRight, question.rightItem);
   promptEl.textContent = question.prompt;
-  const [leftSrc, rightSrc] = await Promise.all([
-    itemImageForDisplay(question.leftItem),
-    itemImageForDisplay(question.rightItem),
-  ]);
-  // 等待期間關卡結束或換了題目，就不要再改畫面
-  if (currentQuestion() !== question || !state.playing) return;
-  setItemImage(itemLeft, question.leftItem, leftSrc);
-  setItemImage(itemRight, question.rightItem, rightSrc);
-  await waitItemsDecoded(itemLeft, itemRight);
+  if (!await window.TGameSupport.prepareItems([itemLeft, itemRight], ITEM_SWAP_MAX_WAIT_MS, isCurrent, labelCard)) return false;
+  state.ready = true;
+  state.questionShownAt = window.WebGameRuntime.now();
+  itemLeft.classList.remove("is-fading");
+  itemRight.classList.remove("is-fading");
+  return true;
 }
 
 function renderHud() {
-  const seconds = Math.max(0, Math.ceil(state.remaining));
   scoreBox.textContent = `${state.score} 分`;
-  timerBox.textContent = state.loading ? `${seconds} 秒 · 載入中` : `${seconds} 秒`;
+  timerBox.textContent = `${Math.max(0, state.remaining)} 秒`;
   levelBox.textContent = `${state.level} / ${STAGE_COUNT}`;
 }
 
 async function chooseDirection(choice) {
-  if (!state.playing || state.busy) return;
-  tick();
-  if (!state.playing) return;
+  if (!state.playing || state.paused || state.busy || !state.ready) return;
+  if (window.WebGameRuntime.now() >= state.levelDeadline) {
+    tick();
+    return;
+  }
+  const token = state.roundToken;
   const question = currentQuestion();
   if (!question) return;
 
-  const token = state.roundToken;
   state.busy = true;
   state.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - state.questionShownAt));
   const isCorrect = choice === question.correct;
+  state.pendingCorrect = isCorrect;
   if (isCorrect) state.score += 1;
   else state.wrong += 1;
 
@@ -292,15 +294,6 @@ async function chooseDirection(choice) {
   showFeedback(isCorrect);
   renderHud();
 
-  // 答對就先決定下一題，趁走路動畫時在背景下載圖示
-  let next = null;
-  if (isCorrect) {
-    state.questionSeq += 1;
-    next = makeQuestion(state.level, state.questionSeq);
-    preloadQuestionImages(next);
-  }
-
-  // 回合已換（暫停或下一關開始）就直接離開，busy 交給新回合處理
   await wait(NEAR_MS);
   if (!sameRound(token)) return;
 
@@ -317,46 +310,44 @@ async function chooseDirection(choice) {
   scene.classList.add("is-turning");
   setSceneBg(SCENE_TURN[choice]);
   await wait(TURN_MS);
+
   if (!sameRound(token)) return;
 
-  state.currentQuestion = next;
+  state.pendingCorrect = false;
+  state.questionSeq += 1;
+  state.currentQuestion = makeQuestion(state.level, state.questionSeq);
   itemLeft.classList.add("is-fading");
   itemRight.classList.add("is-fading");
-  // 先結算載入前的秒內進度，載入期間不扣作答時間。
-  tick();
-  if (!sameRound(token)) return;
-  state.loading = true;
-  renderHud();
-  await renderQuestion();
-  if (!sameRound(token)) return;
+  const questionReady = renderQuestion();
   hideFeedback();
   resetSceneAndPlayer(true);
-  await wait(40);
+  // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
+  await Promise.all([
+    wait(40),
+    questionReady,
+  ]);
   if (!sameRound(token)) return;
+  state.questionShownAt = window.WebGameRuntime.now();
   player.classList.remove("is-snap");
   scene.classList.remove("is-snap");
   player.classList.add("is-arrive");
   scene.classList.add("is-arrive");
   itemLeft.classList.remove("is-fading");
   itemRight.classList.remove("is-fading");
-  state.questionShownAt = window.WebGameRuntime.now();
-  state.timerLastTickAt = state.questionShownAt;
-  state.loading = false;
-  renderHud();
   await wait(ARRIVE_MS);
   if (!sameRound(token)) return;
-
   state.busy = false;
 }
 
 function sameRound(token) {
-  return token === state.roundToken && state.playing;
+  return token === state.roundToken && state.playing && !state.paused;
 }
 
 function pausePlay() {
-  state.playing = false;
-  state.loading = false;
   state.roundToken += 1;
+  state.playing = false;
+  state.paused = false;
+  viewportGuard.hide();
   clearInterval(state.timerId);
   hideFeedback();
   resetSceneAndPlayer();
@@ -375,7 +366,10 @@ function endLevel() {
     return;
   }
   if (finishedLevel < STAGE_COUNT) {
-    window.showStageClear(finishedLevel).then(() => startLevel(finishedLevel + 1));
+    const token = state.roundToken;
+    window.showStageClear(finishedLevel).then(() => {
+      if (token === state.roundToken && !state.playing) startLevel(finishedLevel + 1);
+    });
     return;
   }
   finishGame("complete");
@@ -533,28 +527,65 @@ function setPlayerSprite(src) {
   playerImg.src = src;
 }
 
-// 所有場景與角色圖都下載並解碼完才開始遊戲，第一次換格就不會跳格
-async function preloadSceneImages() {
-  [
+// 預載過的 Image 物件留在這裡，避免被 GC 回收後又重新下載、解碼
+const preloadedImages = new Map();
+
+// 回傳 Promise<boolean>：圖片可用為 true，載入失敗為 false（不會 reject）
+function preloadImage(src) {
+  if (preloadedImages.has(src)) return preloadedImages.get(src).ready;
+  const image = new Image();
+  let ready;
+  if (typeof image.decode === "function") {
+    image.src = src;
+    ready = image
+      .decode()
+      .then(() => true, () => image.complete && image.naturalWidth > 0);
+  } else {
+    ready = new Promise((resolve) => {
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = src;
+    });
+  }
+  preloadedImages.set(src, { image, ready });
+  return ready;
+}
+
+function levelItemIds(level) {
+  const rule = stageRules[level - 1];
+  if (!rule) return [];
+  const wrongItems =
+    rule.wrong || ALL_ITEMS.filter((item) => !rule.correct.includes(item));
+  return Array.from(new Set([...rule.correct, ...wrongItems]));
+}
+
+// 該關所有可能出現的物品圖先下載並解碼；找不到的直接記進 missingImages，之後改用文字卡
+function preloadLevelItems(level) {
+  return Promise.all(
+    levelItemIds(level)
+      .filter((id) => !missingImages.has(id))
+      .map((id) =>
+        preloadImage(itemSrc(id)).then((ok) => {
+          if (!ok) missingImages.add(id);
+        })
+      )
+  );
+}
+
+function preloadSceneImages() {
+  const sources = [
     "img/TGameBack.png",
     "img/TGameNear.png",
     "img/TGameTurnLeft.png",
     "img/TGameTurnRight.png",
-    "img/playerTurnLeft.png",
-    "img/playerTurnRight.png",
     PLAYER_BACK,
+    PLAYER_TURN.left,
+    PLAYER_TURN.right,
     ...PLAYER_WALK_BACK,
     ...PLAYER_WALK_TURN.left,
     ...PLAYER_WALK_TURN.right,
-  ].forEach((src) => {
-    const image = new Image();
-    image.src = src;
-    preloadedImages.push(image);
-  });
-  await Promise.race([
-    Promise.allSettled(preloadedImages.map((image) => image.decode())),
-    wait(PRELOAD_TIMEOUT_MS),
-  ]);
+  ];
+  return Promise.all(sources.map(preloadImage));
 }
 
 function showPlayerPlaceholder() {
@@ -575,6 +606,7 @@ function hidePlayerPlaceholder() {
 
 const CORRECT_TYPES = ["正確", "對", "correct", "true", "o", "1"];
 const WRONG_TYPES = ["錯誤", "錯", "wrong", "false", "x", "0"];
+const missingImages = new Set();
 
 function detectDelimiter(text) {
   const firstLine = text.split(/\r?\n/, 1)[0] || "";
@@ -790,145 +822,15 @@ function showToast(message, isError) {
   toastTimer = setTimeout(() => toastEl.classList.remove("is-show"), 4500);
 }
 
-// 項目圖片：先用 Image() 載入並解碼，完成後才換到畫面上。
-// 找不到圖或載入失敗時改用文字卡；失敗的項目過一段時間會重新嘗試，
-// 避免短暫斷線讓整關都變成文字卡。
-const ITEM_LOAD_TIMEOUT_MS = 5000;
-const ITEM_RETRY_MS = 15000;
-// id -> { promise: Promise<可直接用的 src>, img }
-// 保留 Image 的引用，畫面上的 <img> 才能直接重用已解碼的圖、不必重新下載
-const itemImageCache = new Map();
-
-// 整關預載排在這裡一張一張送，不要一次把連線塞滿；
-// 題目要用的圖才能立刻以高優先權發出，不被整關預載和角色動畫圖擋住。
-const preloadQueue = [];
-let preloading = false;
-
-function queueItemPreload(ids) {
-  ids.forEach((id) => {
-    if (!itemImageCache.has(id) && !preloadQueue.includes(id)) preloadQueue.push(id);
-  });
-  pumpItemPreload();
-}
-
-function pumpItemPreload() {
-  if (preloading || !preloadQueue.length) return;
-  preloading = true;
-  // 某張預載卡住時不要擋住後面的圖：等到上限時間就先換下一張，
-  // 卡住那張仍在背景下載，載完一樣會進快取。
-  const loading = loadItemImage(preloadQueue.shift());
-  Promise.race([loading, wait(ITEM_LOAD_TIMEOUT_MS)]).then(() => {
-    preloading = false;
-    pumpItemPreload();
-  });
-}
-
-function loadItemImage(id, priority = "low") {
-  if (!itemImageCache.has(id)) {
-    // 還排在預載佇列裡就直接插隊，用這次的優先權送出，不必等輪到它
-    const queued = preloadQueue.indexOf(id);
-    if (queued >= 0) preloadQueue.splice(queued, 1);
-    const img = new Image();
-    let settle;
-    const promise = new Promise((resolve) => {
-      settle = resolve;
-      img.onload = () => {
-        const src = img.src;
-        img.decode().then(() => resolve(src), () => resolve(src));
-      };
-      img.onerror = () => {
-        resolve(labelCard(id));
-        setTimeout(() => {
-          if (itemImageCache.get(id)?.promise === promise) itemImageCache.delete(id);
-        }, ITEM_RETRY_MS);
-      };
-    });
-    img.fetchPriority = priority;
-    img.src = itemSrc(id);
-    itemImageCache.set(id, { promise, img, settle });
-  }
-  return itemImageCache.get(id).promise;
-}
-
-// 畫面要顯示的圖最多等 ITEM_LOAD_TIMEOUT_MS，避免網路卡住時遊戲停住。
-// 逾時就先用文字卡，並中止這次請求，下次出現時重新下載。
-function itemImageForDisplay(id) {
-  const loading = loadItemImage(id, "high");
-  let timer;
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => {
-      const entry = itemImageCache.get(id);
-      if (entry?.promise === loading) {
-        entry.img.onload = entry.img.onerror = null;
-        entry.img.removeAttribute("src");
-        itemImageCache.delete(id);
-        // 其他也在等這張圖的地方（另一位玩家）一起改用文字卡，不要白等
-        entry.settle(labelCard(id));
-      }
-      resolve(labelCard(id));
-    }, ITEM_LOAD_TIMEOUT_MS);
-  });
-  return Promise.race([loading, timeout]).finally(() => clearTimeout(timer));
-}
-
-// 題目要用的圖優先下載，不要排在整關預載和角色動畫圖後面
-function preloadQuestionImages(question) {
-  return Promise.all([
-    loadItemImage(question.leftItem, "high"),
-    loadItemImage(question.rightItem, "high"),
-  ]);
-}
-
-// 開新關卡時在背景下載這一關會用到的所有圖示
-function preloadStageImages(level) {
-  const rule = stageRules[level - 1];
-  preloadQueue.length = 0; // 上一關沒排完的就不用再載了
-  queueItemPreload([...rule.correct, ...wrongItemsFor(rule)]);
-}
-
-// 畫面上的 <img> 自己載入失敗時（例如快取過期後重新下載失敗），一樣改用文字卡
-function setItemImage(el, id, src) {
+// 項目圖片：找不到 img/items/名稱.png 時，改用文字卡（SVG）
+function setItemImage(el, id) {
   el.alt = id;
   el.onerror = () => {
     el.onerror = null;
+    missingImages.add(id);
     el.src = labelCard(id);
   };
-  el.src = src;
-}
-
-// 畫面圖示解碼失敗或逾時也改用文字卡，卡片解碼好才開放作答。
-async function waitItemsDecoded(...items) {
-  await Promise.all(items.map(async (el) => {
-    const src = el.src;
-    let timer;
-    const decoded = await Promise.race([
-      el.decode().then(() => true, () => false),
-      new Promise((resolve) => {
-        timer = setTimeout(() => resolve(false), ITEM_LOAD_TIMEOUT_MS);
-      }),
-    ]).finally(() => clearTimeout(timer));
-    // 舊題的等待不能覆寫新題；onerror 換上的文字卡則繼續等解碼。
-    if (el.src !== src) {
-      if (el.src.startsWith("data:image/svg+xml")) await el.decode().catch(() => {});
-      return;
-    }
-    if (decoded) return;
-    el.onerror = null;
-    el.src = labelCard(el.alt);
-    await el.decode().catch(() => {});
-  }));
-}
-
-// 立刻隱藏，不播淡出，避免上一關的圖示在新關卡開始時慢慢淡掉
-function hideItemsNow(...items) {
-  items.forEach((el) => {
-    el.style.transition = "none";
-    el.classList.add("is-fading");
-  });
-  void items[0].offsetWidth;
-  items.forEach((el) => {
-    el.style.transition = "";
-  });
+  el.src = missingImages.has(id) ? labelCard(id) : itemSrc(id);
 }
 
 function xmlEscape(text) {
@@ -968,11 +870,9 @@ function wait(ms) {
 }
 
 async function submitResult(data) {
-
   const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade");
   const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case");
   const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school");
-  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
   if (!grade || !caseId || !school) {
     console.warn("找不到登入學生資料，成績不送出");
     return;
@@ -1018,6 +918,53 @@ async function submitResult(data) {
     console.error("成績送出失敗：", err);
   }
 }
+
+function pauseForViewport() {
+  if (!state.playing) return false;
+  if (state.paused) {
+    // 再次縮小時取消尚未完成的恢復，不能只檢查解碼結束時的尺寸。
+    state.roundToken += 1;
+    return true;
+  }
+  if (window.WebGameRuntime.now() >= state.levelDeadline) { tick();return false; }
+  state.pausedRemainingMs = state.levelDeadline - window.WebGameRuntime.now();
+  const lastAnswer = state.answers[state.answers.length - 1];
+  state.pausedReactionMs = state.ready && (!state.busy || lastAnswer?.questionId !== state.currentQuestion.id)
+    ? Math.max(0, window.WebGameRuntime.now() - state.questionShownAt) : 0;
+  state.remaining = Math.ceil(state.pausedRemainingMs / 1000);
+  state.paused = true;
+  state.roundToken += 1;
+  clearInterval(state.timerId);
+  if (state.pendingCorrect) {
+    state.questionSeq += 1;
+    state.currentQuestion = makeQuestion(state.level, state.questionSeq);
+  }
+  state.pendingCorrect = false;
+  state.busy = false;
+  resetSceneAndPlayer();
+  hideFeedback();
+  void renderQuestion();
+  renderHud();
+  return true;
+}
+
+async function resumeViewport() {
+  if (!state.playing || !state.paused || !viewportGuard.isUsable()) return false;
+  const token = ++state.roundToken;
+  const ready = await renderQuestion();
+  if (!ready || token !== state.roundToken || !viewportGuard.isUsable()) return false;
+  state.paused = false;
+  state.levelDeadline = window.WebGameRuntime.now() + state.pausedRemainingMs;
+  state.questionShownAt = window.WebGameRuntime.now() - state.pausedReactionMs;
+  state.timerId = setInterval(tick, 1000);
+  renderHud();
+  return true;
+}
+
+const viewportGuard = window.TGameSupport.createViewportGuard({
+  minWidth: 600, minHeight: 450,
+  onBlock: pauseForViewport, onResume: resumeViewport, onLeave: leaveGame,
+});
 
 // 所有 const / function 都宣告完才啟動，避免 TDZ 錯誤
 init();

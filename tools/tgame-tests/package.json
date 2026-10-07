@@ -1,0 +1,7 @@
+{
+  "name": "tgame-browser-regressions",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node suite.mjs" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

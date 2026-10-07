@@ -26,6 +26,7 @@ body {
 }
 
 .stage {
+  --panel-w: max(2.4vw, 28px);
   position: relative;
   height: 100vh;
   overflow: hidden;
@@ -163,6 +164,9 @@ body {
   transform-origin: 50% 90%;
   z-index: 4;
   pointer-events: none;
+  /* 陰影放在外層：走路換幀時不必每張圖重算濾鏡 */
+  filter: drop-shadow(0 10px 16px rgba(30, 50, 30, 0.28));
+  will-change: transform;
 }
 
 .lane[data-player="p1"] .player {
@@ -239,7 +243,6 @@ body {
   object-fit: contain;
   transform: scale(1.42);
   transform-origin: 50% 100%;
-  filter: drop-shadow(0 10px 16px rgba(30, 50, 30, 0.28));
 }
 
 .lane[data-player="p2"] .player img {
@@ -296,29 +299,95 @@ body {
   background: linear-gradient(#4a5568, #334155);
 }
 
-.hud-score,
-.hud-timer {
+.hud-score {
   position: absolute;
   top: 2.2vh;
+  left: 1.2vw;
   z-index: 8;
   display: flex;
   align-items: stretch;
   filter: drop-shadow(0 8px 14px rgba(40, 80, 50, 0.18));
 }
 
-.hud-score {
-  left: 1.2vw;
+/* 玩家一的進度條在最左邊，分數往右讓開 */
+.lane[data-player="p1"] .hud-score {
+  left: calc(var(--panel-w) + 1vw);
 }
 
-.lane[data-player="p2"] .hud-score {
-  left: auto;
+/* 與 DAT_double 相同：右上角「第 N 題・剩餘 S 秒（第 X / 6 關）」 */
+.round {
+  position: absolute;
+  top: 2.2vh;
   right: 1.2vw;
+  z-index: 8;
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 14px rgba(40, 80, 50, 0.18);
+  color: #3f6f48;
+  font-size: clamp(0.72rem, 1.1vw, 0.95rem);
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-/* 確定左下角按鈕區域層級夠高，且不被圖層遮擋 */
+.lane[data-player="p2"] .round {
+  right: calc(var(--panel-w) + 1vw);
+}
+
+/* 直立時間進度條：玩家一在最左邊、玩家二在最右邊 */
+.progress-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 9;
+  width: var(--panel-w);
+  padding: 2vh 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4vh;
+  border-radius: 0 18px 18px 0;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.lane[data-player="p2"] .progress-panel {
+  left: auto;
+  right: 0;
+  border-radius: 18px 0 0 18px;
+}
+
+.progress-label {
+  writing-mode: vertical-rl;
+  font-size: clamp(0.75rem, 1.2vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: #2f6a6a;
+}
+
+.progress-track {
+  position: relative;
+  width: 40%;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #cfe8ee;
+}
+
+.progress-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background: linear-gradient(#5fd0c8, #3a9fc0);
+  transition: height 0.3s;
+}
+
+/* 確定左下角按鈕區域層級夠高，且不被圖層遮擋；讓開玩家一的進度條 */
 .btn-leave {
   position: absolute;
-  left: 2vw;
+  left: calc(var(--panel-w) + 1vw);
   bottom: 2.2vh;
   z-index: 20; /* 提高 z-index 確保在最上層 */
   min-width: 6rem;
@@ -327,11 +396,16 @@ body {
 /* 小螢幕：離開按鈕縮小 */
 @media (max-width: 720px) {
   .btn-leave {
-    left: 1.5vw;
+    left: calc(var(--panel-w) + 1.5vw);
     bottom: 1.5vh;
     padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
   }
+}
+
+/* 半個畫面放不下分數與倒數同一列：倒數移到第二列 */
+@media (max-width: 1120px) {
+  .round { top: calc(2.2vh + 2.7rem); }
 }
 
 .toast {
@@ -365,33 +439,6 @@ body {
   background: rgba(211, 90, 74, 0.94);
 }
 
-.hud-center {
-  position: absolute;
-  top: 2.2vh;
-  left: 50%;
-  z-index: 11;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  transform: translateX(-50%);
-}
-
-.hud-timer {
-  position: static;
-  transform: none;
-}
-
-.hud-level {
-  margin: 0;
-  padding: 0.2rem 0.85rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  color: #2f6a3a;
-  font-size: 0.95rem;
-  font-weight: 800;
-}
-
 .hud-chip {
   display: flex;
   align-items: center;
@@ -405,10 +452,6 @@ body {
 .hud-chip-gold {
   background: linear-gradient(#ffd56a, #f0b430);
   text-shadow: 0 1px 0 rgba(160, 90, 0, 0.25);
-}
-
-.hud-chip-sky {
-  background: linear-gradient(#7ed4f6, #4aaedc);
 }
 
 .hud-box {
@@ -426,9 +469,9 @@ body {
 .prompt {
   position: absolute;
   left: 50%;
-  bottom: 6.2vh;
+  bottom: calc(2.2vh + 4rem);
   z-index: 8;
-  width: min(420px, 92%);
+  width: min(420px, calc(100% - var(--panel-w) - 2vw));
   margin: 0;
   padding: 0.65rem 1rem;
   transform: translateX(-50%);
@@ -444,10 +487,13 @@ body {
   text-shadow: 0 2px 0 rgba(20, 70, 80, 0.25);
 }
 
+.lane[data-player="p1"] .prompt { left: calc((100% + var(--panel-w)) / 2); }
+.lane[data-player="p2"] .prompt { left: calc((100% - var(--panel-w)) / 2); }
+
 .feedback {
   position: absolute;
   left: 50%;
-  top: 11vh;
+  top: calc(2.2vh + 3rem);
   z-index: 9;
   margin: 0;
   padding: 0.35rem 1rem;
@@ -600,4 +646,7 @@ body {
   .btn-leave {
     width: auto;
   }
+}
+@media (max-width: 1120px) {
+  .feedback { top: calc(2.2vh + 5rem); }
 }
