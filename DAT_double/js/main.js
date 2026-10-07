@@ -97,8 +97,11 @@ async function leaveToLobby() {
   await withExitLock(async () => {
     const completed = await saveCheckpoint();
     if (playMode === 'game' && completed >= TOTAL_STAGES) {
+    await Promise.all(players.map((player) => player.whenSaved()));
       safeNavigateTo('../Select/index.html');
     } else {
+      const stage = completed >= 3 ? 3 : 0;
+      if (playMode === 'game' && stage && !(await saveBeforeLeaving(stage))) return;
       window.askLeave('../Select/index.html');
     }
   });

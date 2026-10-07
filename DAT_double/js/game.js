@@ -14,6 +14,18 @@ const STREAK_TO_EVOLVE = 5; // 連續成功幾題升級一次動物
 export function createPlayer(element, bindings, answerCodes, answerLabel, playerIndex, getState) {
   const $ = (id) => element.querySelector(`[data-ui="${id}"]`);
 
+  const backHomeBtn = $('back-home');
+  if (backHomeBtn) {
+    backHomeBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 離開會中斷還在飛的存檔請求，先等兩位玩家都寫入完成
+      backHomeBtn.disabled = true;
+      await Promise.all(getState().players.map((player) => player.whenSaved()));
+      getState().safeNavigateTo('../Select/index.html');
+    });
+  }
+
   $('pause').addEventListener('click', () => {
     if (getState().playMode === 'game') return;
     paused = !paused;
@@ -51,6 +63,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let clearedMidBreak = false;
   let saveState = { stage: 0, pending: Promise.resolve() };
   let stageDeadline = 0;
+  let pendingSave = null;
 
   // 雙人彩蛋機制變數與切換函式
   let animalAssetList = [];
@@ -460,7 +473,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    await saveRun(stageCount);
+    pendingSave = saveRun(stageCount);
+    await pendingSave;
   }
 
   function move(delta) {
@@ -600,6 +614,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
+    // 供離開流程等待 finishGame() 的存檔請求結束
+    whenSaved: () => pendingSave || Promise.resolve(),
     canRestart: () => phase === 'finished' && saver?.canRestart(),
     saveStatus: () => saver?.status || 'idle',
     retrySave: () => saver?.retry(),
