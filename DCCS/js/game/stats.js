@@ -1,9 +1,11 @@
 // 統計彙整（SPEC 4.11）。level 是關卡序號；同一題兩列共用 trialIndex。
+// correct_count／accuracy 以題為單位（兩道閥都對才算對）；分項計數以閥為單位。
 // duration 只來自 setDuration() 的模擬遊玩時間；本模組不碰牆上時鐘，
 // 以免分頁切走的時間被算進這個理應為常數的欄位。
 
 export function createStats() {
   const rows = [];
+  const trials = [];
   let durationMs = 0;
 
   function record({
@@ -34,6 +36,11 @@ export function createStats() {
     });
   }
 
+  /** 一題兩道閥都判定完後呼叫一次；correct 表示整題都對。 */
+  function recordTrial({ trialIndex, level, correct }) {
+    trials.push({ trialIndex, level, correct: !!correct });
+  }
+
   function summary() {
     let frameCorrectCount = 0;
     let frameWrongCount = 0;
@@ -57,17 +64,17 @@ export function createStats() {
       }
     }
 
-    const correct_count = frameCorrectCount + categoryCorrectCount + modelCorrectCount;
-    const wrong_count = frameWrongCount + categoryWrongCount + modelWrongCount;
-    const denom = correct_count + wrong_count;
+    const correct_count = trials.filter((trial) => trial.correct).length;
+    const wrong_count = trials.length - correct_count;
+    const denom = trials.length;
     const accuracy = denom === 0 ? 0 : correct_count / denom;
     const levels = Array.from(levelsSeen).sort((a, b) => a - b);
     const byLevel = new Map();
-    for (const row of rows) {
-      const bucket = byLevel.get(row.level) || { correct: 0, total: 0 };
+    for (const trial of trials) {
+      const bucket = byLevel.get(trial.level) || { correct: 0, total: 0 };
       bucket.total += 1;
-      if (row.correct) bucket.correct += 1;
-      byLevel.set(row.level, bucket);
+      if (trial.correct) bucket.correct += 1;
+      byLevel.set(trial.level, bucket);
     }
     const levelAccuracy = [];
     for (let level = 1; level <= 6; level += 1) {
@@ -110,7 +117,9 @@ export function createStats() {
 
   return {
     record,
+    recordTrial,
     rows: () => rows.slice(),
+    trials: () => trials.slice(),
     summary,
     setDuration,
   };
