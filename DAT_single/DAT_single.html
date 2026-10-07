@@ -2,6 +2,8 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
+  <script src="../shared/require-student.js" data-role="student" data-mode="single"></script>
+  <script type="application/x-webgame-script" data-src="../shared/game-runtime.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attention Lesson Plan - 動物追擊令・單人版</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -13,6 +15,8 @@
   <link rel="stylesheet" href="DAT_single.css?v=6">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
   <script src="../shared/api.js"></script>
+  <script src="../shared/dat-assets.js?v=1"></script>
+  <script src="../shared/dat-save.js?v=1"></script>
   <script src="../shared/session-timeout.js"></script>
   <script src="../shared/leave-confirm.js"></script>
   <script src="../shared/stage-clear.js?v=2" defer></script>
@@ -58,6 +62,8 @@
         <strong id="final-score"></strong>
         <p id="summary"></p>
         <p id="accuracy"></p>
+        <p id="save-status" role="status" aria-live="polite"></p>
+        <button id="retry-save" class="primary" type="button" hidden>重試儲存</button>
         <button class="primary" id="restart" type="button">再玩一次</button>
         <button class="primary" id="btn-start-game" hidden>進入正式遊戲</button>
       </section>
@@ -76,5 +82,6 @@
     </div>
   </main>
   <button class="btn-leave" id="leave-btn" type="button">離開</button>
+  <aside id="save-notice" hidden class="save-notice"><p id="checkpoint-save-status" role="status"></p><button id="checkpoint-retry-save" type="button" hidden>重試儲存</button></aside>
 </body>
 </html>

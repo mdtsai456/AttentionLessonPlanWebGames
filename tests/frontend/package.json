@@ -1,0 +1,13 @@
+{
+  "name": "webgames-frontend-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test \"unit/**/*.test.mjs\"",
+    "test:e2e": "playwright test --config e2e/playwright.config.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2"
+  }
+}

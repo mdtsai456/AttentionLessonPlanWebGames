@@ -519,3 +519,19 @@ button:disabled {
   background: linear-gradient(#3aa3d0, #2b86b4);
   box-shadow: none;
 }
+/* 存檔尚未完成時保留結果，讓重玩及離開的停用狀態可辨識。 */
+.result-card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-notice {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  max-width: calc(100vw - 2rem);
+  padding: 1rem;
+  border: 2px solid #65462f;
+  background: #fff8e8;
+  z-index: 10000;
+}

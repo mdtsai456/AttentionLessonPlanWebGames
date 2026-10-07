@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pymysql
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
 
 import writes
 from converters import normalize_game_type_for_db, to_float, to_int
 from models import GameItem, GameListResponse
+from routers.identity import Identity, get_current_identity, require_student
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +239,18 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
 
 
 @router.post("/api/sessions", response_model=SessionAcceptResponse, status_code=201)
-def create_session(payload: UnityGameDataRequest) -> SessionAcceptResponse:
+def create_session(
+    payload: UnityGameDataRequest,
+    identity: Identity = Depends(require_student),
+    x_partner_authorization: str | None = Header(default=None),
+) -> SessionAcceptResponse:
+    data = payload.data
+    if (identity.grade, identity.case_id, identity.school) != (data.grade, data.caseId, data.school):
+        raise HTTPException(status_code=403, detail="成績身分與登入學生不符")
+    if data.mode == "double":
+        partner = get_current_identity(x_partner_authorization)
+        if partner.subject_type != "student":
+            raise HTTPException(status_code=403, detail="搭檔必須是學生")
     try:
         response = persist_unity_session(payload)
     except InvalidTimestampError as exc:
