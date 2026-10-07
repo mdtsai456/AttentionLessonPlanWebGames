@@ -25,12 +25,6 @@ const DEFAULT_ANIMAL_POOL = [
 - 修改會在每關最後一秒跑很多題目的問題
 - 動物角色圖片完全載入才會顯示
 - 改成換下一關不會重置動物圖片
-### 彩蛋規則調整（10/04）
-- 連續 5 題「判斷正確且準心在動物上」升級一次動物；答錯、漏答或沒瞄準只會把連擊歸零，**不再降級**，已經變成的動物會保留。
-- 回饋文字會提示規則：連擊中顯示「（再連續答對 N 題變身）」，中斷連擊時顯示「（連擊歸零）」。
-- 門檻由 `STREAK_TO_EVOLVE` 常數控制。
-### 出題修正（10/04）
-- 正式模式改為顏色題、數學題每題隨機出題，修正 `795a7ad` 以來只出顏色題的問題。練習模式維持顏色、數學各 1 題。
 
 
 
@@ -40,15 +34,16 @@ const DEFAULT_ANIMAL_POOL = [
 const API_BASE_URL = "http://127.0.0.1:5002";
 改為 const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
 
-cd DAT_double
+cd frontend/DAT_double
 python local_sqlite_server.py
 
 cd "\backend"
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
-在 repo 根目錄執行 `python -m http.server 5500`
+cd "\frontend"
+python -m http.server 5500
 
-## 開 http://127.0.0.1:5500/Home/index.html
+## 開 http://127.0.0.1:5500/games.html
 
 ctrl+F12 console
 sessionStorage.setItem('game_mode', 'double');

@@ -10,9 +10,6 @@ __pycache__/
 student_login.json
 *.db
 .vscode/
-node_modules/
-tests/frontend/test-results/
-tests/frontend/playwright-report/
 
 # e2e 測試（Playwright）
 e2e/node_modules/

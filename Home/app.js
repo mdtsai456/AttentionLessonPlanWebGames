@@ -316,15 +316,3 @@ function clearSelected(selector) {
     button.classList.remove("is-selected");
   });
 }
-
-// 驗證錯誤回到登入頁，提示保留在角色選擇畫面，不需先打開登入表單。
-const authReason = new URLSearchParams(location.search).get('auth');
-if (authReason === 'retry' || authReason === 'expired') {
-  const notice = document.createElement('p');
-  notice.setAttribute('role', 'alert');
-  notice.className = 'error';
-  notice.textContent = authReason === 'retry'
-    ? '無法連線驗證登入，請確認網路後重新嘗試登入。'
-    : '登入已失效或身分不符，請重新登入。';
-  panel.appendChild(notice);
-}

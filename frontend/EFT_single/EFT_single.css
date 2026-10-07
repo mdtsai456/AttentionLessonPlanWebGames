@@ -1,0 +1,316 @@
+/* 基本設定 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  background: #164e62;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  color: #175467;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:focus-visible {
+  outline: 4px solid #6638ad;
+  outline-offset: 5px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* 遊戲背景與整體比例（1cqw = 遊戲區寬度的 1%） */
+.game {
+  position: relative;
+  width: min(100vw, 177.68svh);
+  aspect-ratio: 1672 / 941;
+  overflow: hidden;
+  container-type: inline-size;
+  background: #2cbfd3 url("assets/background.png") center / 100% 100% no-repeat;
+}
+
+/* 左側進度條 */
+.progress-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4.8%;
+  background: #fffbedee;
+  border-radius: 0 3cqw 3cqw 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2cqw;
+  padding: 2% 0;
+}
+
+.progress-label {
+  writing-mode: vertical-rl;
+  font-size: 1.7cqw;
+  font-weight: 800;
+  letter-spacing: .15em;
+}
+
+.progress-track {
+  position: relative;
+  flex: 1;
+  width: 43%;
+  overflow: hidden;
+  border-radius: 3cqw;
+  background: #c6dce0;
+  box-shadow: inset 0 2px 4px #245b6840;
+}
+
+#progress-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background: #60acd1;
+  transition: height .35s;
+}
+
+/* 分數與題數 */
+.score {
+  position: absolute;
+  left: 7.4%;
+  top: 3%;
+  display: flex;
+  align-items: center;
+  width: 31%;
+  height: 8%;
+  border: .6cqw solid white;
+  border-radius: .8cqw;
+  background: #f4fffd;
+  box-shadow: 0 .2cqw .4cqw #16647333;
+  font-size: 2.2cqw;
+}
+
+.score span {
+  display: grid;
+  place-items: center;
+  height: 140%;
+  width: 35%;
+  background: linear-gradient(#ffce44,#e9a719);
+  border-radius: .8cqw;
+  color: white;
+  font-weight: 900;
+  text-shadow: 0 .15cqw #996723;
+}
+
+.score strong {
+  flex: 1;
+  text-align: center;
+}
+
+.round {
+  position: absolute;
+  right: 17%;
+  top: 5%;
+  font-size: 1.5cqw;
+  font-weight: bold;
+  background: #ffffffd9;
+  padding: .5em 1em;
+  border-radius: 2em;
+}
+
+/* 泡泡區域：left / top 調位置，width / height 調範圍 */
+.bubble-field {
+  position: absolute;
+  left: 10%;
+  top: 17%;
+  width: 83%;
+  height: 42%;
+}
+
+/* 泡泡大小：width 為泡泡區域寬度的百分比；各顆位置由 JS 的 positions 設定 */
+.bubble {
+  position: absolute;
+  width: 15%;
+  aspect-ratio: 1;
+}
+
+.bubble img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 中央作答區與提示文字 */
+.answer-panel {
+  position: absolute;
+  left: 38.5%;
+  bottom: 3%;
+  width: 23%;
+  height: 31%;
+  background: #287fae70;
+  border: .2cqw solid #c0faff66;
+  border-radius: 3cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 1cqw;
+  color: white;
+}
+
+.answer-panel h1 {
+  position: absolute;
+  top: -4.2cqw;
+  left: 0;
+  width: 100%;
+  font-size: 4cqw;
+  margin: 0;
+  text-shadow: 0 .25cqw #378cab;
+}
+
+#feedback {
+  font-size: 2cqw;
+  font-weight: bold;
+  margin: .5em 0;
+}
+
+.keyboard-hint {
+  font-size: 1.15cqw;
+  margin: .5em 0;
+}
+
+/* 左右作答按鈕：width 調大小，bottom 調垂直位置 */
+.direction {
+  position: absolute;
+  bottom: 5%;
+  width: 12%;
+  aspect-ratio: 1;
+  border: 1.3cqw solid #efffff;
+  border-radius: 3.5cqw;
+  background: #cf79f4;
+  box-shadow: 0 .3cqw .25cqw #24788c33;
+  display: grid;
+  place-items: center;
+  color: #933acf;
+}
+
+.direction span {
+  font-size: 6cqw;
+  line-height: 1;
+}
+
+.direction.left {
+  left: 24%;
+}
+
+.direction.right {
+  right: 24%;
+}
+
+.direction:hover:not(:disabled) {
+  background: #df9dff;
+  transform: translateY(-.3cqw);
+}
+
+.direction:active:not(:disabled) {
+  transform: translateY(.15cqw);
+}
+
+.direction:disabled {
+  cursor: default;
+  opacity: .65;
+}
+
+/* 答題結果的背景顏色 */
+.answer-panel[data-result="correct"] {
+  background: #147b65dc;
+}
+
+.answer-panel[data-result="wrong"] {
+  background: #a44957e8;
+}
+
+/* 結算畫面 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #ffe67b, #f3a314);
+}
+
+.result-card {
+  position: relative;
+  width: 91%;
+  height: 86%;
+  padding: 7% 7% 2%;
+  border-radius: 12% / 18%;
+  background: #fffefd;
+  text-align: center;
+}
+
+.result-card h2 {
+  position: absolute;
+  top: -3%;
+  left: 32%;
+  width: 36%;
+  margin: 0;
+  padding: .25em;
+  border-radius: 2cqw;
+  background: #24afe0;
+  color: white;
+  font-size: 3.6cqw;
+  box-shadow: .3cqw .4cqw #168eb7;
+}
+
+/* 再玩一次按鈕 */
+.primary {
+  border: 0;
+  padding: .35em 2.5em;
+  border-radius: 3em;
+  background: #2ec75b;
+  color: white;
+  font-size: 2.5cqw;
+  font-weight: bold;
+  box-shadow: 0 .25cqw #1ba548;
+}
+
+.primary:hover {
+  background: #24b950;
+}
+
+.result-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1cqw;
+  font-size: 2cqw;
+}
+
+.result-card p {
+  margin: .4em;
+}
+
+#final-score {
+  color: #139bc1;
+  font-size: 6cqw;
+}
+
+/* 減少動態效果的偏好設定 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+}

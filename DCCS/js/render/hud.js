@@ -138,10 +138,9 @@ function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
   ctx.restore();
 }
 
-// 往下避開右上角的「離開」按鈕（z-index 高於 canvas，會遮住勾勾）。
 function drawTick(ctx, vx, vy, w, h) {
   const cx = vx + w * 0.90;
-  const cy = vy + h * 0.18;
+  const cy = vy + h * 0.08;
   const r = h * 0.045;
 
   ctx.save();

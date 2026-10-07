@@ -46,11 +46,11 @@ export function createEftPlayer({
     }
 
     function stageRemaining() {
-        return stageStartedAt ? STAGE_MS - (window.WebGameRuntime.now() - stageStartedAt) : STAGE_MS;
+        return stageStartedAt ? STAGE_MS - (Date.now() - stageStartedAt) : STAGE_MS;
     }
 
     function updateProgress() {
-        const used = stageStartedAt ? Math.min(STAGE_MS, window.WebGameRuntime.now() - stageStartedAt) : 0;
+        const used = stageStartedAt ? Math.min(STAGE_MS, Date.now() - stageStartedAt) : 0;
         const ratio = ((stage - 1) + used / STAGE_MS) / STAGE_COUNT;
         getUi('progress-fill').style.height = `${Math.min(100, ratio * 100)}%`;
         root.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', index);
@@ -146,7 +146,7 @@ export function createEftPlayer({
 
     function beginAnswerPhase() {
         phase = 'answer';
-        answerStartedAt = window.WebGameRuntime.now();
+        answerStartedAt = Date.now();
         getUi('feedback').textContent = '回答剛才位置的泡泡';
         setEnabled(true);
         const remaining = stageRemaining();
@@ -191,7 +191,7 @@ export function createEftPlayer({
         stage = nextStage;
         stageQuestion = 0;
         stageOutcomes = [];
-        stageStartedAt = window.WebGameRuntime.now();
+        stageStartedAt = Date.now();
         startStageClock();
         renderQuestion();
     }
@@ -226,7 +226,7 @@ export function createEftPlayer({
 
     function startGame() {
         resetGame();
-        startTimeMs = window.WebGameRuntime.now();
+        startTimeMs = Date.now();
         onGameStart(startTimeMs);
         beginStage(1);
     }
@@ -258,7 +258,7 @@ export function createEftPlayer({
 
     function missQuestion(message) {
         if (phase !== 'answer' && phase !== 'memory') return;
-        const reactionMs = phase === 'answer' ? Math.max(0, window.WebGameRuntime.now() - answerStartedAt) : 0;
+        const reactionMs = phase === 'answer' ? Math.max(0, Date.now() - answerStartedAt) : 0;
         phase = 'feedback';
         setEnabled(false);
         clearTimeout(timer);
@@ -307,7 +307,7 @@ export function createEftPlayer({
         clearTimeout(timer);
         const expected = getExpectedDirection(question);
         const correct = direction === expected;
-        recordOutcome(correct, Math.max(0, window.WebGameRuntime.now() - answerStartedAt));
+        recordOutcome(correct, Math.max(0, Date.now() - answerStartedAt));
         panel.dataset.result = correct ? 'correct' : 'wrong';
         const message = correct
             ? '答對了！＋1 分'

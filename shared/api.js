@@ -4,7 +4,6 @@
 
   function resolveApiBase() {
     if (global.API_BASE_URL) return global.API_BASE_URL;
-    if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
     const { hostname, protocol } = global.location;
     if (DEV_HOSTS[hostname]) {
       return `${protocol}//${hostname}:5001/api`;
@@ -124,37 +123,7 @@
     return 100;
   }
 
-
-  function sameStudent(identity, data) {
-    return identity && data && identity.grade === data.grade && identity.caseId === data.caseId && identity.school === data.school;
-  }
-
-  function sessionPlayer(payload, player) {
-    const auth = global.WebGameAuth;
-    const session = auth && auth.session;
-    if (!auth || !auth.active || !session || session.bodies[0].role !== 'student') return -1;
-    if (payload.data.mode === 'double' && session.mode !== 'double') return -1;
-    const index = player == null ? session.bodies.findIndex((body) => sameStudent(body, payload.data)) : player - 1;
-    return sameStudent(session.bodies[index], payload.data) ? index : -1;
-  }
-
-  /** 雙人每筆使用本人 token 與另一位學生 token，不把 token 放入 payload。 */
-  async function submitSession(payload, { player, url, signal } = {}) {
-    const index = sessionPlayer(payload, player);
-    if (index < 0) throw Object.assign(new Error('登入未驗證或成績身分不符'), { status: 401 });
-    const session = global.WebGameAuth.session;
-    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.tokens[index] };
-    if (payload.data.mode === 'double') headers['X-Partner-Authorization'] = 'Bearer ' + session.tokens[1 - index];
-    const res = await fetch(url || `${resolveApiBase()}/sessions`, {
-      method: 'POST', headers, body: JSON.stringify(payload), signal,
-    });
-    if (res.status === 401) global.WebGameAuth.invalidate();
-    return res;
-  }
-
   global.WebGameApi = {
-    submitSession,
-    sessionPlayer,
     resolveApiBase,
     loginStudent,
     loginTeacher,

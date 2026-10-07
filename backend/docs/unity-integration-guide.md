@@ -4,7 +4,7 @@
 API（`POST /api/sessions`）送回中介平台。
 
 - 對應設計：[`specs/2026-09-08-single-vs-double-player-mode-design.md`](superpowers/specs/2026-09-08-single-vs-double-player-mode-design.md)
-- 契約狀態：**本分支已實作學生 token 授權；Unity 必須同步升級並驗收後才可上線**。
+- 契約狀態：**已定案、已實作、已用真資料庫測過**。
 
 ---
 
@@ -12,27 +12,23 @@ API（`POST /api/sessions`）送回中介平台。
 
 | 你負責的 | 要不要改 Unity 送資料的程式？ |
 |---|---|
-| **單人版**（DAT / DCCS / EFT 任一款） | **要改 headers**：帶本人學生 token，payload 維持原格式 |
-| **雙人版**（DAT / DCCS / EFT 任一款） | **要改 headers**：帶本人及搭檔學生 token；保留 `mode: "double"` 與 `pairId`（見 §3） |
+| **單人版**（DAT / DCCS / EFT 任一款） | **不用改**。現有 payload 照送，中介平台會當成 `mode = "single"` 處理 |
+| **雙人版**（DAT / DCCS / EFT 任一款） | **要改**：在 `data` 裡多送兩個欄位 `mode: "double"` 和 `pairId`（見 §3） |
 
-IM 僅有單人版；TGame 有雙人版。所有遊戲寫入均適用此授權契約。
+IM、TGame 沒有雙人版，不受影響。
 
 ---
 
 ## 1. Endpoint
 
 ```
-POST  https://attention-lesson-plan-data.zeabur.app/api/sessions
+POST  https://attention-lesson-plan-transfer-data.zeabur.app/api/sessions
 Content-Type: application/json
 ```
 
 - 成功回 `201`，body：`{ "sessionId": "<uuid>", "message": "已接收" }`
 - 一位學生玩完一場 → 送一個 POST。**雙人版是兩位學生 → 兩個各自獨立的 POST**（見 §3）。
-- 單人必須帶 `Authorization: Bearer <本人學生 token>`。
-- 雙人每筆另帶 `X-Partner-Authorization: Bearer <搭檔學生 token>`。兩個 token 都必須有效、未過期、未撤銷，且皆屬於學生。
-- `data.grade`／`caseId`／`school` 必須與 **Authorization 本人**完全一致。不得使用預設學生身分；可由 `GET /api/auth/me` 查詢身分及 `expiresAt`（回應 `Cache-Control: no-store`）。
-- 缺 token、假 token、過期或已撤銷回 `401`；老師 token 或成績身分不符回 `403`，均不寫入。
-- 不新增同校或不同帳號限制。Token 只放 headers，不寫入成績 payload 或待送佇列。
+- 沒有驗證、不用帶 token。
 
 ---
 
@@ -127,14 +123,7 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 
 ### 3.3 兩個 POST 各自獨立
 
-雙人局的兩位學生 = 兩個各自授權的 `POST /api/sessions`：
-
-| 成績 | Authorization | X-Partner-Authorization |
-|---|---|---|
-| 玩家一 | `Bearer <玩家一 token>` | `Bearer <玩家二 token>` |
-| 玩家二 | `Bearer <玩家二 token>` | `Bearer <玩家一 token>` |
-
-一個失敗不影響另一個，
+雙人局的兩位學生 = 兩個完全獨立的 `POST /api/sessions`。一個失敗不影響另一個，
 失敗的那個可以自己重送。**不要**想做「一次送兩個人」。
 
 ### 3.4 缺 pairId 會怎樣
@@ -148,11 +137,9 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 
 | 情況 | HTTP | body |
 |---|---|---|
-| 任一必要學生 token 缺少、無效、過期或撤銷 | `401` | `{"detail":"請重新登入"}`，不寫入 |
-| 本人或搭檔不是學生、成績身分不符 | `403` | 不寫入；請核對登入學生 |
 | 成功 | `201` | `{"sessionId": "...", "message": "已接收"}` |
 | `mode` 不是 single / double | `422` | Pydantic 驗證錯誤結構 |
-| `mode: "double"` 但遊戲不是 DAT/DCCS/EFT/TGame | `400` | `{"detail": "雙人版僅支援 DAT／DCCS／EFT／TGame"}` |
+| `mode: "double"` 但遊戲不是 DAT/DCCS/EFT | `400` | `{"detail": "雙人版僅支援 DAT／DCCS／EFT"}` |
 | `pairId` 長度 > 36 | `400` | `{"detail": "pairId 格式錯誤"}` |
 | `data.school` 不在已登記的 8 個場域內（打錯字、送了表外的值） | `400` | `{"detail": "未知的場域（school 尚未登記）"}` —— 這筆成績**不會被儲存**，請修正 `school` 後重送 |
 | 缺 5 個核心 stat 之一 | `400` | `{"detail": "缺少必要統計：DAT_wrong"}` |
@@ -210,10 +197,6 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 
 給雙人版負責人：
 
-- [ ] 開始遊戲前驗證兩人的 `GET /api/auth/me`
-- [ ] 每筆 headers 帶本人 Authorization 與搭檔 X-Partner-Authorization
-- [ ] 任一學生登入失效時停止輸入、計時與送出，重新登入後才可重試
-
 - [ ] 開局時 `Guid.NewGuid()` 產一個 `pairId`，這局兩位學生共用
 - [ ] 每位學生結束時各送一個 `POST /api/sessions`，`data` 裡帶：
   - [ ] `mode: "double"`
@@ -224,7 +207,7 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 
 給單人版負責人：
 
-- [ ] 保留現有 payload，新增 `Authorization: Bearer <本人學生 token>`
+- [ ] 確認現有 payload 仍照送（不用改）
 - [ ] `data.school` 用 §6 表格的代碼
 - [ ] （選）如果研究需要保留遊戲專屬細項欄位，跟後端負責人提出
 
@@ -233,12 +216,10 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 ## 8. 快速自測（curl）
 
 ```bash
-BASE=http://127.0.0.1:5001 # 使用獨立測試庫；先取得兩個學生登入 token
+BASE=https://attention-lesson-plan-transfer-data.zeabur.app
 
 # 雙人版 DAT
-curl -X POST "$BASE/api/sessions" -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $STUDENT_TOKEN" \
-  -H "X-Partner-Authorization: Bearer $PARTNER_TOKEN" -d '{
+curl -X POST "$BASE/api/sessions" -H "Content-Type: application/json" -d '{
   "lessonId": "test_DAT",
   "data": {
     "grade": "G1", "caseId": "S99", "school": "KMU",
@@ -254,11 +235,4 @@ curl -X POST "$BASE/api/sessions" -H "Content-Type: application/json" \
 # → {"sessionId":"...","message":"已接收"}
 ```
 
-此範例須使用與 token 相同的年級、個案、場域；不要寫入正式庫作測試。
-
-## 同步上線與 Unity 驗收
-
-Unity 原始碼不在本專案，由 Unity 維護者完成 headers、登入驗證、失效處理與待送資料保留。
-本分支測試通過後仍須驗收 Unity：正常單人、雙人兩筆各自身分、搭檔撤銷、401／403 不寫入。
-前端、後端、Unity 通過驗收才同步上線；部署後重跑未登入阻擋、雙人成績與撤銷 token 測試。
-本 PR 不合併、不部署，不能據此宣稱正式站已生效。
+（正式環境測完記得把測試資料清掉，或用測試場域代碼。）

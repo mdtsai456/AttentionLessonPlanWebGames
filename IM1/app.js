@@ -191,7 +191,6 @@ const backBtn = document.getElementById("back-btn");
 
 /** 鍵盤左右是否按著；點擊互動時會改用 walkTarget 自動走過去。 */
 const keys = { left: false, right: false };
-window.addEventListener("webgame:pause", () => { keys.left = keys.right = false; });
 
 const state = {
   questions: [], // 本題題庫（後端或本地）
@@ -311,7 +310,7 @@ function startGame() {
   state.playing = true;
   state.stageLive = false;
   state.busy = false;
-  state.startedAt = window.WebGameRuntime.now();
+  state.startedAt = Date.now();
   state.bag = [];
   state.completedItems = [];
   state.stageResults = [];
@@ -380,7 +379,7 @@ function beginCurrentStage() {
   problemPanel.classList.add("is-hidden");
   state.stageLive = true;
   state.busy = false;
-  state.stageStartedAt = window.WebGameRuntime.now();
+  state.stageStartedAt = Date.now();
   if (!state.timerId) {
     state.timerId = setInterval(tickTimer, 1000);
   }
@@ -952,7 +951,7 @@ function commitStage(passed) {
     timeLimit: TIME_LIMIT_SEC,
     targetItemCount: problem.targetItems.length,
     passed,
-    timeUsage: (window.WebGameRuntime.now() - state.stageStartedAt) / 1000,
+    timeUsage: (Date.now() - state.stageStartedAt) / 1000,
   };
   state.stageResults.push(record);
   state.stageTasks.push(record);
@@ -1031,7 +1030,7 @@ function saveCurrentRun(stage) {
     score: state.score,
     wrong: failed,
     accuracy: Math.round((state.score / answered) * 100),
-    duration: window.WebGameRuntime.now() - state.startedAt,
+    duration: Date.now() - state.startedAt,
     stage,
     levelAccuracy: state.levelAccuracies.slice(0, stage).join(","),
     avgReactionMs: averageReaction(state.stageResults),
@@ -1055,7 +1054,7 @@ function buildPayload(reason, progress) {
     gameId: "InstructionGame",
     score: state.score,
     total: state.questions.length,
-    durationSec: Math.round((window.WebGameRuntime.now() - state.startedAt) / 1000),
+    durationSec: Math.round((Date.now() - state.startedAt) / 1000),
     reason,
     progress,
     stages: state.stageResults,
@@ -1233,15 +1232,10 @@ async function fetchQuestions() {
  * 中場（progress 50）與全破（progress 100）都會呼叫一次。
  */
 async function submitResult(data) {
-
-  const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade");
-  const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case");
-  const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school");
-  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
-  if (!grade || !caseId || !school) {
-    console.warn("找不到登入學生資料，成績不送出");
-    return;
-  }
+  const url = `${window.WebGameApi.resolveApiBase()}/sessions`;
+  const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade") || "G1";
+  const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case") || "S03";
+  const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school") || "KMU";
   const currentDay = parseInt(
     sessionStorage.getItem("currentDay")
       || sessionStorage.getItem("student1_day")
@@ -1257,7 +1251,7 @@ async function submitResult(data) {
       caseId,
       school,
       currentDay,
-      startTime: window.WebGameRuntime.toWallTime(state.startedAt),
+      startTime: state.startedAt,
       endTime: Date.now(),
       mode: "single",
       stats: [
@@ -1273,7 +1267,11 @@ async function submitResult(data) {
   };
 
   try {
-    const res = await window.WebGameApi.submitSession(payload);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     if (res.status !== 201) {
       const errData = await res.json().catch(() => ({}));
       console.error(`成績送出失敗 ${res.status}:`, errData.detail || "寫入失敗");

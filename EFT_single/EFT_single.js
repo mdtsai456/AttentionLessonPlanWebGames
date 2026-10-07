@@ -84,7 +84,7 @@ function saveCurrentRun(stage) {
         score: state.score,
         wrong: Math.max(total - state.score, 0),
         accuracy: state.score / total,
-        duration: window.WebGameRuntime.now() - gameStartTime,
+        duration: Date.now() - gameStartTime,
         stage,
         levelAccuracy: levelAccuracyText(stage),
         avgReactionMs,
@@ -95,15 +95,10 @@ function saveCurrentRun(stage) {
 function levelAccuracyText(stageCount) { return player.levelAccuracyText(stageCount); }
 
 async function saveGameDataToBackend(data) {
-
-    const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade');
-    const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case');
-    const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school');
-    // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
-    if (!grade || !caseId || !school) {
-        console.warn('找不到登入學生資料，成績不送出');
-        return;
-    }
+    const url = `${window.WebGameApi.resolveApiBase()}/sessions`;
+    const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade') || 'G1';
+    const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case') || 'S03';
+    const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school') || 'KMU';
     const currentDay = parseInt(
         sessionStorage.getItem('currentDay')
         || sessionStorage.getItem('student1_day')
@@ -119,7 +114,7 @@ async function saveGameDataToBackend(data) {
             caseId,
             school,
             currentDay,
-            startTime: window.WebGameRuntime.toWallTime(gameStartTime),
+            startTime: gameStartTime,
             endTime: Date.now(),
             mode: 'single',
             stats: buildDatStats(data),
@@ -127,7 +122,11 @@ async function saveGameDataToBackend(data) {
     };
 
     try {
-        const res = await window.WebGameApi.submitSession(payload);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
         if (res.status !== 201) {
             const errData = await res.json().catch(() => ({}));
             console.error(`成績送出失敗 ${res.status}:`, errData.detail || '寫入失敗');

@@ -6,38 +6,10 @@ from datetime import datetime
 
 import pymysql
 import pytest
-from fastapi.testclient import TestClient as BaseTestClient
-from datetime import timedelta, timezone
-import queries
+from fastapi.testclient import TestClient
 
 import main
 from routers import sessions
-
-
-
-class TestClient(BaseTestClient):
-    __test__ = False
-
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("headers", {"Authorization": "Bearer owner", "X-Partner-Authorization": "Bearer partner"})
-        super().__init__(*args, **kwargs)
-
-
-@pytest.fixture(autouse=True)
-def session_writer_login(request, monkeypatch):
-    # 格式／轉換測試用可驗證的學生；整合測試登入真實測試庫。
-    if "db" in request.fixturenames or "client" in request.fixturenames:
-        login = request.getfixturevalue("login_as_student")
-        _, owner = login(grade="G1", case_id="S03", school="測試場域")
-        _, partner = login(grade="G2", case_id="S04", school="其他場域")
-        client = request.getfixturevalue("client")
-        client.headers.update(owner)
-        client.headers["X-Partner-Authorization"] = partner["Authorization"]
-    else:
-        monkeypatch.setattr(queries, "fetch_login_session", lambda token: {
-            "subject_type": "student", "grade": "G1", "case_id": "S03",
-            "school": "測試場域", "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
-        } if token in {"owner", "partner"} else None)
 
 
 def dccs_payload() -> dict:
@@ -455,7 +427,8 @@ def test_post_session_writes_session_retrievable_by_existing_api(
         [session_id],
     ) == [{"correct_count": 10, "frameWrongCount": None}]
 
-    # 成績由登入學生寫入，再登入同場域老師查詢。
+    # POST /api/sessions 是 Unity 用的，無驗證；GET /sessions 是人看的，帳密登入後
+    # 要帶 token —— 這裡登入一位「測試場域」的老師來查剛才 Unity 寫入的場次。
     _, headers = login_as_teacher(school="測試場域")
     get_response = client.get(
         "/api/students/G1_S03/sessions", params={"school": "測試場域"}, headers=headers

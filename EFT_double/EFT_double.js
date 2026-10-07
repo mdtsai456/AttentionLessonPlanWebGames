@@ -27,10 +27,11 @@ function getPlayerIdentity(playerIndex) {
     const studentKey = sessionStorage.getItem(isP1 ? 'student1_key' : 'student2_key') || '';
     const caseId =
         sessionStorage.getItem(isP1 ? 'student1_case' : 'student2_case') ||
-        (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey);
+        (studentKey.includes('_') ? studentKey.slice(studentKey.indexOf('_') + 1) : studentKey) ||
+        (isP1 ? 'S01' : 'S02');
     return {
-        grade: sessionStorage.getItem(isP1 ? 'student1_grade' : 'student2_grade'),
-        school: sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school'),
+        grade: sessionStorage.getItem(isP1 ? 'student1_grade' : 'student2_grade') || 'G1',
+        school: sessionStorage.getItem(isP1 ? 'student1_school' : 'student2_school') || 'KMU',
         caseId,
         currentDay: parseInt(
             sessionStorage.getItem(isP1 ? 'student1_day' : 'student2_day')
@@ -50,7 +51,7 @@ function buildPlayerStats(player, state, stage) {
         score: state.score,
         wrong: Math.max(total - state.score, 0),
         accuracy: state.score / total,
-        duration: window.WebGameRuntime.now() - state.startTimeMs,
+        duration: Date.now() - state.startTimeMs,
         stage,
         levelAccuracy: player.levelAccuracyText(stage),
         avgReactionMs,
@@ -61,7 +62,10 @@ function buildPlayerStats(player, state, stage) {
 async function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();
-    await window.WebGameApi.submitSession({
+    await fetch(`${window.WebGameApi.resolveApiBase()}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
             lessonId: '1140908_DAT',
             data: {
                 ...identity,
@@ -71,7 +75,8 @@ async function savePlayerRun(player, playerIndex, stage) {
                 pairId,
                 stats: buildPlayerStats(player, state, stage),
             },
-        }, { player: playerIndex + 1 }).catch((error) => console.error(error));
+        }),
+    }).catch((error) => console.error(error));
 }
 
 function createPlayer(element, keyBindings, playerIndex) {
@@ -91,7 +96,7 @@ function createPlayer(element, keyBindings, playerIndex) {
 }
 
 // 兩位玩家的題目、計時與分數各自獨立。
-export const players = [
+const players = [
     createPlayer(document.querySelector('.player-1'), { KeyA: 'left', KeyD: 'right' }, 0),
     createPlayer(document.querySelector('.player-2'), { ArrowLeft: 'left', ArrowRight: 'right' }, 1)
 ];
@@ -129,7 +134,7 @@ document.getElementById('mid-continue').addEventListener('click', () => {
     document.getElementById('mid-break').hidden = true;
     resumes.forEach((resume) => resume && resume());
 });
-let pairId = `${window.WebGameRuntime.now()}`;
+let pairId = `${Date.now()}`;
 
 document.getElementById('leave-btn').addEventListener('click', async () => {
     const completed = Math.min(...players.map((player) => player.completedStages()));

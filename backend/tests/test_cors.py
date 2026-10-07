@@ -53,7 +53,7 @@ def test_cors_preflight_request_is_allowed():
             headers={
                 "Origin": "http://localhost:5173",
                 "Access-Control-Request-Method": "POST",
-                "Access-Control-Request-Headers": "content-type, authorization, x-partner-authorization",
+                "Access-Control-Request-Headers": "content-type",
             },
         )
     assert response.status_code in (200, 204)

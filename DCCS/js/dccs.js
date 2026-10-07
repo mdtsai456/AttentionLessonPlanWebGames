@@ -6,7 +6,7 @@ import { createInput } from './core/input.js';
 import { loadManifest, preloadImages } from './core/assets.js';
 import { Track } from './game/track.js';
 import { createStats } from './game/stats.js';
-import { buildPayload, submitResult, flushPendingResults } from './net/client.js?v=2';
+import { buildPayload, submitResult, flushPendingResults } from './net/client.js';
 import { resolveSubmitUrl } from './net/apiBase.js';
 import { createOverlays } from './ui/overlays.js?v=2';
 
@@ -839,7 +839,6 @@ export function mountDCCS(options) {
                   void finish({ skipResult: true }).catch(fail);
                   return;
                 }
-                emitPhase('playing');
               }
 
               if (previousLevel !== 3) {

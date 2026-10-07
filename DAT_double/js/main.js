@@ -66,9 +66,7 @@ const state = {
   get playMode() { return playMode; },
   syncStart,
   waitForMidBreak,
-  waitForStageClear,
-  restartSession,
-  refreshSaveControls
+  waitForStageClear
 };
 
 export const players = [
@@ -106,30 +104,7 @@ async function leaveToLobby() {
 
 document.getElementById('leave-btn').addEventListener('click', leaveToLobby);
 
-function refreshSaveControls() {
-  const restartable = players.every((player) => player.canRestart());
-  document.querySelectorAll('[data-ui="restart"]').forEach((button) => { button.disabled = !restartable; });
-  const statuses = players.map((player) => player.saveStatus());
-  const messages = players.map((player, index) => `玩家${index + 1}：${document.querySelector(`.player-${index + 1} [data-ui="save-status"]`).textContent}`);
-  document.getElementById('checkpoint-save-status').textContent = messages.join('　');
-  document.getElementById('checkpoint-retry-save').hidden = !statuses.includes('failed');
-  const resultsVisible = [...document.querySelectorAll('[data-ui="results"]')].every((panel) => !panel.hidden);
-  document.getElementById('save-notice').hidden = resultsVisible || statuses.every((status) => status === 'idle' || status === 'saved');
-}
-document.getElementById('checkpoint-retry-save').addEventListener('click', () => {
-  players.filter((player) => player.saveStatus() === 'failed').forEach((player) => player.retrySave());
-});
-
-function restartSession() {
-  if (!players.every((player) => player.canRestart())) return;
-  beginSession();
-}
-
 function beginSession() {
-  stageWait[0] = stageWait[1] = null;
-  stageResume[0] = stageResume[1] = null;
-  playerPracticeFinished = [false, false];
-  document.getElementById('save-notice').hidden = true;
   clearMidBreak();
   currentGamePairId = generateUUID();
   const formalButton = document.getElementById('enter-formal-btn');
@@ -253,7 +228,49 @@ async function fetchStudentAssetList(playerIndex) {
   const studentId = assetStudentId(rawId);
   const apiUrl = `${ASSET_SERVER_HOST}/api/students/${studentId}/assets`;
 
-  return window.DatAssets.fetchAssetList(apiUrl, DEFAULT_ANIMAL_POOL);
+  let assetList = [];
+
+  try {
+    const res = await fetch(apiUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const files = data?.DAT?.assets?.files;
+
+      if (Array.isArray(files) && files.length > 0) {
+        assetList = files.map((relativePath) =>
+          relativePath.startsWith('http')
+            ? relativePath
+            : `${ASSET_SERVER_HOST}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`
+        );
+        console.log(`[P${playerIndex + 1} 素材] 成功從伺服器抓取 ${assetList.length} 張圖:`, assetList);
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [P${playerIndex + 1} 素材] API 請求異常:`, err);
+  }
+
+  // 自動補充機制：確保每個玩家都有至少 2 張圖以上的輪播清單可觸發彩蛋
+  if (assetList.length === 0) {
+    assetList = [...DEFAULT_ANIMAL_POOL];
+  } else if (assetList.length === 1) {
+    // 只有 1 張素材時，將預設清單拼在後面作為彩蛋輪播圖
+    assetList = [...assetList, ...DEFAULT_ANIMAL_POOL.filter(p => p !== assetList[0])];
+  }
+
+  return assetList;
+}
+
+// 2. 下載單張圖片（404 時降級容錯）
+function downloadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(src);
+    img.onerror = () => {
+      console.warn(`⚠️ 圖片載入失敗，使用預設圖: ${src}`);
+      resolve(DEFAULT_ANIMAL_PATH);
+    };
+    img.src = src;
+  });
 }
 
 // 3. 初始化雙人素材與啟動流程
@@ -282,20 +299,16 @@ async function initDoubleGameWorkflow() {
   ]);
 
   // C. 預載通用與玩家首張圖片
-  const [, , p1Initial, p2Initial] = await Promise.all([
-    window.DatAssets.loadImage('assets/background.png', 'assets/background.png'),
-    window.DatAssets.loadImage('assets/crosshair.png', 'assets/crosshair.png'),
-    window.DatAssets.loadImage(p1List[0]),
-    window.DatAssets.loadImage(p2List[0])
+  await Promise.all([
+    downloadImage('assets/background.png'),
+    downloadImage('assets/crosshair.png'),
+    downloadImage(p1List[0]),
+    downloadImage(p2List[0])
   ]);
-  p1List[0] = p1Initial;
-  p2List[0] = p2Initial;
 
   // D. 將素材清單傳送給兩位 Player 實體
-  await Promise.all([
-    players[0].setAnimalAssets(p1List),
-    players[1].setAnimalAssets(p2List),
-  ]);
+  players[0].setAnimalAssets(p1List);
+  players[1].setAnimalAssets(p2List);
 
   // E. 啟動遊戲 Session
   beginSession();

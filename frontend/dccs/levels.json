@@ -1,0 +1,9 @@
+{
+  "levels": [
+    { "shapeCount": 5, "objectCount": 2, "objectRule": "model",    "sourceCategory": "2" },
+    { "shapeCount": 5, "objectCount": 3, "objectRule": "model",    "sourceCategory": "3" },
+    { "shapeCount": 2, "objectCount": 4, "objectRule": "category", "sourceCategories": ["2", "3", "4", "5"] },
+    { "shapeCount": 2, "objectCount": 4, "objectRule": "model",    "sourceCategory": "4" },
+    { "shapeCount": 2, "objectCount": 5, "objectRule": "model",    "sourceCategory": "5" }
+  ]
+}

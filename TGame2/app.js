@@ -127,11 +127,12 @@ function levelAccuracyText(player, stageCount) {
 async function savePlayer(player, index, stage) {
   const isP1 = index === 0;
   const studentKey = sessionStorage.getItem(isP1 ? "student1_key" : "student2_key") || "";
-  const grade = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade");
-  const school = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school");
+  const grade = sessionStorage.getItem(isP1 ? "student1_grade" : "student2_grade") || "G1";
+  const school = sessionStorage.getItem(isP1 ? "student1_school" : "student2_school") || "KMU";
   const caseId =
     sessionStorage.getItem(isP1 ? "student1_case" : "student2_case") ||
-    (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey);
+    (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey) ||
+    (isP1 ? "S01" : "S02");
   const currentDay = parseInt(
     sessionStorage.getItem(isP1 ? "student1_day" : "student2_day")
       || (isP1 ? sessionStorage.getItem("current_day") || sessionStorage.getItem("currentDay") : "")
@@ -140,21 +141,24 @@ async function savePlayer(player, index, stage) {
   );
   const answered = Math.max(player.answers.length, 1);
   const wrong = Math.max(player.answers.length - player.score, 0);
-  await window.WebGameApi.submitSession({
+  await fetch(`${window.WebGameApi.resolveApiBase()}/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       lessonId: "1140908_TGame",
       data: {
         grade,
         caseId,
         school,
         currentDay,
-        startTime: window.WebGameRuntime.toWallTime(session.startedAt || window.WebGameRuntime.now()),
+        startTime: session.startedAt || Date.now(),
         endTime: Date.now(),
         mode: "double",
         stats: [
           { apiname: "TGame_correct", value: player.score },
           { apiname: "TGame_wrong", value: wrong },
           { apiname: "TGame_accuracy", value: player.score / answered },
-          { apiname: "TGame_duration", value: window.WebGameRuntime.now() - (session.startedAt || window.WebGameRuntime.now()) },
+          { apiname: "TGame_duration", value: Date.now() - (session.startedAt || Date.now()) },
           { apiname: "TGame_stage", value: stage },
           { apiname: "TGame_levelAccuracy", value: levelAccuracyText(player, stage) },
           {
@@ -166,7 +170,8 @@ async function savePlayer(player, index, stage) {
           { apiname: "TGame_questionCount", value: player.answers.length },
         ],
       },
-    }, { player: index + 1 }).catch((error) => console.error(error));
+    }),
+  }).catch((error) => console.error(error));
 }
 
 document.getElementById("mid-lobby").addEventListener("click", async () => {
@@ -266,7 +271,7 @@ function makePlayerAssets(base) {
 function startGame() {
   clearInterval(session.timerId);
   savedStage = 0;
-  session.startedAt = window.WebGameRuntime.now();
+  session.startedAt = Date.now();
   session.endReason = "";
   stageRules = buildStageRules();
   resultEl.classList.add("is-hidden");
@@ -304,7 +309,7 @@ function startLevel(level) {
     resetSceneAndPlayer(player);
     hideFeedback(player);
     renderQuestion(player);
-    player.questionShownAt = window.WebGameRuntime.now();
+    player.questionShownAt = Date.now();
     renderPlayerHud(player);
   });
 
@@ -405,7 +410,7 @@ async function chooseDirection(player, choice) {
 
   const token = session.roundToken;
   player.busy = true;
-  player.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - player.questionShownAt));
+  player.reactionSamples.push(Math.max(0, Date.now() - player.questionShownAt));
   const isCorrect = choice === question.correct;
   if (isCorrect) player.score += 1;
 
@@ -436,7 +441,7 @@ async function chooseDirection(player, choice) {
   if (!isCorrect) {
     hideFeedback(player);
     resetSceneAndPlayer(player);
-    player.questionShownAt = window.WebGameRuntime.now();
+    player.questionShownAt = Date.now();
     player.busy = false;
     return;
   }
@@ -457,7 +462,7 @@ async function chooseDirection(player, choice) {
   player.itemLeft.classList.add("is-fading");
   player.itemRight.classList.add("is-fading");
   renderQuestion(player);
-  player.questionShownAt = window.WebGameRuntime.now();
+  player.questionShownAt = Date.now();
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
   await wait(40);

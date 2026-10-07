@@ -1,0 +1,113 @@
+/* 單人頁外殼；遊戲畫面層樣式由 overlays.js 注入。 */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC",
+    "PingFang TC", "Microsoft JhengHei", Roboto, Helvetica, Arial, sans-serif;
+  color: #eee;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+#game-root {
+  position: absolute;
+  inset: 0;
+}
+
+#setup-form {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  background: #14181f;
+  border: 1px solid #2c333f;
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  min-width: 320px;
+  max-width: min(92vw, 480px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+#setup-form[hidden] {
+  display: none !important;
+}
+
+#setup-form h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+}
+
+.hint {
+  margin: 0.35rem 0;
+  color: #a8b0bf;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.hint.notice {
+  color: #ffd479;
+}
+
+.hint code {
+  background: #1f2530;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+#setup-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #c4cbd6;
+}
+
+#setup-form input {
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #333b48;
+  background: #0d1015;
+  color: #eee;
+  font-size: 1rem;
+}
+
+#setup-form input:focus {
+  outline: 2px solid #4f7cff;
+  outline-offset: 1px;
+}
+
+button {
+  margin-top: 0.6rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #6890ff;
+}

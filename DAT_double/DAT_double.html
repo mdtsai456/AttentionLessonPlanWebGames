@@ -2,19 +2,18 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <script src="../shared/require-student.js" data-role="student" data-mode="double"></script>
-  <script type="application/x-webgame-script" data-src="../shared/game-runtime.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attention Lesson Plan - 動物追擊令・雙人版</title>
   <link rel="stylesheet" href="DAT_double.css?v=7">
   <script src="assets/animals/rabbit-hit-mask.js" defer></script>
-  <script src="../shared/api.js"></script>
-  <script src="../shared/dat-assets.js?v=1"></script>
-  <script src="../shared/dat-save.js?v=1"></script>
-  <script src="../shared/session-timeout.js"></script>
-  <script src="../shared/leave-confirm.js"></script>
-  <script src="../shared/stage-clear.js?v=2" defer></script>
-  <script type="module" src="js/main.js?v=10" defer></script>
+  <!-- 修改前：<script src="DAT_double.js" defer></script> -->
+<!-- 修改後： -->
+<!-- <script type="module" src="DAT_double.js" defer></script> -->
+<script src="../shared/api.js"></script>
+<script src="../shared/session-timeout.js"></script>
+<script src="../shared/leave-confirm.js"></script>
+<script src="../shared/stage-clear.js?v=2" defer></script>
+<script type="module" src="js/main.js?v=10" defer></script>
 </head>
 <body>
   <main class="game" aria-label="動物追擊令雙人遊戲">
@@ -61,8 +60,6 @@
         <strong data-ui="final-score"></strong>
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
-        <p data-ui="save-status" role="status" aria-live="polite"></p>
-        <button data-ui="retry-save" class="primary" type="button" hidden>重試儲存</button>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
         <button class="secondary" data-ui="back-home" type="button">返回遊戲大廳</button>
       </section>
@@ -112,8 +109,6 @@
         <strong data-ui="final-score"></strong>
         <p data-ui="summary"></p>
         <p data-ui="accuracy"></p>
-        <p data-ui="save-status" role="status" aria-live="polite"></p>
-        <button data-ui="retry-save" class="primary" type="button" hidden>重試儲存</button>
         <button class="primary" data-ui="restart" type="button">再玩一次</button>
         <button class="secondary" data-ui="back-home" type="button">返回遊戲大廳</button>
       </section>
@@ -142,7 +137,6 @@
       </section>
     </div>
   </main>
-  <aside id="save-notice" hidden class="save-notice"><p id="checkpoint-save-status" role="status"></p><button id="checkpoint-retry-save" type="button" hidden>重試儲存</button></aside>
   <button type="button" class="btn-leave" id="leave-btn">離開</button>
 </body>
 </html>
