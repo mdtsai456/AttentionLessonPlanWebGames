@@ -12,6 +12,7 @@ const TURN_WALK_FRAME_MS = 130;
 const NEAR_MS = 1080;
 const TURN_MS = 650;
 const ARRIVE_MS = 320;
+const PRELOAD_TIMEOUT_MS = 10000; // 某張圖卡住時最多等這麼久，避免永遠停在載入中
 const PLAYER_BACK = "img/playerBack.png";
 const PLAYER_TURN = {
   left: "img/playerTurnLeft.png",
@@ -33,6 +34,8 @@ const PLAYER_WALK_TURN = {
       `img/walkRight/playerTurnRightWalk${String(index + 1).padStart(2, "0")}.png`
   ),
 };
+// 保留預載圖片的參照，避免被 GC 回收後換格時又要重新解碼
+const preloadedImages = [];
 const SCENE_TURN = {
   left: "turn-left",
   right: "turn-right",
@@ -133,8 +136,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function init() {
-  preloadSceneImages();
-  const ok = await loadCsvFromUrl(CSV_URL);
+  showToast("載入中…");
+  clearTimeout(toastTimer); // 載入時間可能超過提示的自動消失時間，載完再收起
+  const [, ok] = await Promise.all([preloadSceneImages(), loadCsvFromUrl(CSV_URL)]);
+  toastEl.classList.remove("is-show");
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
   startGame();
 }
@@ -477,20 +482,28 @@ function setPlayerSprite(src) {
   playerImg.src = src;
 }
 
-function preloadSceneImages() {
+// 所有場景與角色圖都下載並解碼完才開始遊戲，第一次換格就不會跳格
+async function preloadSceneImages() {
   [
+    "img/TGameBack.png",
     "img/TGameNear.png",
     "img/TGameTurnLeft.png",
     "img/TGameTurnRight.png",
     "img/playerTurnLeft.png",
     "img/playerTurnRight.png",
+    PLAYER_BACK,
     ...PLAYER_WALK_BACK,
     ...PLAYER_WALK_TURN.left,
     ...PLAYER_WALK_TURN.right,
   ].forEach((src) => {
     const image = new Image();
     image.src = src;
+    preloadedImages.push(image);
   });
+  await Promise.race([
+    Promise.allSettled(preloadedImages.map((image) => image.decode())),
+    wait(PRELOAD_TIMEOUT_MS),
+  ]);
 }
 
 function showPlayerPlaceholder() {
