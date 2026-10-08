@@ -4,7 +4,7 @@ for (const name of ['DAT', 'EFT', 'TGame', 'DCCS']) {
   test(`${name} 雙人各送正確學生及搭檔 token`, async ({ page }) => {
     const writes = await recordWrites(page);
     await loginAs(page, DOUBLE);
-    const path = name === 'DAT' ? 'DAT_double/DAT_double.html?mode=game' : name === 'EFT' ? 'EFT_double/EFT_double.html' : name === 'TGame' ? 'TGame2/index.html' : 'DCCS/double.html?sessionSeconds=5';
+    const path = name === 'DAT' ? 'DAT_double/DAT_double.html?mode=game' : name === 'EFT' ? 'EFT_double/EFT_double.html' : name === 'TGame' ? 'TGame_double/index.html' : 'DCCS_double/index.html?sessionSeconds=5';
     await page.goto(path);
     await expect.poll(() => page.evaluate(() => !!window.WebGameApi && !!window.WebGameRuntime)).toBe(true);
     const tokens = await page.evaluate(() => [sessionStorage.getItem('student1_token'), sessionStorage.getItem('student2_token')]);

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""依 DCCS/levels.json 與唯讀 DCCS/assets/ 產生 DCCS/manifest.json。
+"""依各遊戲資料夾的 levels.json 與 assets/ 產生 manifest.json。
 
-只使用標準函式庫。設定錯誤會終止；素材不足則將關卡標為不可玩。
+DCCS_single 與 DCCS_double 各寫各的。只使用標準函式庫。設定錯誤會終止；素材不足則將關卡標為不可玩。
 
 用法：python3 tools/build_manifest.py
 """
@@ -14,10 +14,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
-GAME_DIR = ROOT / "DCCS"
-# 素材與遊戲同在 DCCS/ 底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
-# 前綴、相對於 assetBase（= DCCS/）解析。
+GAME_DIRS = (ROOT / "DCCS_single", ROOT / "DCCS_double")
+# 素材與遊戲同在該資料夾底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
+# 前綴、相對於 assetBase（該遊戲資料夾）解析。
 ASSET_DIR_NAME = "assets"
+GAME_DIR = GAME_DIRS[0]
 MATERIAL_DIR = GAME_DIR / ASSET_DIR_NAME
 LEVELS_CONFIG_PATH = GAME_DIR / "levels.json"
 MANIFEST_PATH = GAME_DIR / "manifest.json"
@@ -100,8 +101,16 @@ def build_categories(category_dirs: list[Path]) -> list[dict]:
     return categories
 
 
+def use_game_dir(game_dir: Path) -> None:
+    global GAME_DIR, MATERIAL_DIR, LEVELS_CONFIG_PATH, MANIFEST_PATH
+    GAME_DIR = game_dir
+    MATERIAL_DIR = game_dir / ASSET_DIR_NAME
+    LEVELS_CONFIG_PATH = game_dir / "levels.json"
+    MANIFEST_PATH = game_dir / "manifest.json"
+
+
 def load_levels_config() -> list[dict] | None:
-    """讀 DCCS/levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
+    """讀該遊戲資料夾的 levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
 
     SPEC 5.1：這裡驗證的是「設定本身合不合法」（缺欄位、型別錯、長度對不
     上），跟「素材有沒有補齊」是兩回事——後者是 compute_feasibility() 的
@@ -299,7 +308,8 @@ def print_feasibility_table(table_rows: list[dict]) -> None:
         )
 
 
-def main() -> int:
+def build_game(game_dir: Path) -> int:
+    use_game_dir(game_dir)
     if not MATERIAL_DIR.is_dir():
         print(f"錯誤：找不到素材目錄 ({MATERIAL_DIR})", file=sys.stderr)
         return 1
@@ -346,6 +356,14 @@ def main() -> int:
         print(f"無警告：{len(levels)} 關全部 playable。")
 
     return 0
+
+
+def main() -> int:
+    status = 0
+    for game_dir in GAME_DIRS:
+        if build_game(game_dir) != 0:
+            status = 1
+    return status
 
 
 if __name__ == "__main__":

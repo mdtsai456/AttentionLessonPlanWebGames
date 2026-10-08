@@ -343,20 +343,20 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     stageHits = [];
   }
 
-  // 資料夾叫 DAT，但後端把動物追擊令（選單與後台叫瓢蟲追擊令）記為 EFT，所以成績用 EFT 送；素材 API 則讀 DAT。
-  function eftStats(stage, durationMs) {
+  // 瓢蟲追擊令成績送 DAT；素材 API 也讀 DAT。
+  function datStats(stage, durationMs) {
     const metrics = sessionMetrics();
     return [
-      { apiname: 'EFT_correct', value: score },
-      { apiname: 'EFT_wrong', value: wrong },
-      { apiname: 'EFT_accuracy', value: metrics.accuracy },
-      { apiname: 'EFT_duration', value: durationMs },
-      { apiname: 'EFT_stage', value: stage },
-      { apiname: 'EFT_levelAccuracy', value: levelAccuracyText(stage) },
-      { apiname: 'EFT_avgReactionMs', value: metrics.avgReactionMs },
-      { apiname: 'EFT_questionCount', value: metrics.questionCount },
-      { apiname: 'EFT_aimRatio', value: metrics.aimRatio },
-      { apiname: 'EFT_focusMs', value: metrics.focusMs },
+      { apiname: 'DAT_correct', value: score },
+      { apiname: 'DAT_wrong', value: wrong },
+      { apiname: 'DAT_accuracy', value: metrics.accuracy },
+      { apiname: 'DAT_duration', value: durationMs },
+      { apiname: 'DAT_stage', value: stage },
+      { apiname: 'DAT_levelAccuracy', value: levelAccuracyText(stage) },
+      { apiname: 'DAT_avgReactionMs', value: metrics.avgReactionMs },
+      { apiname: 'DAT_questionCount', value: metrics.questionCount },
+      { apiname: 'DAT_aimRatio', value: metrics.aimRatio },
+      { apiname: 'DAT_focusMs', value: metrics.focusMs },
     ];
   }
 
@@ -576,7 +576,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
       10
     );
     return saver.save(stage, {
-      lessonId: '1140908_EFT',
+      lessonId: '1140908_DAT',
       data: {
         grade: gradeKey,
         caseId,
@@ -586,7 +586,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         endTime: Date.now(),
         mode: 'double',
         pairId: getState().currentGamePairId,
-        stats: eftStats(stage, window.WebGameRuntime.now() - (startTimeMs || window.WebGameRuntime.now())),
+        stats: datStats(stage, window.WebGameRuntime.now() - (startTimeMs || window.WebGameRuntime.now())),
       },
     }, playerIndex + 1);
   }

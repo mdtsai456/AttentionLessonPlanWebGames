@@ -41,16 +41,16 @@ export function levelAccuracyText(levelAccuracies, stageCount) {
     .join(',');
 }
 
-// 漂浮泡泡（EFT_* 資料夾）的成績；後端把這款記為 DAT，所以前綴是 DAT_。
-export function buildDatStats(data) {
+// 漂浮泡泡（EFT）的成績，前綴是 EFT_。
+export function buildEftStats(data) {
   return [
-    { apiname: 'DAT_correct', value: data.score },
-    { apiname: 'DAT_wrong', value: data.wrong },
-    { apiname: 'DAT_accuracy', value: data.accuracy },
-    { apiname: 'DAT_duration', value: data.duration },
-    { apiname: 'DAT_stage', value: data.stage },
-    { apiname: 'DAT_levelAccuracy', value: data.levelAccuracy },
-    { apiname: 'DAT_avgReactionMs', value: data.avgReactionMs },
-    { apiname: 'DAT_questionCount', value: data.questionCount },
+    { apiname: 'EFT_correct', value: data.score },
+    { apiname: 'EFT_wrong', value: data.wrong },
+    { apiname: 'EFT_accuracy', value: data.accuracy },
+    { apiname: 'EFT_duration', value: data.duration },
+    { apiname: 'EFT_stage', value: data.stage },
+    { apiname: 'EFT_levelAccuracy', value: data.levelAccuracy },
+    { apiname: 'EFT_avgReactionMs', value: data.avgReactionMs },
+    { apiname: 'EFT_questionCount', value: data.questionCount },
   ];
 }

@@ -1,8 +1,27 @@
 # 自動化測試
 
-目前涵蓋「動物追擊令」（`DAT_double/`、`DAT_single/`）的彩蛋規則、完整六關流程、桌面鍵鼠操作、素材容錯與存檔狀態。
+這個資料夾有兩套前端測試。
 
-## 執行
+- 這裡的 `unit/`、`e2e/`：瓢蟲追擊令（`DAT_single/`、`DAT_double/`）的彩蛋、六關流程、鍵鼠、素材與存檔。
+- [`frontend/`](frontend/)：全站登入守門、選遊戲、存檔、舊網址與 bfcache。執行方式見下方「全站流程」。
+
+## 全站流程
+
+```bash
+cd tests/frontend
+npm install
+npx playwright install chromium
+npm test
+```
+
+- `test:unit`：共用守門、遊戲排程與授權送出。
+- `test:e2e`：用獨立的 Node 測試服務提供靜態頁與驗證資料。
+- `E2E_PORT` 可指定連接埠，已被佔用就失敗。`SITE_ROOT` 可改測另一份程式。
+- 真實後端與 MariaDB 的瀏覽器檢查是 `LIVE_BASE_URL=http://127.0.0.1:19368 node live-check.mjs`。腳本只接受本機網址。先備好測試帳號再啟動後端，做法見專案根目錄 README 的測試表，以及 [`../backend/README.md`](../backend/README.md)。
+
+## 瓢蟲追擊令
+
+`unit/` 與 `e2e/` 涵蓋彩蛋規則、完整六關、桌面鍵鼠、素材容錯與存檔狀態。
 
 ```bash
 cd tests
@@ -77,6 +96,6 @@ cd backend
 env -u TEST_DB_NAME uv run pytest tests/test_dat_webgame_contract.py -q
 ```
 
-兩個案例透過 FastAPI TestClient 執行真實路由，把資料寫入函式替換為記錄器，驗證六關 EFT 統計及雙人 pairId。`DAT_*` 目錄的動物追擊令網頁版沿用 EFT 資料分類；不要以目錄名稱推斷應改為 DAT。
+兩個案例透過 FastAPI TestClient 執行真實路由，把資料寫入函式替換為記錄器，驗證六關 `DAT_*` 統計及雙人 pairId。瓢蟲追擊令的 `lessonId` 是 `1140908_DAT`。
 
 評估依據及未驗證範圍見 [EVALUATION.md](EVALUATION.md)。

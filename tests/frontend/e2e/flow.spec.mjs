@@ -3,11 +3,11 @@ import { test, expect } from "@playwright/test";
 import { STUDENT, loginAs } from "./helpers.mjs";
 
 const GAMES = [
-  { label: "賽道攔截", tutorial: "/tutorial/DCCS_tutorial.html", game: "/DCCS/index.html" },
-  { label: "瓢蟲追擊令", tutorial: "/tutorial/DAT_tutorial.html", game: "/DAT_single/DAT_single.html" },
-  { label: "漂浮泡泡", tutorial: "/tutorial/EFT_tutorial.html", game: "/EFT_single/EFT_single.html" },
-  { label: "勇闖迷宮", tutorial: "/tutorial/TGame_tutorial.html", game: "/TGame1/index.html" },
-  { label: "指令出擊", tutorial: "/tutorial/InstructionGame_tutorial.html", game: "/IM1/index.html" },
+  { label: "賽道攔截", tutorial: "/Tutorial/DCCS_tutorial.html", game: "/DCCS_single/index.html" },
+  { label: "瓢蟲追擊令", tutorial: "/Tutorial/DAT_tutorial.html", game: "/DAT_single/DAT_single.html" },
+  { label: "漂浮泡泡", tutorial: "/Tutorial/EFT_tutorial.html", game: "/EFT_single/EFT_single.html" },
+  { label: "勇闖迷宮", tutorial: "/Tutorial/TGame_tutorial.html", game: "/TGame_single/index.html" },
+  { label: "指令出擊", tutorial: "/Tutorial/InstructionGame_tutorial.html", game: "/IM_single/index.html" },
 ];
 
 for (const game of GAMES) {
@@ -43,7 +43,7 @@ for (const game of GAMES.filter((game) => game.label !== '指令出擊')) {
     }
     await expect(page).toHaveURL(/_double_tutorial.html$/);
     await page.click('a.btn-green');
-    await expect(page).toHaveURL(game.label === '賽道攔截' ? /DCCS\/double.html$/ : game.label === '瓢蟲追擊令' ? /DAT_double\/DAT_double.html(?:\?.*)?$/ : game.label === '漂浮泡泡' ? /EFT_double\/EFT_double.html$/ : /TGame2\/index.html$/);
+    await expect(page).toHaveURL(game.label === '賽道攔截' ? /DCCS_double\/index.html$/ : game.label === '瓢蟲追擊令' ? /DAT_double\/DAT_double.html(?:\?.*)?$/ : game.label === '漂浮泡泡' ? /EFT_double\/EFT_double.html$/ : /TGame_double\/index.html$/);
     await expect.poll(() => page.evaluate(() => !!window.WebGameAuth?.active)).toBe(true);
   });
 }

@@ -1,40 +1,45 @@
-# 09.28 ~ 10.04 (README 更新時間: 9/30)
-##  更新彩蛋與素材 api 
-- 測試以 s070 做為有素材的範例（原本的圖片加上一些藍色標記）
-### 修改動物圖片路徑
-- 651~658 行：
-const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
-const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
-const DEFAULT_ANIMAL_POOL = [
-  'assets/animals/rabbit.png',
-  'assets/animals/cat.png',
-  'assets/animals/dog.png',
-  'assets/animals/bird.png',
-];
-### 更改 DAT_single/DAT_single.js
-- 241~337行(function updateAnimalImage 附近)：連續答對更換動物角色彩蛋
-- 650 行開始(function fetchStudentAssets)：assets 的 API 串接
-### 學生 ID（10/01）
-- 後端 `caseId` 是 `S01` 這種格式。打素材 API 前由 `assetStudentId()` 補成三位數，例如 `S01` → `S001`。
-- 網址：`https://attention-lesson-plan-assets.zeabur.app/api/students/S001/assets`
-- 目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`。
-### 修改一些 bug
-- 修改會在每關最後一秒跑很多題目的問題
-- 動物角色圖片完全載入才會顯示
-### 彩蛋規則調整（10/04）
-- 連續 5 題「判斷正確且準心在動物上」升級一次動物；答錯、漏答或沒瞄準只會把連擊歸零，**不再降級**，已經變成的動物會保留。
-- 回饋文字會提示規則：連擊中顯示「（再連續答對 N 題變身）」，中斷連擊時顯示「（連擊歸零）」。
-- 門檻由 `STREAK_TO_EVOLVE` 常數控制。
+# 瓢蟲追擊令・單人
 
+畫面上的標題是「動物追擊令」。選單、資料夾與成績代號都是 `DAT`。
 
+玩家移動準心去疊住動物。題目要求按鍵時，準心在動物上才算對；要求不要按時，時間內不要按。按錯、沒瞄準或逾時都算錯。
 
+## 一局怎麼進行
 
-# 檔案用途
-- DAT_single.：遊戲畫面
-- DAT_tutorial.：遊戲說明
+網址決定模式：
 
-### 遊戲代號（10/04）
-- 這個資料夾叫 `DAT`，但後端與後台把動物追擊令記為 `EFT`。
-- 成績送 `lessonId: 1140908_EFT`，`stats[].apiname` 用 `EFT_*` 前綴，選單與後台顯示成「瓢蟲追擊令」。
-- 素材 API 讀的是 `DAT.assets.files`，沿用資料夾命名。
-- 漂浮泡泡（`EFT_*` 資料夾）剛好相反，送 `1140908_DAT` 與 `DAT_*`。兩邊都是正確的，不要改成跟資料夾同名。
+- `?mode=practice`：練習，1 關、2 題，顏色題與數學題各一題。
+- `?mode=game`：正式，6 關，每關 60 秒。時間內答完會繼續出題。
+
+每一題最多 10 秒。正式題型是顏色判斷（色名與字色是否相同）與數學判斷（算式答案是否正確），每題隨機。
+
+打完第 3 關可以回選遊戲頁，這時會送中場成績。六關結束再送完整成績。
+
+操作：`W` `A` `S` `D` 或方向鍵移動，空白鍵作答。
+
+## 動物圖
+
+連續 5 題都答對且準心在動物上，動物升一張。答錯、漏答或沒瞄準只把連擊歸零，已經換成的動物留著。門檻是 `STREAK_TO_EVOLVE`。連擊中提示還要再對幾題，中斷時提示連擊歸零。到最後一張後維持該張。
+
+圖的順序來自素材平台：
+
+`https://attention-lesson-plan-assets.zeabur.app/api/students/{學生ID}/assets`
+
+學生 ID 用個案編號補成三位數，例如 `S01` 打成 `S001`。網址不含年級與場域。回應讀 `DAT.assets.files`。沒有客製圖、請求失敗，或只有一張時，用 `assets/animals/` 的兔子、貓、狗、鳥補上。圖片要載入完成才換上去。
+
+成績裡的 `caseId` 仍用原本的編號，不補成三位數。
+
+## 成績
+
+`lessonId` 是 `1140908_DAT`，統計欄位前綴是 `DAT_`。送出與畫面上的儲存狀態在 `shared/dat-save.js`。同一關不重複送；網路中斷不自動重送，因為請求可能已經寫入。玩家可以手動重試。
+
+## 檔案
+
+| 檔案 | 用途 |
+| --- | --- |
+| `DAT_single.html` | 遊戲畫面 |
+| `DAT_single.js` | 移動、出題、彩蛋、讀素材、組成績 |
+| `DAT_single.css` | 版面 |
+| `assets/animals/` | 預設動物圖與瞄準遮罩 |
+
+說明頁在 `Tutorial/DAT_tutorial.html`，不在這個資料夾。素材抓取的共用部分在 `shared/dat-assets.js`。

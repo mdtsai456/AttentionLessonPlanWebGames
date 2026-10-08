@@ -82,11 +82,11 @@ for (const loggedOut of [true, false]) {
   });
 }
 
-for (const path of ['Select/index.html', DCCS_PAGE, 'DAT_double/DAT_double.html', 'Back/index.html']) {
+for (const path of ['Select/index.html', DCCS_PAGE, 'DAT_double/DAT_double.html', 'Teacher_platform/index.html']) {
   test(`${path} bfcache 後端撤銷 token 時回 Home`, async ({ page, request }) => {
     const { DOUBLE, TEACHER } = await import('./helpers.mjs');
     const shows = await trackPageshow(page);
-    await loginAs(page, path.startsWith('Back/') ? TEACHER : path.includes('double') ? DOUBLE : STUDENT);
+    await loginAs(page, path.startsWith('Teacher_platform/') ? TEACHER : path.includes('double') ? DOUBLE : STUDENT);
     await page.goto(path);
     await expect.poll(() => page.evaluate(() => !!window.WebGameAuth?.active && !!window.WebGameRuntime)).toBe(true);
     const token = await page.evaluate((double) => sessionStorage.getItem(double ? 'student2_token' : 'token'), path.includes('double'));

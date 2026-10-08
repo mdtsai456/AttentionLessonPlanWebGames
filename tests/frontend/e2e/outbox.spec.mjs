@@ -4,7 +4,7 @@ async function ready(page) {
   await loginAs(page, STUDENT);
   await page.goto('Select/index.html');
   await expect.poll(() => page.evaluate(() => !!window.WebGameAuth?.active && !!window.WebGameApi)).toBe(true);
-  await page.evaluate(async () => { window.outbox = await import('/DCCS/js/net/client.js'); });
+  await page.evaluate(async () => { window.outbox = await import('/DCCS_single/js/net/client.js'); });
 }
 test('DCCS 僅重送目前學生資料，其他人紀錄保留，暫存沒有 token', async ({ page }) => {
   const writes = await recordWrites(page);

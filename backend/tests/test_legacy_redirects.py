@@ -20,7 +20,7 @@ def test_missing_site_directories_still_start(tmp_path):
         assert client.get("/health-not-here").status_code == 404
 
 
-@pytest.mark.parametrize('path', ['Home/index.html', 'Select/index.html', 'Back/index.html', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html', 'EFT_single/EFT_single.html', 'EFT_double/EFT_double.html', 'TGame1/index.html', 'TGame2/index.html', 'IM1/index.html', 'DCCS/index.html', 'DCCS/double.html', '主題資料.csv'])
+@pytest.mark.parametrize('path', ['Home/index.html', 'Select/index.html', 'Teacher_platform/index.html', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html', 'EFT_single/EFT_single.html', 'EFT_double/EFT_double.html', 'TGame_single/index.html', 'TGame_double/index.html', 'IM_single/index.html', 'DCCS_single/index.html', 'DCCS_double/index.html', 'TGame_single/asset/主題資料.csv', 'TGame_double/asset/主題資料.csv'])
 def test_current_pages_and_shared_script_available(path):
     with TestClient(main.app) as client:
         assert client.get('/app/' + path).status_code == 200

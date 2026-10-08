@@ -56,16 +56,16 @@ function assertPayloads(posts, game) {
   assert.equal(posts.length, game === 'double' ? 2 : 1, '每位玩家同局只送一次');
   assert.deepEqual(posts.map((post) => post.data.caseId).sort(), game === 'double' ? ['S01', 'S02'] : ['S03']);
   for (const post of posts) {
-    assert.equal(post.lessonId, '1140908_EFT', '動物追擊令網頁版分類為 EFT');
+    assert.equal(post.lessonId, '1140908_DAT', '瓢蟲追擊令成績代號為 DAT');
     assert.equal(post.data.mode, game);
     assert.ok(post.data.endTime >= post.data.startTime);
     const stats = Object.fromEntries(post.data.stats.map(({ apiname, value }) => [apiname, value]));
-    assert.equal(stats.EFT_stage, 6);
-    assert.deepEqual(stats.EFT_levelAccuracy.split(',').map(Number), [1, 1, 1, 1, 1, 1]);
-    assert.equal(stats.EFT_questionCount, 36);
-    assert.equal(stats.EFT_correct, 36);
-    assert.equal(stats.EFT_wrong, 0);
-    assert.ok(post.data.stats.every(({ apiname }) => apiname.startsWith('EFT_')));
+    assert.equal(stats.DAT_stage, 6);
+    assert.deepEqual(stats.DAT_levelAccuracy.split(',').map(Number), [1, 1, 1, 1, 1, 1]);
+    assert.equal(stats.DAT_questionCount, 36);
+    assert.equal(stats.DAT_correct, 36);
+    assert.equal(stats.DAT_wrong, 0);
+    assert.ok(post.data.stats.every(({ apiname }) => apiname.startsWith('DAT_')));
   }
   if (game === 'double') {
     assert.ok(posts[0].data.pairId);

@@ -5,11 +5,11 @@
 // 進度依後端該生當天場次：DCCS 只打完前 3 關為 50%，打完後段或其它遊戲為 100%。
 // =============================================================================
 
-/** 五個遊戲的固定清單；id 給後端，name 給畫面顯示。 */
+/** 五個遊戲的固定清單。id 對資料夾，name 給畫面顯示。 */
 const GAMES = [
   { id: "DCCS", name: "賽道攔截" },
-  { id: "EFT", name: "瓢蟲追擊令" },
-  { id: "DAT", name: "漂浮泡泡" },
+  { id: "DAT", name: "瓢蟲追擊令" },
+  { id: "EFT", name: "漂浮泡泡" },
   { id: "TGame", name: "勇闖迷宮" },
   { id: "InstructionGame", name: "指令出擊" },
 ];
@@ -19,24 +19,24 @@ const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
 
 const ROUTES = {
   DCCS: {
-    single: "../tutorial/DCCS_tutorial.html",
-    double: "../tutorial/DCCS_double_tutorial.html",
-  },
-  EFT: {
-    single: "../tutorial/DAT_tutorial.html",
-    double: "../tutorial/DAT_double_tutorial.html",
+    single: "../Tutorial/DCCS_tutorial.html",
+    double: "../Tutorial/DCCS_double_tutorial.html",
   },
   DAT: {
-    single: "../tutorial/EFT_tutorial.html",
-    double: "../tutorial/EFT_double_tutorial.html",
+    single: "../Tutorial/DAT_tutorial.html",
+    double: "../Tutorial/DAT_double_tutorial.html",
+  },
+  EFT: {
+    single: "../Tutorial/EFT_tutorial.html",
+    double: "../Tutorial/EFT_double_tutorial.html",
   },
   TGame: {
-    single: "../tutorial/TGame_tutorial.html",
-    double: "../tutorial/TGame_double_tutorial.html",
+    single: "../Tutorial/TGame_tutorial.html",
+    double: "../Tutorial/TGame_double_tutorial.html",
   },
   InstructionGame: {
-    single: "../tutorial/InstructionGame_tutorial.html",
-    double: "../tutorial/InstructionGame_tutorial.html",
+    single: "../Tutorial/InstructionGame_tutorial.html",
+    double: "../Tutorial/InstructionGame_tutorial.html",
   },
 };
 

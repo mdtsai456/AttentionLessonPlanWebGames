@@ -1,4 +1,4 @@
-import { buildDatStats } from '../shared/eft-game-logic.js';
+import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
@@ -46,7 +46,7 @@ function buildPlayerStats(player, state, stage) {
     const avgReactionMs = state.reactionSamples.length
         ? state.reactionSamples.reduce((sum, value) => sum + value, 0) / state.reactionSamples.length
         : 0;
-    return buildDatStats({
+    return buildEftStats({
         score: state.score,
         wrong: Math.max(total - state.score, 0),
         accuracy: state.score / total,
@@ -58,12 +58,12 @@ function buildPlayerStats(player, state, stage) {
     });
 }
 
-// 資料夾叫 EFT，但後端與後台把漂浮泡泡記為 DAT，所以成績用 DAT 送；素材 API 則讀 EFT。
+// 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。
 async function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();
     await window.WebGameApi.submitSession({
-            lessonId: '1140908_DAT',
+            lessonId: '1140908_EFT',
             data: {
                 ...identity,
                 startTime: state.startTimeMs,

@@ -23,7 +23,7 @@
 存活檢查：`GET {BASE_URL}/health` → `{"status":"ok"}`。
 互動式 API 文件（Swagger UI）：`{BASE_URL}/docs`。
 
-`/demo` 已轉至 `/app/Back/index.html`。現行登入入口為 `/app/Home/index.html`，
+`/demo` 已轉至 `/app/Teacher_platform/index.html`。現行登入入口為 `/app/Home/index.html`，
 舊 `/app/index.html`、`/app/dms.html`、`/app/games.html` 及遊戲入口統一轉至新版。
 跨網域不搬移 token，須重新登入。
 

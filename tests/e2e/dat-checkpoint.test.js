@@ -45,8 +45,8 @@ for (const game of ['single', 'double']) {
       await waitNotice(session, () => document.querySelector('#save-notice').hidden);
       assert.deepEqual(session.sessionPosts.at(-1), original, '重試保存原始時間與成績');
       for (const post of session.sessionPosts) {
-        assert.equal(post.data.stats.find((stat) => stat.apiname === 'EFT_stage').value, 3);
-        assert.equal(post.data.stats.find((stat) => stat.apiname === 'EFT_levelAccuracy').value, '1,1,1');
+        assert.equal(post.data.stats.find((stat) => stat.apiname === 'DAT_stage').value, 3);
+        assert.equal(post.data.stats.find((stat) => stat.apiname === 'DAT_levelAccuracy').value, '1,1,1');
       }
       const count = session.sessionPosts.length;
       await session.page.locator(lobby).click();

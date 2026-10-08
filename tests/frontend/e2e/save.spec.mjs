@@ -8,8 +8,8 @@ const RESULT = { score: 3, wrong: 1, accuracy: 75, duration: 1000, stage: 3, lev
 const GAMES = [
   { name: "DAT_single", page: "DAT_single/DAT_single.html", save: "window.saveGameDataToBackend" },
   { name: "EFT_single", page: "EFT_single/EFT_single.html", save: "window.EFTSingle?.saveGameDataToBackend" },
-  { name: "TGame1", page: "TGame1/index.html", save: "window.submitResult" },
-  { name: "IM1", page: "IM1/index.html", save: "window.submitResult" },
+  { name: "TGame_single", page: "TGame_single/index.html", save: "window.submitResult" },
+  { name: "IM_single", page: "IM_single/index.html", save: "window.submitResult" },
 ];
 
 async function openGameAndSave(page, game, session) {

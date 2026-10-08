@@ -564,9 +564,9 @@ async function saveGameDataToBackend(data) {
     10
   );
 
-  // 資料夾叫 DAT，但後端把動物追擊令（選單與後台叫瓢蟲追擊令）記為 EFT，所以成績用 EFT 送；素材 API 則讀 DAT。
+  // 瓢蟲追擊令成績送 DAT；素材 API 也讀 DAT。
   const payload = {
-    lessonId: "1140908_EFT",
+    lessonId: "1140908_DAT",
     data: {
       grade: grade,
       caseId: caseId,
@@ -576,16 +576,16 @@ async function saveGameDataToBackend(data) {
       endTime: Date.now(),
       mode: "single",
       stats: [
-        { apiname: "EFT_correct",  value: data.score },
-        { apiname: "EFT_wrong",    value: data.wrong },
-        { apiname: "EFT_accuracy", value: data.accuracy },
-        { apiname: "EFT_duration", value: data.duration },
-        { apiname: "EFT_stage",    value: data.stage },
-        { apiname: "EFT_levelAccuracy", value: data.levelAccuracy },
-        { apiname: "EFT_avgReactionMs", value: data.avgReactionMs },
-        { apiname: "EFT_questionCount", value: data.questionCount },
-        { apiname: "EFT_aimRatio", value: data.aimRatio },
-        { apiname: "EFT_focusMs", value: data.focusMs },
+        { apiname: "DAT_correct",  value: data.score },
+        { apiname: "DAT_wrong",    value: data.wrong },
+        { apiname: "DAT_accuracy", value: data.accuracy },
+        { apiname: "DAT_duration", value: data.duration },
+        { apiname: "DAT_stage",    value: data.stage },
+        { apiname: "DAT_levelAccuracy", value: data.levelAccuracy },
+        { apiname: "DAT_avgReactionMs", value: data.avgReactionMs },
+        { apiname: "DAT_questionCount", value: data.questionCount },
+        { apiname: "DAT_aimRatio", value: data.aimRatio },
+        { apiname: "DAT_focusMs", value: data.focusMs },
       ]
     }
   };

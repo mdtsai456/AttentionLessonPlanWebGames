@@ -290,7 +290,7 @@ async function submitLogin() {
       throw new Error("無法儲存登入狀態，請重新整理頁面後再試");
     }
     loggedIn = true;
-    location.href = teacher ? "../Back/index.html" : "../Select/index.html";
+    location.href = teacher ? "../Teacher_platform/index.html" : "../Select/index.html";
   } catch (err) {
     const prefix = dual && loginSlot ? `學生 ${loginSlot}：` : "";
     errorMsg.textContent = `${prefix}${backendErrorMessage(err)}`;

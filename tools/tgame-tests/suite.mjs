@@ -69,20 +69,20 @@ async function gamePage(game, { stall = false, width = 1440, height = 810 } = {}
       sessionStorage.setItem('student2_school', 'KMU');
     }
     let seed=12345;Math.random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
-  }, game === 'TGame2' ? 'double' : 'single');
+  }, game === 'TGame_double' ? 'double' : 'single');
   await page.clock.install();await page.clock.pauseAt(new Date());
   await page.goto(`${base}${process.env.TGAME_TEST_PATH || ""}/${game}/index.html`, { waitUntil: 'domcontentloaded' });
   const snapshot = () => page.evaluate(g => {
-    const s = g === 'TGame1' ? state : session;const ps=g==='TGame1'?[state]:[players.p1,players.p2];
-    return { level:s.level,playing:s.playing,paused:!!s.paused,timerStarted:s.timerStarted,remaining:g==='TGame1'?s.remaining:Math.max(0,Math.ceil(((s.paused?s.pausedRemainingMs:s.levelDeadline-Date.now()))/1000)),players:ps.map(p=>({busy:p.busy,seq:p.questionSeq,score:p.score,answers:p.answers.map(a=>({...a}))})) };
+    const s = g === 'TGame_single' ? state : session;const ps=g==='TGame_single'?[state]:[players.p1,players.p2];
+    return { level:s.level,playing:s.playing,paused:!!s.paused,timerStarted:s.timerStarted,remaining:g==='TGame_single'?s.remaining:Math.max(0,Math.ceil(((s.paused?s.pausedRemainingMs:s.levelDeadline-Date.now()))/1000)),players:ps.map(p=>({busy:p.busy,seq:p.questionSeq,score:p.score,answers:p.answers.map(a=>({...a}))})) };
   }, game);
   const advance = async ms => { await page.clock.runFor(ms);await new Promise(r=>setTimeout(r,20)); };
   const ready = async () => {
     for(let i=0;i<100;i++){
       const yes=await page.evaluate(g=>{
-        const s=g==='TGame1'?(typeof state==='undefined'?null:state):(typeof session==='undefined'?null:session);
+        const s=g==='TGame_single'?(typeof state==='undefined'?null:state):(typeof session==='undefined'?null:session);
         if(!s)return false;
-        const ps=g==='TGame1'?[state]:[players.p1,players.p2];
+        const ps=g==='TGame_single'?[state]:[players.p1,players.p2];
         return s.playing&&ps.every(p=>p.ready)&&[...document.querySelectorAll('.item')].every(i=>i.getAttribute('src')&&i.complete&&i.naturalWidth);
       },game);
       if(yes)return;await advance(100);
@@ -90,14 +90,14 @@ async function gamePage(game, { stall = false, width = 1440, height = 810 } = {}
     throw new Error(`題目未完成準備 ${page.url()} ${errors.join(' | ')}`);
   };
   const answer = async ({ repeat=false }={}) => {
-    const keys = await page.evaluate(g=>g==='TGame1'?[state.currentQuestion.correct==='left'?'a':'d']:[players.p1.currentQuestion.correct==='left'?'a':'d',players.p2.currentQuestion.correct==='left'?'ArrowLeft':'ArrowRight'],game);
+    const keys = await page.evaluate(g=>g==='TGame_single'?[state.currentQuestion.correct==='left'?'a':'d']:[players.p1.currentQuestion.correct==='left'?'a':'d',players.p2.currentQuestion.correct==='left'?'ArrowLeft':'ArrowRight'],game);
     await page.evaluate(({keys,repeat})=>keys.forEach(key=>document.dispatchEvent(new KeyboardEvent('keydown',{key,repeat,bubbles:true}))),{keys,repeat});
   };
   const resize=async(size)=>{await page.setViewportSize(size);await page.evaluate(()=>window.dispatchEvent(new Event('resize')));};
   const close=async()=>{held.forEach(resolve=>resolve());await context.close();assert.deepEqual(errors,[], '頁面不得發生 JS 錯誤');};
   return { page,context,saves,errors,ready,answer,snapshot,advance,resize,close };
 }
-for(const game of ['TGame1','TGame2']) {
+for(const game of ['TGame_single','TGame_double']) {
   await test(`round ${game} 舊動畫不能跳題或解除新關作答鎖`, async()=>{
     const t=await gamePage(game);try{
       await t.ready();await t.answer();await t.advance(200);await t.page.evaluate(()=>endLevel());await t.page.click('.shared-stage-clear-btn');await t.ready();
@@ -107,7 +107,7 @@ for(const game of ['TGame1','TGame2']) {
   });
   await test(`round ${game} 到期後即使 tick 未執行也不計分`,async()=>{
     const t=await gamePage(game);try{
-      await t.ready();if(game==='TGame2'){await t.answer();await t.advance(2600);}
+      await t.ready();if(game==='TGame_double'){await t.answer();await t.advance(2600);}
       const before=await t.snapshot();await t.page.clock.setSystemTime(new Date(await t.page.evaluate(()=>Date.now()+61000)));await t.answer();
       const after=await t.snapshot();assert.deepEqual(after.players.map(p=>p.answers.length),before.players.map(p=>p.answers.length));assert.equal(after.playing,false);
     }finally{await t.close();}
@@ -116,7 +116,7 @@ for(const game of ['TGame1','TGame2']) {
     const t=await gamePage(game);try{await t.ready();await t.answer();await t.advance(2600);await t.answer({repeat:true});assert.ok((await t.snapshot()).players.every(p=>p.answers.length===1));}finally{await t.close();}
   });
 }
-for(const game of ['TGame1','TGame2']){
+for(const game of ['TGame_single','TGame_double']){
   await test(`images ${game} 下載完成但解碼逾時仍須轉文字卡`,async()=>{
     const t=await gamePage(game);try{
       await t.ready();await t.page.evaluate(()=>{
@@ -148,8 +148,8 @@ for(const game of ['TGame1','TGame2']){
     }finally{held.forEach(r=>r());await t.close();}
   });
 }
-await test('viewport TGame2 所有支援寬度的 HUD／回饋／提示／進度條不遮擋',async()=>{
-  const t=await gamePage('TGame2');try{
+await test('viewport TGame_double 所有支援寬度的 HUD／回饋／提示／進度條不遮擋',async()=>{
+  const t=await gamePage('TGame_double');try{
     await t.ready();await t.page.evaluate(()=>document.fonts.ready);await t.answer();
     for(const width of [700,721,768,820,900,1024,1440])for(const height of [500,620]){
       await t.resize({width,height});
@@ -158,7 +158,7 @@ await test('viewport TGame2 所有支援寬度的 HUD／回饋／提示／進度
     }
   }finally{await t.close();}
 });
-for(const game of ['TGame1','TGame2']){
+for(const game of ['TGame_single','TGame_double']){
   await test(`viewport ${game} 恢復準備中再次縮小必須重新按繼續`,async()=>{
     const t=await gamePage(game);try{
       await t.ready();await t.advance(5000);await t.resize({width:320,height:400});await t.advance(1000);
@@ -177,14 +177,14 @@ for(const game of ['TGame1','TGame2']){
       await t.page.getByRole('button',{name:'繼續',exact:true}).click();
       for(let i=0;i<20&&(await t.snapshot()).paused;i++)await t.advance(50);
       assert.equal((await t.snapshot()).paused,false);
-      await t.advance(500);await t.answer();const samples=await t.page.evaluate(g=>(g==='TGame1'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[0]),game);
+      await t.advance(500);await t.answer();const samples=await t.page.evaluate(g=>(g==='TGame_single'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[0]),game);
       assert.ok(samples.every(ms=>ms>=5500&&ms<=5800),`重新恢復有效反應時間：${samples}`);
     }finally{await t.close();}
   });
   await test(`viewport ${game} 錯答重試保留思考時間，多次暫停仍累計有效時間`,async()=>{
     const t=await gamePage(game);try{
       await t.ready();await t.page.evaluate(g=>{
-        const ps=g==='TGame1'?[state]:[players.p1,players.p2];
+        const ps=g==='TGame_single'?[state]:[players.p1,players.p2];
         ps.forEach((p,i)=>{
           const left=p.currentQuestion.correct!=='left';
           const key=i===0?(left?'a':'d'):(left?'ArrowLeft':'ArrowRight');
@@ -195,7 +195,7 @@ for(const game of ['TGame1','TGame2']){
       await t.resize({width:900,height:620});await t.page.getByRole('button',{name:'繼續',exact:true}).click();await t.advance(1000);
       await t.resize({width:320,height:400});await t.advance(20000);await t.resize({width:900,height:620});
       await t.page.getByRole('button',{name:'繼續',exact:true}).click();await t.advance(500);await t.answer();
-      const samples=await t.page.evaluate(g=>(g==='TGame1'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[1]),game);
+      const samples=await t.page.evaluate(g=>(g==='TGame_single'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[1]),game);
       assert.ok(samples.every(ms=>ms>=6400&&ms<=6700),`重試有效反應時間應約 6500 ms：${samples}`);
     }finally{await t.close();}
   });
@@ -204,7 +204,7 @@ for(const game of ['TGame1','TGame2']){
       await t.ready();await t.advance(5000);await t.resize({width:320,height:400});await t.advance(20000);
       await t.resize({width:900,height:620});await t.advance(5000);await t.page.getByRole('button',{name:'繼續',exact:true}).click();
       await t.advance(1000);await t.answer();
-      const samples=await t.page.evaluate(g=>(g==='TGame1'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[0]),game);
+      const samples=await t.page.evaluate(g=>(g==='TGame_single'?[state]:[players.p1,players.p2]).map(p=>p.reactionSamples[0]),game);
       assert.ok(samples.every(ms=>ms>=5900&&ms<=6200),`有效反應時間應約 6000 ms：${samples}`);
     }finally{await t.close();}
   });
@@ -218,13 +218,13 @@ for(const game of ['TGame1','TGame2']){
     }finally{await t.close();}
   });
 }
-await test('viewport TGame2 未按鍵開局且直向時暫停，恢復後仍須首次作答才倒數',async()=>{
-  const t=await gamePage('TGame2',{width:768,height:1024});try{
+await test('viewport TGame_double 未按鍵開局且直向時暫停，恢復後仍須首次作答才倒數',async()=>{
+  const t=await gamePage('TGame_double',{width:768,height:1024});try{
     await t.ready();assert.equal((await t.snapshot()).paused,true);await t.advance(20000);await t.resize({width:1024,height:768});await t.page.getByRole('button',{name:'繼續',exact:true}).click();
     assert.equal((await t.snapshot()).timerStarted,false);await t.answer();assert.equal((await t.snapshot()).timerStarted,true);
   }finally{await t.close();}
 });
-for(const game of ['TGame1','TGame2']){
+for(const game of ['TGame_single','TGame_double']){
   await test(`viewport ${game} near／turn／decode／arrive 暫停均只換一題`,async()=>{
     for(const at of [200,1200,1750,1900]){
       const t=await gamePage(game);try{
@@ -246,16 +246,16 @@ for(const game of ['TGame1','TGame2']){
   await test(`flow ${game} 中場離開只存已完成三關`,async()=>{
     const t=await gamePage(game);try{
       await t.ready();for(let level=1;level<=3;level++){await t.answer();await t.advance(60100);if(level<3){await t.page.click('.shared-stage-clear-btn');await t.ready();}}
-      await t.page.click(game==='TGame1'?'#btn-lobby':'#mid-lobby');await t.page.waitForURL('**/Select/index.html');assert.equal(t.saves.length,game==='TGame1'?1:2);assert.ok(t.saves.every(s=>s.data.stats.find(x=>x.apiname==='TGame_stage').value===3));
+      await t.page.click(game==='TGame_single'?'#btn-lobby':'#mid-lobby');await t.page.waitForURL('**/Select/index.html');assert.equal(t.saves.length,game==='TGame_single'?1:2);assert.ok(t.saves.every(s=>s.data.stats.find(x=>x.apiname==='TGame_stage').value===3));
     }finally{await t.close();}
   });
   await test(`flow ${game} 六關中場結算重玩與存檔`,async()=>{
     const t=await gamePage(game);try{
       await t.ready();for(let level=1;level<=6;level++){
         await t.answer();await t.advance(60100);assert.equal((await t.snapshot()).playing,false);
-        if(level===3)await t.page.click(game==='TGame1'?'#btn-next-stage':'#mid-continue');else if(level<6)await t.page.click('.shared-stage-clear-btn');if(level<6)await t.ready();
+        if(level===3)await t.page.click(game==='TGame_single'?'#btn-next-stage':'#mid-continue');else if(level<6)await t.page.click('.shared-stage-clear-btn');if(level<6)await t.ready();
       }
-      assert.ok(await t.page.locator('#result').isVisible());for(const save of t.saves)assert.equal(save.data.stats.find(x=>x.apiname==='TGame_stage').value,6);assert.equal(t.saves.length,game==='TGame1'?1:2);
+      assert.ok(await t.page.locator('#result').isVisible());for(const save of t.saves)assert.equal(save.data.stats.find(x=>x.apiname==='TGame_stage').value,6);assert.equal(t.saves.length,game==='TGame_single'?1:2);
       await t.page.click('#replay-btn');await t.ready();const s=await t.snapshot();assert.equal(s.level,1);assert.ok(s.players.every(p=>p.score===0&&p.answers.length===0));
     }finally{await t.close();}
   });

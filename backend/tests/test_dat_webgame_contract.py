@@ -1,4 +1,4 @@
-"""動物追擊令網頁版沿用 EFT 寫入契約；所有寫入皆替換成記錄器。"""
+"""瓢蟲追擊令網頁版以 DAT 寫入；所有寫入皆替換成記錄器。"""
 
 from __future__ import annotations
 
@@ -31,25 +31,25 @@ def webgame_payload(case_id="S03", mode="single", pair_id=None):
         "endTime": 1782877560000,
         "mode": mode,
         "stats": [
-            {"apiname": "EFT_correct", "value": 27},
-            {"apiname": "EFT_wrong", "value": 9},
-            {"apiname": "EFT_accuracy", "value": 0.75},
-            {"apiname": "EFT_duration", "value": 360000},
-            {"apiname": "EFT_stage", "value": 6},
-            {"apiname": "EFT_levelAccuracy", "value": "1,0.5,1,0.5,1,0.5"},
-            {"apiname": "EFT_avgReactionMs", "value": 1250},
-            {"apiname": "EFT_questionCount", "value": 36},
-            {"apiname": "EFT_aimRatio", "value": 0.8},
-            {"apiname": "EFT_focusMs", "value": 288000},
+            {"apiname": "DAT_correct", "value": 27},
+            {"apiname": "DAT_wrong", "value": 9},
+            {"apiname": "DAT_accuracy", "value": 0.75},
+            {"apiname": "DAT_duration", "value": 360000},
+            {"apiname": "DAT_stage", "value": 6},
+            {"apiname": "DAT_levelAccuracy", "value": "1,0.5,1,0.5,1,0.5"},
+            {"apiname": "DAT_avgReactionMs", "value": 1250},
+            {"apiname": "DAT_questionCount", "value": 36},
+            {"apiname": "DAT_aimRatio", "value": 0.8},
+            {"apiname": "DAT_focusMs", "value": 288000},
         ],
     }
     if pair_id is not None:
         data["pairId"] = pair_id
-    return {"lessonId": "1140908_EFT", "data": data}
+    return {"lessonId": "1140908_DAT", "data": data}
 
 
-def assert_six_stage_eft_write(call):
-    assert call["game_type"] == "EFT"
+def assert_six_stage_dat_write(call):
+    assert call["game_type"] == "DAT"
     assert call["stats"] == {
         "correct_count": 27,
         "wrong_count": 9,
@@ -64,7 +64,7 @@ def assert_six_stage_eft_write(call):
     }
 
 
-def test_dat_single_webgame_is_accepted_as_six_stage_eft(write_calls):
+def test_dat_single_webgame_is_accepted_as_dat(write_calls):
     with TestClient(main.app) as client:
         response = client.post("/api/sessions", json=webgame_payload())
 
@@ -73,7 +73,7 @@ def test_dat_single_webgame_is_accepted_as_six_stage_eft(write_calls):
     assert write_calls[0]["case_id"] == "S03"
     assert write_calls[0]["mode"] == "single"
     assert write_calls[0]["pair_id"] is None
-    assert_six_stage_eft_write(write_calls[0])
+    assert_six_stage_dat_write(write_calls[0])
 
 
 def test_dat_double_webgame_stores_each_player_with_shared_pair_id(write_calls):
@@ -92,4 +92,4 @@ def test_dat_double_webgame_stores_each_player_with_shared_pair_id(write_calls):
     for call in write_calls:
         assert call["mode"] == "double"
         assert call["pair_id"] == pair_id
-        assert_six_stage_eft_write(call)
+        assert_six_stage_dat_write(call)

@@ -1,73 +1,39 @@
-# 09.28 ~ 10.04 (README 更新時間: 9/30)
-##  更新彩蛋與素材 api 
-- 測試以 s070 做為有素材的範例（原本的圖片加上一些藍色標記）
-### 修改動物圖片路徑
-- 159~168 行
-const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
-const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
+# 瓢蟲追擊令・雙人
 
-// 預設彩蛋備用圖清單（無素材時輪播用）
-const DEFAULT_ANIMAL_POOL = [
-  'assets/animals/rabbit.png',
-  'assets/animals/cat.png',
-  'assets/animals/dog.png',
-  'assets/animals/bird.png',
-];
-### 更改 DAT_double/js/main.js
-- 158 行之後(function fetchStudentAssetList 附近)： assets 的 API 串接
-### 學生 ID（10/01）
-- 後端個案編號是 `S01` 這種格式。兩位玩家各自由 `assetStudentId()` 補成三位數再打素材 API，例如 `S01` → `S001`。
-- 網址：`https://attention-lesson-plan-assets.zeabur.app/api/students/S001/assets`
-- 目前同一個個案編號只對應一種場域，所以網址不含年級與場域。成績存檔仍用原本的 `caseId`。沒有客製圖的那位用預設圖。
-### 更改 DAT_double/js/game.js
--  62~110 行(function setAnimalAssets 附近)：連續答對的彩蛋
-### 修改一些 bug
-- 修改會在每關最後一秒跑很多題目的問題
-- 動物角色圖片完全載入才會顯示
-- 改成換下一關不會重置動物圖片
-### 彩蛋規則調整（10/04）
-- 連續 5 題「判斷正確且準心在動物上」升級一次動物；答錯、漏答或沒瞄準只會把連擊歸零，**不再降級**，已經變成的動物會保留。
-- 回饋文字會提示規則：連擊中顯示「（再連續答對 N 題變身）」，中斷連擊時顯示「（連擊歸零）」。
-- 門檻由 `STREAK_TO_EVOLVE` 常數控制。
-### 出題修正（10/04）
-- 正式模式改為顏色題、數學題每題隨機出題，修正 `795a7ad` 以來只出顏色題的問題。練習模式維持顏色、數學各 1 題。
+左右各一位玩家，規則與單人相同。選單、資料夾與成績代號都是 `DAT`。單人的題型、秒數與動物升級見 [`../DAT_single/README.md`](../DAT_single/README.md)。
 
+## 和單人的差別
 
+| 玩家 | 移動 | 作答 |
+| --- | --- | --- |
+| 玩家 1（左） | `W` `A` `S` `D` | 空白鍵 |
+| 玩家 2（右） | 方向鍵 | Enter |
 
+兩人各自出題、計分、連擊與動物圖。換關不重置已經升過的動物。
 
-# 之前版本的執行方式(現在用不到了)
-## 目前寫在本地SQL lite 之後將api.js中
-const API_BASE_URL = "http://127.0.0.1:5002";
-改為 const API_BASE_URL = "https://attention-lesson-plan-transfer-data.zeabur.app";
+練習是 `?mode=practice`，每人 2 題，顏色與數學各一題。正式是 `?mode=game`，6 關、每關 60 秒，顏色與數學每題隨機。
 
-cd DAT_double
-python local_sqlite_server.py
+第 3 關結束要等兩人都到，才一起選繼續或回大廳。成績各送一筆，`lessonId` 為 `1140908_DAT`，`mode` 為 `double`，並共用一組 `pairId`。
 
-cd "\backend"
-uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
+## 動物圖
 
-在 repo 根目錄執行 `python -m http.server 5500`
+兩人各打一次素材平台，圖的順序來自：
 
-## 開 http://127.0.0.1:5500/Home/index.html
+`https://attention-lesson-plan-assets.zeabur.app/api/students/{學生ID}/assets`
 
-ctrl+F12 console
-sessionStorage.setItem('game_mode', 'double');
-sessionStorage.setItem('student1_key', 'G1_S03');
-sessionStorage.setItem('student1_school', 'KMU');
-sessionStorage.setItem('student2_key', 'G1_S04');
-sessionStorage.setItem('student2_school', 'KMU');
+玩家 1 用 `student1_case`，玩家 2 用 `student2_case`。個案編號補成三位數，例如 `S01` 打成 `S001`。網址不含年級與場域。回應由 `shared/dat-assets.js` 的 `fetchAssetList` 讀 `DAT.assets.files`。沒有客製圖、請求失敗，或只有一張時，那位玩家用 `assets/animals/` 的兔子、貓、狗、鳥補上。圖片要載入完成才換上去。
 
-## 重載入畫面至雙人即可藉由畫面跳轉至頁面5:Dat_double.html
+成績裡的 `caseId` 仍用原本的編號，不補成三位數。
 
-在學姊的games.html
-新增
-   const GAME_PAGES = {
-        5: "DAT_double\\DAT_double.html", // DAT 雙人版
-      };
-連接進去
+## 檔案
 
-### 遊戲代號（10/04）
-- 這個資料夾叫 `DAT`，但後端與後台把動物追擊令記為 `EFT`。
-- 成績送 `lessonId: 1140908_EFT`，`stats[].apiname` 用 `EFT_*` 前綴，選單與後台顯示成「瓢蟲追擊令」。
-- 素材 API 讀的是 `DAT.assets.files`，沿用資料夾命名。
-- 漂浮泡泡（`EFT_*` 資料夾）剛好相反，送 `1140908_DAT` 與 `DAT_*`。兩邊都是正確的，不要改成跟資料夾同名。
+| 檔案 | 用途 |
+| --- | --- |
+| `DAT_double.html` | 雙人畫面 |
+| `js/main.js` | 兩位玩家的開局、等待、素材網址 |
+| `js/game.js` | 單一玩家的遊玩、彩蛋與成績 |
+| `js/questions.js` | 顏色題與數學題 |
+| `js/api.js` | 雙人這局的編號 |
+| `assets/animals/` | 預設動物圖 |
+
+說明頁在 `Tutorial/DAT_double_tutorial.html`。

@@ -6,11 +6,11 @@ assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), '只允�
 const browser = await chromium.launch();
 const result = { flows: [], sessions: [] };
 const games = [
-  ['DCCS', '賽道攔截', 'DCCS/index.html', 'DCCS/double.html'],
-  ['EFT', '瓢蟲追擊令', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html'],
-  ['DAT', '漂浮泡泡', 'EFT_single/EFT_single.html', 'EFT_double/EFT_double.html'],
-  ['TGame', '勇闖迷宮', 'TGame1/index.html', 'TGame2/index.html'],
-  ['InstructionGame', '指令出擊', 'IM1/index.html', null],
+  ['DCCS', '賽道攔截', 'DCCS_single/index.html', 'DCCS_double/index.html'],
+  ['DAT', '瓢蟲追擊令', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html'],
+  ['EFT', '漂浮泡泡', 'EFT_single/EFT_single.html', 'EFT_double/EFT_double.html'],
+  ['TGame', '勇闖迷宮', 'TGame_single/index.html', 'TGame_double/index.html'],
+  ['InstructionGame', '指令出擊', 'IM_single/index.html', null],
 ];
 async function ready(page) {
   await page.waitForFunction(() => window.WebGameAuth?.active && document.querySelectorAll('script[type="application/x-webgame-script"]').length === 0);
@@ -55,7 +55,7 @@ try {
           await page.click(`[data-enter="${slot}"]`);
         }
       }
-      await page.waitForURL('**/app/tutorial/*');
+      await page.waitForURL('**/app/Tutorial/*');
       await ready(page);
       await page.click('a.btn-green');
       const gamePath = mode === 'single' ? single : double;
@@ -70,16 +70,16 @@ try {
         } else await page.click('#shared-continue');
         await page.waitForURL('**/app/Select/index.html', { timeout: 20000 });
       } else if (mode === 'single') {
-        await page.waitForFunction((id) => id === 'DAT' ? !!window.EFTSingle : typeof startGame === 'function' && (id === 'EFT' ? typeof saveGameDataToBackend === 'function' : typeof submitResult === 'function'), id);
+        await page.waitForFunction((id) => id === 'EFT' ? !!window.EFTSingle : typeof startGame === 'function' && (id === 'DAT' ? typeof saveGameDataToBackend === 'function' : typeof submitResult === 'function'), id);
         await page.evaluate(async (id) => {
           const data = { score: 3, wrong: 1, accuracy: 0.75, duration: 1000, stage: 3, levelAccuracy: '1,0.5,0.75', avgReactionMs: 500, questionCount: 4, aimRatio: 0.5, focusMs: 500 };
-          if (id === 'DAT') { EFTSingle.startGame(); await EFTSingle.saveGameDataToBackend(data); }
-          else if (id === 'EFT') { startGame(); await saveGameDataToBackend(data); }
+          if (id === 'EFT') { EFTSingle.startGame(); await EFTSingle.saveGameDataToBackend(data); }
+          else if (id === 'DAT') { startGame(); await saveGameDataToBackend(data); }
           else { startGame(); await submitResult(data); }
         }, id);
-      } else if (id === 'EFT') {
-        await page.evaluate(async () => { const { players } = await import('/app/DAT_double/js/main.js?v=5'); await Promise.all(players.map((player) => player.saveRun(3))); });
       } else if (id === 'DAT') {
+        await page.evaluate(async () => { const { players } = await import('/app/DAT_double/js/main.js?v=5'); await Promise.all(players.map((player) => player.saveRun(3))); });
+      } else if (id === 'EFT') {
         await page.evaluate(async () => { const { players } = await import('/app/EFT_double/EFT_double.js'); await Promise.all(players.map((player) => player.saveRun(3))); });
       } else {
         await page.waitForFunction(() => typeof saveBoth === 'function');
@@ -105,7 +105,7 @@ try {
   await teacherPage.fill('[name="username-0"]', 'browser-teacher');
   await teacherPage.fill('[name="password-0"]', 'browser-test-pw');
   await teacherPage.click('#login-form [type="submit"]');
-  await teacherPage.waitForURL('**/app/Back/index.html');
+  await teacherPage.waitForURL('**/app/Teacher_platform/index.html');
   await teacherPage.waitForFunction(() => document.querySelectorAll('#student-select option').length > 1);
   result.teacher = await teacherPage.locator('#student-select').innerText();
   await teacherContext.close();

@@ -1,4 +1,4 @@
-import { buildDatStats } from '../shared/eft-game-logic.js';
+import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
@@ -112,9 +112,9 @@ async function saveGameDataToBackend(data) {
         10
     );
 
-    // 資料夾叫 EFT，但後端與後台把漂浮泡泡記為 DAT，所以成績用 DAT 送；素材 API 則讀 EFT。
+    // 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。
     const payload = {
-        lessonId: '1140908_DAT',
+        lessonId: '1140908_EFT',
         data: {
             grade,
             caseId,
@@ -123,7 +123,7 @@ async function saveGameDataToBackend(data) {
             startTime: window.WebGameRuntime.toWallTime(gameStartTime),
             endTime: Date.now(),
             mode: 'single',
-            stats: buildDatStats(data),
+            stats: buildEftStats(data),
         },
     };
 

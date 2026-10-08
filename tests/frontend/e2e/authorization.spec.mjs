@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { GUARDED_PAGES, DOUBLE_PAGES } from '../site.mjs';
 import { STUDENT, DOUBLE, TEACHER, HOME_URL, loginAs, recordWrites } from './helpers.mjs';
-const all = [...GUARDED_PAGES, ...DOUBLE_PAGES, 'Back/index.html'];
+const all = [...GUARDED_PAGES, ...DOUBLE_PAGES, 'Teacher_platform/index.html'];
 for (const pagePath of all) {
-  const teacher = pagePath.startsWith('Back/');
+  const teacher = pagePath.startsWith('Teacher_platform/');
   const session = teacher ? TEACHER : DOUBLE_PAGES.includes(pagePath) ? DOUBLE : STUDENT;
   const scenarios = [
     ['未登入', {}],
@@ -73,7 +73,7 @@ for (const path of [...GUARDED_PAGES.filter((path) => !path.startsWith('Select/'
     const doublePage = DOUBLE_PAGES.includes(path);
     await loginAs(page, doublePage ? STUDENT : DOUBLE);
     await page.goto(path);
-    await expect(page).toHaveURL(path === 'DCCS/index.html' ? /DCCS\/double.html$/ : /Select\/index.html$/);
+    await expect(page).toHaveURL(path === 'DCCS_single/index.html' ? /DCCS_double\/index.html$/ : /Select\/index.html$/);
     expect(await page.evaluate(() => sessionStorage.getItem('user_role'))).toBe('student');
   });
 }
