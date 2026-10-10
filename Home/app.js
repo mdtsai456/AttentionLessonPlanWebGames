@@ -1,7 +1,7 @@
 // =============================================================================
 // Home / 登入頁
-// 流程：選身份（學生／老師）→ 學生再選模式（單人／雙人）→ 填帳密 → 打後端登入
-// 老師登入後進 Back；學生登入後進 Select。年級／場域以後端回傳為準。
+// 登入流程：選擇身分。學生再選單人或雙人模式。輸入帳號與密碼後，呼叫後端登入。
+// 老師登入後進入 Back，學生登入後進入 Select。年級與場域使用後端回傳值。
 // =============================================================================
 
 const panel = document.querySelector(".panel");
@@ -14,10 +14,10 @@ const errorMsg = document.getElementById("error-msg");
 
 const state = {
   role: null, // "student" | "teacher"
-  mode: null, // "single" | "dual" | null（老師不需要模式）
+  mode: null, // "single" | "dual" | null。老師不需要選擇模式。
 };
 
-// 點「學生／老師」時，用 closest 讓點到按鈕內文字也能算點到按鈕
+// 點擊學生或老師按鈕時，使用 closest 識別按鈕內文字的點擊。
 roleStep.addEventListener("click", (event) => {
   const button = event.target.closest("[data-role]");
   if (!button) return;
@@ -31,11 +31,11 @@ modeStep.addEventListener("click", (event) => {
 });
 
 loginForm.addEventListener("submit", (event) => {
-  event.preventDefault(); // 攔截原生送出，改由 submitLogin 處理
+  event.preventDefault(); // 攔截原生表單送出，改由 submitLogin 處理。
   submitLogin();
 });
 
-// 登入成功後按鈕會保持停用；從下一頁按「上一頁」由 bfcache 還原時要重新打開。
+// 登入成功後維持按鈕停用。按上一頁並從 bfcache 還原時，重新啟用按鈕。
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;
   enterBtn.disabled = false;
@@ -43,13 +43,13 @@ window.addEventListener("pageshow", (event) => {
 });
 
 /**
- * 選擇身份。
- * 老師：直接顯示一組帳密欄位。
- * 學生：先隱藏表單，再顯示單人／雙人步驟。
+ * 選擇身分。
+ * 老師直接顯示一組帳號與密碼欄位。
+ * 學生先隱藏表單，再顯示單人與雙人模式選擇。
  */
 function selectRole(role) {
   state.role = role;
-  state.mode = null; // 換身份時清掉先前選的模式
+  state.mode = null; // 切換身分時，清除先前選擇的模式。
   setSelected("[data-role]", `[data-role="${role}"]`);
   errorMsg.textContent = "";
   panel.classList.remove("is-dual", "is-single");
@@ -68,8 +68,8 @@ function selectRole(role) {
 }
 
 /**
- * 選擇單人／雙人。
- * 雙人會加上 is-dual，讓版面改成兩欄帳密。
+ * 選擇單人或雙人模式。
+ * 雙人模式加入 is-dual，將帳號與密碼欄位排成兩欄。
  */
 function selectMode(mode) {
   state.mode = mode;
@@ -87,9 +87,7 @@ function selectMode(mode) {
   loginForm.classList.remove("is-hidden");
 }
 
-/**
- * 依人數畫出欄位。學生只多填第幾天；年級／場域由登入後端回傳。老師只有帳密。
- */
+/** 依玩家人數建立欄位。學生另填施測日，年級與場域由登入回應提供。老師只填帳號與密碼。 */
 function renderCredentialSlots(count, titles, includeSession) {
   credentialSlots.innerHTML = titles
     .slice(0, count)
@@ -136,7 +134,7 @@ function fieldValue(slot, name) {
   return input ? input.value.trim() : "";
 }
 
-/** 從畫面上的欄位收集帳密與第幾天；帳號會去掉前後空白。 */
+/** 從畫面欄位取得帳號、密碼與施測日。移除帳號前後的空白。 */
 function collectAccounts() {
   const slots = [...credentialSlots.querySelectorAll(".slot")];
   return slots.map((slot, index) => ({
@@ -147,8 +145,8 @@ function collectAccounts() {
 }
 
 /**
- * 前端基本檢查。有錯誤回傳訊息字串；通過則回傳空字串。
- * 雙人必須剛好兩組帳密，其餘情況一組即可。
+ * 執行前端基本檢查。失敗時回傳錯誤訊息，通過時回傳空字串。
+ * 雙人模式須有兩組帳號與密碼，其他情況使用一組。
  */
 function validate(accounts) {
   if (!state.role) return "請先選擇身份";
@@ -238,12 +236,12 @@ async function submitLogin() {
   enterBtn.disabled = true;
   errorMsg.textContent = "登入中…";
 
-  // 已拿到的登入結果；沒走完登入流程時要在 finally 登出，避免 token 留在 server 上。
+  // 已取得的登入結果。登入流程未完成時，在 finally 登出，避免伺服器保留 token。
   const results = [];
   let loggedIn = false;
   const teacher = state.role === "teacher";
   const dual = state.mode === "dual";
-  // 雙人模式下正在登入第幾位學生，錯誤訊息用來加前綴；0 表示不在登入步驟。
+  // 雙人模式中目前登入的學生序號，用於錯誤訊息前綴。0 表示未進行登入。
   let loginSlot = 0;
 
   try {
@@ -275,7 +273,7 @@ async function submitLogin() {
       loginSlot = 0;
     }
 
-    // 下面會清掉 sessionStorage；已登入的人（例如按上一頁回來）再登入時，舊 token 要先登出。
+    // 清除 sessionStorage 前，先登出舊 token，包含按上一頁返回後的再次登入。
     WebGameApi.storedTokens().forEach((token) => WebGameApi.logout(token));
     try {
       if (teacher) {
@@ -285,7 +283,7 @@ async function submitLogin() {
         storeStudentSession(state.mode, results, days);
       }
     } catch (_err) {
-      // 寫到一半失敗時不要留下指向已登出 token 的登入狀態，也不要誤報成後端錯誤。
+      // 寫入登入狀態失敗時，清除已登出 token 的狀態，並避免將錯誤顯示為後端錯誤。
       sessionStorage.clear();
       throw new Error("無法儲存登入狀態，請重新整理頁面後再試");
     }
@@ -295,7 +293,7 @@ async function submitLogin() {
     const prefix = dual && loginSlot ? `學生 ${loginSlot}：` : "";
     errorMsg.textContent = `${prefix}${backendErrorMessage(err)}`;
   } finally {
-    // 登入成功正在換頁時不重新打開按鈕，避免重複送出又多拿一組 token。
+    // 登入成功並導向頁面時，維持按鈕停用，避免重複送出並取得額外 token。
     if (!loggedIn) {
       results.forEach((result) => WebGameApi.logout(result.token));
       enterBtn.disabled = false;
@@ -303,21 +301,21 @@ async function submitLogin() {
   }
 }
 
-/** 同一組按鈕只讓目前選到的那個加上 is-selected（按下的視覺）。 */
+/** 同一組按鈕中，僅為目前選取的按鈕加入 is-selected 樣式。 */
 function setSelected(allSelector, activeSelector) {
   document.querySelectorAll(allSelector).forEach((button) => {
     button.classList.toggle("is-selected", button.matches(activeSelector));
   });
 }
 
-/** 清掉指定按鈕上的選取樣式（例如老師不需要模式，就要清掉單人／雙人）。 */
+/** 清除指定按鈕的選取樣式。例如，老師不需選擇模式，須清除單人與雙人按鈕的選取狀態。 */
 function clearSelected(selector) {
   document.querySelectorAll(selector).forEach((button) => {
     button.classList.remove("is-selected");
   });
 }
 
-// 驗證錯誤回到登入頁，提示保留在角色選擇畫面，不需先打開登入表單。
+// 驗證失敗時返回登入頁，在角色選擇畫面顯示提示，無須先開啟登入表單。
 const authReason = new URLSearchParams(location.search).get('auth');
 if (authReason === 'retry' || authReason === 'expired') {
   const notice = document.createElement('p');

@@ -164,7 +164,7 @@ body {
   transform-origin: 50% 90%;
   z-index: 4;
   pointer-events: none;
-  /* 陰影放在外層：走路換幀時不必每張圖重算濾鏡 */
+  /* 將陰影設在外層，避免行走動畫換幀時，重新計算每張圖片的濾鏡。 */
   filter: drop-shadow(0 10px 16px rgba(30, 50, 30, 0.28));
   will-change: transform;
 }
@@ -309,7 +309,7 @@ body {
   filter: drop-shadow(0 8px 14px rgba(40, 80, 50, 0.18));
 }
 
-/* 玩家一的進度條在最左邊，分數往右讓開 */
+/* 玩家一的進度條靠左對齊。分數向右移動，避免重疊。 */
 .lane[data-player="p1"] .hud-score {
   left: calc(var(--panel-w) + 1vw);
 }
@@ -384,12 +384,12 @@ body {
   transition: height 0.3s;
 }
 
-/* 確定左下角按鈕區域層級夠高，且不被圖層遮擋；讓開玩家一的進度條 */
+/* 提高左下角按鈕區域的層級，避免被圖層遮擋。位置避開玩家一的進度條。 */
 .btn-leave {
   position: absolute;
   left: calc(var(--panel-w) + 1vw);
   bottom: 2.2vh;
-  z-index: 20; /* 提高 z-index 確保在最上層 */
+  z-index: 20; /* 提高 z-index，使按鈕顯示在最上層。 */
   min-width: 6rem;
 }
 
@@ -403,7 +403,7 @@ body {
   }
 }
 
-/* 半個畫面放不下分數與倒數同一列：倒數移到第二列 */
+/* 半幅畫面無法在同一列顯示分數與倒數時，將倒數移至第二列。 */
 @media (max-width: 1120px) {
   .round { top: calc(2.2vh + 2.7rem); }
 }

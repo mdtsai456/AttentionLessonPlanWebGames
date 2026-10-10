@@ -113,7 +113,7 @@ def test_fetch_stats_for_rows_skips_sessions_without_stats_row(db):
 
 
 def test_fetch_stats_for_rows_ignores_unknown_game_type(db):
-    """game_type 不在白名單裡時不該炸，只是查不到 stats。"""
+    """game_type 不在白名單中時，不拋出錯誤，且查無 stats。"""
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session("G1", "S03", "測試場域", uuid="u1", game_type="UNKNOWN")
 
@@ -130,7 +130,7 @@ def test_fetch_stats_for_rows_of_empty_input_is_empty(db):
 
 
 def test_zero_session_student_has_count_zero_not_one(db):
-    """陷阱一：LEFT JOIN 對零場次學生產生一列，COUNT(*) 會把它算成 1。"""
+    """LEFT JOIN 為零場次學生產生一列，COUNT(*) 會將此列計為一場。"""
     db.insert_student("G1", "S04", "測試場域")
 
     rows = queries.fetch_students()
@@ -141,7 +141,7 @@ def test_zero_session_student_has_count_zero_not_one(db):
 
 
 def test_school_filter_keeps_zero_session_students(db):
-    """陷阱二：WHERE a.school = %s 會把零場次學生濾掉，因為 a.school 是 NULL。"""
+    """WHERE a.school = %s 會排除零場次學生，因為 a.school 為 NULL。"""
     db.insert_student("G1", "S03", "測試場域")
     db.insert_student("G1", "S04", "測試場域")
     db.insert_session("G1", "S03", "測試場域", uuid="u1")
@@ -153,7 +153,7 @@ def test_school_filter_keeps_zero_session_students(db):
 
 
 def test_same_case_id_in_two_schools_is_not_merged(db):
-    """陷阱三：ON 條件少了 school，兩個場域的同名學生會互相 join。"""
+    """ON 條件缺少 school 時，不同場域的同名學生會互相連接。"""
     db.insert_student("G1", "S03", "SchoolA")
     db.insert_student("G1", "S03", "SchoolB")
     for index in range(3):
@@ -164,13 +164,13 @@ def test_same_case_id_in_two_schools_is_not_merged(db):
 
     rows = queries.fetch_students()
 
-    assert len(rows) == 2  # 每個場域各一列，不該有重複
+    assert len(rows) == 2  # 每個場域各回傳一列，不可重複。
     counts = {row["school"]: row["session_count"] for row in rows}
     assert counts == {"SchoolA": 3, "SchoolB": 0}
 
 
 def test_last_played_at_uses_start_time_and_ignores_null_end_time(db):
-    """最近一場尚未結束（end_time 為 NULL），仍然要是最後遊玩時間。"""
+    """最近場次尚未結束時，end_time 為 NULL，但仍須計入最後遊玩時間。"""
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
         "G1", "S03", "測試場域", uuid="finished",
@@ -190,10 +190,10 @@ def test_last_played_at_uses_start_time_and_ignores_null_end_time(db):
 
 
 def test_fetch_students_orders_by_school_grade_case_id(db):
-    """SchoolA 底下刻意放兩個 case_id 相同、grade 不同的學生。
+    """在 SchoolA 放入兩位 case_id 相同、grade 不同的學生。
 
-    少了他們，grade 與 case_id 的先後就分不出來 —— ORDER BY 若寫成
-    school, case_id, grade，輸出順序會完全相同，測試照樣通過。
+    若缺少這些資料，ORDER BY school, case_id, grade 仍會產生相同結果，
+    無法驗證 grade 與 case_id 的排序優先順序。
     """
     db.insert_student("G2", "S01", "SchoolB")
     db.insert_student("G1", "S02", "SchoolA")

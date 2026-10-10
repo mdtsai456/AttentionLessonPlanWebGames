@@ -28,7 +28,7 @@ export function stepTarget(target, dt, speed) {
 }
 
 /**
- * 目標是否已抵達（或超過）某個 z 平面（由遠而近，z 遞減，故用 <=）。
+ * 判斷目標是否抵達或通過指定的 z 平面。移動方向由遠至近，z 遞減，因此使用 <=。
  * @param {object} target
  * @param {number} z
  * @returns {boolean}

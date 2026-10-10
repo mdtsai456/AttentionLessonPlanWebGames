@@ -1,4 +1,4 @@
-// 守門不能擋到正常流程：學生從 Select 進教學、進遊戲、再回 Select。
+// 登入驗證須允許正常流程：學生從 Select 進入教學與遊戲，再返回 Select。
 import { test, expect } from "@playwright/test";
 import { STUDENT, loginAs } from "./helpers.mjs";
 

@@ -1,8 +1,8 @@
 // 動物追擊令 E2E 測試共用工具
-// - 內建靜態伺服器（不需 python）
-// - Playwright 假時鐘：快轉遊戲時間，讓每題 10 秒的流程在數百毫秒內跑完
-// - 攔截所有對外請求：素材 API 回傳指定清單、成績 API 只記錄不送出、字型直接擋掉
-// - 在頁面注入觀測鉤子：回饋文字、動物圖片、紅光（data-result）、準心是否對準
+// 內建靜態伺服器，不需要 Python。
+// Playwright 模擬時鐘加速遊戲時間，使每題 10 秒的流程在數百毫秒內完成。
+// 攔截所有外部請求。素材 API 回傳指定清單，成績 API 僅記錄請求，並阻止字型請求。
+// 在頁面注入觀測函式，記錄回饋文字、動物圖片、data-result 與準心的瞄準狀態。
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { chromium } from 'playwright-core';
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
-// SITE_ROOT 可指向其他版本的程式碼（例如舊版）做回歸比對
+// SITE_ROOT 可指定其他版本的程式碼，用於回歸比對。
 export const SITE_ROOT = process.env.SITE_ROOT ? path.resolve(process.env.SITE_ROOT) : REPO_ROOT;
 
 const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
@@ -26,7 +26,7 @@ const MIME = {
   '.wav': 'audio/wav',
 };
 
-// 回饋文字中屬於「單題判定結果」的訊息（recordResult 設定的原始文字）
+// recordResult 設定的單題判定訊息。
 export const RESULT_RE = /^(瞄準且答對|正確等待且保持瞄準|漏答|誤按|判斷正確，但準心未對到動物)/;
 
 export async function startStaticServer(root = SITE_ROOT) {
@@ -68,20 +68,20 @@ export async function launchBrowser() {
   return chromium.launch({ executablePath, headless: process.env.HEADED !== '1' });
 }
 
-// 測試用畫格間隔：遊戲以時間差（delta）計算，放寬畫格可大幅縮短測試時間
+// 測試用的每幀間隔。遊戲使用時間差 delta 計算，增加間隔可縮短測試時間。
 const FRAME_MS = Number(process.env.FRAME_MS || 100);
 
-// 在頁面腳本執行前注入的觀測鉤子
+// 在頁面腳本執行前，注入觀測函式。
 function installProbes({ frameMs, realAim, realClock, randomValue }) {
   if (typeof randomValue === 'number') Math.random = () => randomValue;
-  // 以假時鐘的 setTimeout 驅動 requestAnimationFrame，降低畫格頻率
+  // 使用模擬時鐘的 setTimeout 執行 requestAnimationFrame，降低每幀更新頻率。
   if (!realClock) window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), frameMs);
   if (!realClock) window.cancelAnimationFrame = (id) => clearTimeout(id);
 
   const qa = {
-    feedback: [[], []],      // 每位玩家回饋文字的每一次設定
+    feedback: [[], []],      // 每位玩家的回饋文字設定記錄。
     questions: [[], []],     // 每位玩家每次出題的題型
-    resultMarks: [[], []],   // 動物 data-result 每次被設成的非空值（correct / wrong）
+    resultMarks: [[], []],   // 動物 data-result 每次設定的非空值：correct／wrong。
     offTarget: [false, false],
   };
   window.__qa = qa;
@@ -102,7 +102,7 @@ function installProbes({ frameMs, realAim, realClock, randomValue }) {
     },
   });
 
-  // 準心永遠對準動物（offTarget 為 true 時改成永遠沒對準），讓測試只取決於作答
+  // 準心固定瞄準動物。offTarget 為 true 時，固定未瞄準，使測試結果只取決於作答。
   const rectOf = Element.prototype.getBoundingClientRect;
   if (!realAim) Element.prototype.getBoundingClientRect = function () {
     if (is(this, 'animal') || is(this, 'animal-image')) {
@@ -120,7 +120,7 @@ function installProbes({ frameMs, realAim, realClock, randomValue }) {
     return rectOf.call(this);
   };
 
-  // 紅光 / 綠光：記錄 data-result 每次被設定的值（用 oldValue 還原設定順序）
+  // 記錄 data-result 的紅光與綠光值，使用 oldValue 還原設定順序。
   document.addEventListener('readystatechange', () => {
     if (document.readyState !== 'interactive') return;
     document.querySelectorAll('[data-ui="animal"], #animal').forEach((el) => {
@@ -136,11 +136,11 @@ function installProbes({ frameMs, realAim, realClock, randomValue }) {
 }
 
 /**
- * 開啟遊戲頁面
+ * 開啟遊戲頁面。
  * @param {object} opts
  * @param {'double'|'single'} opts.game
  * @param {'game'|'practice'} opts.mode
- * @param {string[]|null} opts.assetFiles 素材 API 回傳的檔案清單；null 代表沒有素材（使用預設兔、貓、狗、鳥）
+ * @param {string[]|null} opts.assetFiles 素材 API 回傳的檔案清單。null 表示使用預設的兔、貓、狗與鳥圖片。
  */
 export async function openGame(browser, origin, { game, mode = 'game', assetFiles = null, routeOverride, realAim = false, realClock = false, randomValue }) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -192,7 +192,7 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
         status: 200,
         contentType: 'application/json',
         headers: { 'Access-Control-Allow-Origin': '*' },
-        // 沒有指定素材時回傳空清單，遊戲會使用預設的兔、貓、狗、鳥
+        // 未指定素材時，回傳空清單。遊戲使用預設的兔、貓、狗與鳥圖片。
         body: JSON.stringify(assetFiles ? { DAT: { assets: { files: assetFiles } } } : {}),
       });
     }
@@ -207,12 +207,12 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
         body: JSON.stringify({ sessionId: 'e2e-test' }),
       });
     }
-    // 其他外部資源（例如 Google Fonts）回傳空內容，不連外
+    // 其他外部資源，例如 Google Fonts，回傳空內容，不連線至外部服務。
     blocked.push(url);
     return route.fulfill({ status: 200, body: '' });
   });
 
-  // 假時鐘在載入前就暫停，之後只靠 runFor 推進，讓每次執行的流程一致
+  // 載入前暫停模擬時鐘，之後只使用 runFor 推進，使每次執行流程一致。
   const start = new Date('2026-10-04T09:00:00+08:00').getTime();
   if (!realClock) {
     await page.clock.install({ time: start });
@@ -263,7 +263,7 @@ export class GameDriver {
     this.seenMarks = players.map(() => 0);
   }
 
-  // 一邊快轉時鐘一邊等條件成立；過關畫面出現時自動按「繼續」
+  // 推進時鐘並等待條件成立。出現過關畫面時，自動按繼續。
   async waitFor(predicate, label, { stepMs = 500, maxMs = 120000, arg } = {}) {
     for (let t = 0; t <= maxMs; t += stepMs) {
       const done = await this.page.evaluate(({ src, arg }) => {
@@ -300,7 +300,7 @@ export class GameDriver {
     });
   }
 
-  // 依畫面上的題目算出正解（雙人版沒有對外暴露題目資料，因此從 DOM 推算）
+  // 依 DOM 中的題目計算答案。雙人模式未對外提供題目資料。
   async solve(p) {
     if (this.game === 'single') {
       // 單人版的題目是全域變數
@@ -324,11 +324,11 @@ export class GameDriver {
   }
 
   /**
-   * 進行一題。actions 依玩家順序給定：
-   * - 'correct'：正確作答（正確題按鍵、不正確題不按）
-   * - 'miss'：錯誤作答（正確題漏答、不正確題誤按）
-   * - 'offTarget'：正確作答但準心沒對準動物
-   * 回傳每位玩家這一題的判定訊息、紅綠光、動物圖片，以及判定後畫面上實際顯示的回饋文字
+   * 執行一題。actions 依玩家順序指定。
+   * 'correct'：正確作答。正確題按鍵，不正確題不按鍵。
+   * 'miss'：錯誤作答。正確題漏答，不正確題誤按。
+   * 'offTarget'：正確作答，但準心未瞄準動物。
+   * 回傳各玩家的判定訊息、紅綠光、動物圖片與判定後的畫面回饋文字。
    */
   async playQuestion(...actions) {
     const { players } = this;
@@ -357,7 +357,7 @@ export class GameDriver {
       { arg: { seen: this.seenResults, re: RESULT_RE.source } },
     );
     await this.page.evaluate(() => { window.__qa.offTarget = [false, false]; });
-    // 換圖需等待非同步預載完成；快轉300ms不代表HTTP／圖片解碼已完成。
+    // 換圖前，須等待非同步預載完成。推進 300 ms 不代表 HTTP 請求或圖片解碼已完成。
     await this.page.clock.runFor(300);
     await this.waitFor(() => [...document.querySelectorAll('#animal-image, [data-ui="animal-image"]')]
       .every((img) => img.complete && img.naturalWidth > 0 && img.style.opacity !== '0.2'),

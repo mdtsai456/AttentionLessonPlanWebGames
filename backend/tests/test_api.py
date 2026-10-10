@@ -1,12 +1,10 @@
-"""既有端點的特性測試。
+"""既有端點的行為測試。
 
-這些測試描述重構前的實際行為，包含不理想的部分（例如 endTime 的空字串），
-目的是讓 Task 3–6 的搬移一旦改變行為就立刻失敗。
+保留重構前的行為，包括 endTime 使用空字串，讓 Task 3–6 的重構變更行為時，測試失敗。
 
-2026-09-11：帳密登入上線後（見 docs/adr/0004-teacher-student-password-login.md），
-/api/students、/sessions、/report 都要求 Authorization header。這裡統一用
-login_as_teacher fixture 登入一位「測試場域」的老師，取得 headers 帶給每個請求——
-這些測試原本驗證的行為（回應形狀、篩選、排序……）本身沒變，只是現在要先登入。
+/api/students、/sessions、/report 需要 Authorization header。
+各請求使用 login_as_teacher fixture 登入「測試場域」的老師並取得 headers。
+測試驗證回應結構、篩選與排序。帳號與密碼登入設計見 docs/adr/0004-teacher-student-password-login.md。
 """
 
 from __future__ import annotations
@@ -86,9 +84,9 @@ def test_sessions_of_unknown_student_is_empty_not_404(client, db, login_as_teach
 
 
 def test_unfinished_session_end_time_is_empty_string(client, db, login_as_teacher):
-    """記錄既有行為：end_time 為 NULL 時回傳空字串，而非 null。
+    """end_time 為 NULL 時，既有端點回傳空字串。
 
-    這是已知債務，本次不修改。新端點的 lastPlayedAt 使用 null。
+    新端點的 lastPlayedAt 使用 null。
     """
     _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
@@ -109,7 +107,7 @@ def test_unfinished_session_end_time_is_empty_string(client, db, login_as_teache
 
 
 def test_sessions_filters_by_game_type_and_normalizes_tgame(client, db, login_as_teacher):
-    """Unity 送 TGame，資料庫存 TGAME，回應要送回 TGame。"""
+    """Unity 傳入 TGame，資料庫儲存為 TGAME，回應使用 TGame。"""
     _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
@@ -180,7 +178,7 @@ def test_report_includes_stats_and_summary(client, db, login_as_teacher):
 
 
 def test_report_session_without_stats_row_has_null_stats(client, db, login_as_teacher):
-    """assessment_result 有列，但細部表沒有對應列。"""
+    """assessment_result 包含場次資料，但明細表沒有對應列。"""
     _, headers = login_as_teacher(school="測試場域")
     db.insert_student("G1", "S03", "測試場域")
     db.insert_session(
@@ -260,8 +258,8 @@ def test_report_db_error_returns_500_without_leaking_exception(
 
 # --- GET /api/students ---
 #
-# 老師登入後只能查自己場域（見 routers/students.py 的 list_students）：不帶
-# school 參數時預設是自己的場域，帶了別的場域一律 403，不再有「查全部場域」模式。
+# 老師只能查詢自己的場域，見 routers/students.py 的 list_students。
+# 未提供 school 時，使用老師的場域。提供其他場域時，回傳 403。不支援查詢全部場域。
 
 
 def test_list_students_without_school_defaults_to_own_school(client, db, login_as_teacher):
@@ -348,12 +346,12 @@ def test_list_students_blank_school_is_treated_as_not_given(client, db, login_as
     )
 
     body = response.json()
-    assert body["school"] == "SchoolA"  # 空白視同沒給，落回自己的場域
+    assert body["school"] == "SchoolA"  # 空白值視為未提供，使用老師的場域。
     assert body["studentCount"] == 1
 
 
 def test_list_students_of_own_empty_school_is_200_with_empty_list(client, db, login_as_teacher):
-    """自己場域目前沒有任何學生，仍是 200 + 空陣列，不是錯誤。"""
+    """老師所屬場域沒有學生時，回傳 200 與空陣列。"""
     _, headers = login_as_teacher(school="空場域")
 
     response = client.get(
@@ -447,7 +445,7 @@ def test_report_includes_trends_ascending_by_time(client, db, login_as_teacher):
 
 
 def _seed_single_and_double_dat(db):
-    """DAT 單人 3 場、DAT 雙人 2 場，皆帶 stats。"""
+    """DAT 單人模式有三場，雙人模式有兩場，各場皆包含 stats。"""
     db.insert_student("G1", "S03", "測試場域")
     for i in range(3):
         uuid = f"s{i}"

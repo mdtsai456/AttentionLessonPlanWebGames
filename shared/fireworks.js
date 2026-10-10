@@ -1,6 +1,6 @@
-// 專心達標的煙火動畫：煙火放滿整個畫面，下方置中顯示提示文字，右上角 ✕ 關閉。
-// 用法：window.showFireworks("聽說這裡有專心的小朋友，原來是你！")，回傳 Promise，關閉時 resolve。
-// 點 ✕、按 Esc 或 15 秒後自動關閉。系統開啟「減少動態效果」時只顯示文字。
+// 專心達標時顯示全畫面的煙火動畫。提示文字位於下方中央，關閉按鈕 ✕ 位於右上角。
+// 用法：window.showFireworks("聽說這裡有專心的小朋友，原來是你！")。回傳 Promise，關閉時 resolve。
+// 點擊 ✕、按 Esc，或等待 15 秒後關閉。系統啟用減少動態效果時，只顯示文字。
 (function () {
   const script = document.currentScript;
   const base = new URL("./", script.src);
@@ -34,7 +34,7 @@
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "shared-fireworks-text");
-    // 焦點放在整層而不是 ✕，一打開時才不會出現鍵盤焦點框；按 Tab 仍可移到 ✕
+    // 初始焦點設在覆蓋層，避免關閉按鈕出現鍵盤焦點框。按 Tab 仍可移至 ✕。
     root.tabIndex = -1;
     root.innerHTML =
       '<canvas class="shared-fireworks-canvas" aria-hidden="true"></canvas>' +
@@ -54,7 +54,7 @@
     window.addEventListener("resize", resize);
   }
 
-  /** 以第一個「，」拆成兩行：前半小字鋪陳，後半大字揭曉。沒有「，」就整句用大字。 */
+  /** 以第一個逗號「，」分成兩行。前半使用小字，後半使用大字。沒有逗號時，整句使用大字。 */
   function renderMessage(message) {
     const index = message.indexOf("，");
     const lead = index === -1 ? "" : message.slice(0, index + 1);
@@ -91,7 +91,7 @@
     rockets.push({
       x: width * (0.04 + Math.random() * 0.92),
       y: height,
-      // 飛到 targetY 大約要 40～55 格，炸開高度才能分布到整個畫面
+      // 約 40～55 幀後抵達 targetY，使煙火爆炸高度分布於整個畫面。
       vy: -(height - targetY) / (40 + Math.random() * 15),
       targetY,
       color: pick(COLORS),
@@ -100,7 +100,7 @@
 
   function burst(rocket) {
     const count = 70 + Math.floor(Math.random() * 40);
-    // 爆炸半徑跟著畫面大小走，大螢幕也能鋪滿
+    // 爆炸半徑依畫面大小調整，使大螢幕也能顯示全幅效果。
     const speed = Math.min(window.innerWidth, window.innerHeight) * (0.006 + Math.random() * 0.004);
     const second = pick(COLORS);
     for (let i = 0; i < count; i += 1) {

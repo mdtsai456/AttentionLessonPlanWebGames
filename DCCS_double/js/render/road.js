@@ -1,4 +1,4 @@
-// SPEC 4.6 — 背景與 sprite 繪製。
+// 背景與 sprite 繪製（SPEC 4.6）。
 
 import { project } from './projection.js';
 
@@ -6,8 +6,8 @@ const BG_NATIVE_W = 1672;
 const BG_NATIVE_H = 941;
 
 /**
- * 以 cover 方式（依寬度縮放、垂直靠上對齊）填滿 viewport，
- * 讓背景圖的地平線對齊 VANISHING_Y 所隱含的位置。
+ * 以 cover 方式填滿 viewport：依寬度縮放，垂直靠上對齊。
+ * 背景地平線對齊 VANISHING_Y 對應的位置。
  * @param {CanvasRenderingContext2D} ctx
  * @param {HTMLImageElement} bgImage
  * @param {{x:number,y:number,w:number,h:number}} viewport

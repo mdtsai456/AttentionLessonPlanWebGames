@@ -41,7 +41,7 @@ export function levelAccuracyText(levelAccuracies, stageCount) {
     .join(',');
 }
 
-// 漂浮泡泡（EFT）的成績，前綴是 EFT_。
+// 漂浮泡泡 EFT 的成績欄位使用 EFT_ 前綴。
 export function buildEftStats(data) {
   return [
     { apiname: 'EFT_correct', value: data.score },

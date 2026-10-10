@@ -1,16 +1,15 @@
-// 純函式規則判斷（SPEC 4.9）。物件規則由關卡指定，不從選項內容推導。
+// 純函式的規則判斷（SPEC 4.9）。關卡指定物件規則，不從選項內容推導。
 
 /**
  * @param {{kind: 'shape'|'object', items: Array<object>}} valve
- * @param {'model'|'category'} objectRule 該題所屬關卡指定的物件閥規則
- *   （見 game/levels.json、SPEC 1.4/1.5）。valve.kind === 'shape' 時不使用
- *   這個參數（形狀閥永遠是 'frame'）。
+ * @param {'model'|'category'} objectRule 關卡指定的物件閥規則，見 game/levels.json、SPEC 1.4/1.5。
+ *   valve.kind === 'shape' 時，不使用此參數。形狀閥固定使用 'frame'。
  * @returns {'frame'|'category'|'model'}
  */
 export function ruleForValve(valve, objectRule) {
   if (valve.kind === 'shape') return 'frame';
 
-  // 非法規則應立即失敗，避免把 category 題誤記為 model。
+  // 規則無效時立即拋出錯誤，避免將 category 題記為 model 題。
   if (objectRule !== 'model' && objectRule !== 'category') {
     throw new Error(`ruleForValve: invalid objectRule "${objectRule}"`);
   }

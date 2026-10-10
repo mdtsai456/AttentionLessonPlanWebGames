@@ -1,4 +1,4 @@
-"""seed_directory.py 的測試：常數不變式（純函式）＋ 冪等灌注（需測試庫）。"""
+"""seed_directory.py 測試包含純函式的常數不變式，以及需要測試資料庫的冪等插入。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 import seed_directory
 
 
-# --- 不碰資料庫 ---
+# 不存取資料庫
 
 
 def test_eight_schools_all_distinct():
@@ -50,7 +50,7 @@ def test_resolve_target_requires_test_db_name(monkeypatch):
         seed_directory._resolve_target()
 
 
-# --- 碰測試資料庫 ---
+# 存取測試資料庫
 
 
 def _counts(db):
@@ -75,7 +75,7 @@ def test_seed_is_idempotent(db):
     with get_connection() as connection:
         seed_directory.seed(connection)
     with get_connection() as connection:
-        seed_directory.seed(connection)  # 第二次不該拋重複鍵、不該增加筆數
+        seed_directory.seed(connection)  # 第二次執行不可產生重複鍵錯誤，也不可增加筆數。
 
     assert _counts(db) == (8, 16)
 
@@ -105,7 +105,7 @@ def test_seed_assigns_account_and_password_to_every_teacher_without_one(db):
     with get_connection() as connection:
         _, _, new_credentials = seed_directory.seed(connection)
 
-    assert len(new_credentials) == 16  # 全部都是新的，account 欄位原本是 NULL
+    assert len(new_credentials) == 16  # 所有老師的 account 原為 NULL，此次皆建立新帳號。
     rows = db.query("SELECT account, password_hash FROM teacher")
     assert all(row["account"] for row in rows)  # 每位老師都有非空的 account
     assert len({row["account"] for row in rows}) == 16  # 全域唯一，沒有重複
@@ -126,12 +126,12 @@ def test_seed_does_not_reassign_or_leak_existing_credentials(db):
     with get_connection() as connection:
         _, _, new_credentials = seed_directory.seed(connection)
 
-    assert new_credentials == []  # 第二次跑，沒有人需要新帳密
+    assert new_credentials == []  # 第二次執行時，不需建立新帳號或密碼。
     after = {
         row["teacher_id"]: (row["account"], row["password_hash"])
         for row in db.query("SELECT teacher_id, account, password_hash FROM teacher")
     }
-    assert before == after  # 既有帳密完全沒變
+    assert before == after  # 保留既有帳號與密碼。
 
 
 def test_seed_generated_credentials_actually_verify(db):

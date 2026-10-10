@@ -1,6 +1,6 @@
-"""手錶專心判定轉發端點（GET /api/attention/me）的測試。
+"""手錶專心判定轉發端點 GET /api/attention/me 的測試。
 
-全部不碰資料庫：學生身分用 dependency_overrides 換掉，手錶平台用 monkeypatch 換掉。
+不存取資料庫。使用 dependency_overrides 替換學生身分，使用 monkeypatch 替換手錶平台。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def no_mock_env(monkeypatch):
     monkeypatch.delenv("WATCH_PREDICT_MOCK", raising=False)
 
 
-# --- 學號對應 ---
+# 學號對應
 
 
 @pytest.mark.parametrize(
@@ -49,7 +49,7 @@ def test_watch_subject_id_rejects_unexpected_format(case_id):
     assert attention.watch_subject_id(case_id) is None
 
 
-# --- 端點 ---
+# 端點
 
 
 def test_requires_login():

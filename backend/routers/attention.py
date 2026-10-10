@@ -1,11 +1,11 @@
-"""手錶（Xsens DOT）專心判定的轉發端點。
+"""手錶 Xsens DOT 專心判定的轉發端點。
 
 手錶平台 https://xsensdotdata2server.zeabur.app 提供
-`GET /remote/predict/{subject_id}`，回 `{"result": 1 | 0, ...}`。該服務沒有送 CORS
-標頭，瀏覽器無法直接呼叫，所以由這裡代打，前端只打同一個後端。
+GET /remote/predict/{subject_id}，回傳 {"result": 1 | 0, ...}。
+該平台不提供 CORS 標頭，瀏覽器無法直接呼叫。此後端代為呼叫，前端只存取此後端。
 
-測試：手錶端資料超過 24 小時一律回 0，沒辦法測到 1。設 WATCH_PREDICT_MOCK=1
-時不呼叫手錶平台，直接回 result=1。
+手錶資料超過 24 小時時，固定回傳 0。
+測試設為 WATCH_PREDICT_MOCK=1 時，不呼叫手錶平台，直接回傳 result=1。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ _CASE_ID_PATTERN = re.compile(r"^([A-Za-z]+)(\d+)$")
 
 
 def watch_subject_id(case_id: str | None) -> str | None:
-    """S01 → S001。格式不符時回 None（當成找不到資料）。"""
+    """將 S01 轉為 S001。格式不符時，回傳 None，視為查無資料。"""
     match = _CASE_ID_PATTERN.match((case_id or "").strip())
     if not match:
         return None
@@ -57,7 +57,7 @@ def fetch_watch_prediction(subject: str) -> dict:
 
 @router.get("/api/attention/me", response_model=AttentionResponse)
 def my_attention(identity: Identity = Depends(require_student)) -> AttentionResponse:
-    """目前登入學生是否專心。任何失敗都回 result=0，不讓前端因此卡住。"""
+    """查詢目前登入學生的專心狀態。失敗時回傳 result=0，不阻止前端顯示。"""
     subject = watch_subject_id(identity.case_id)
     if _mock_enabled():
         return AttentionResponse(result=1, subject=subject, source="mock")

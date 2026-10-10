@@ -58,7 +58,7 @@ def _get_db_config(user_variable: str, password_variable: str) -> dict:
 
 
 def get_db_config() -> dict:
-    """Maintenance/test 預設連線設定，沿用 DB_USER。"""
+    """維護與測試的預設連線設定，沿用 DB_USER。"""
     return _get_db_config("DB_USER", "DB_PASSWORD")
 
 

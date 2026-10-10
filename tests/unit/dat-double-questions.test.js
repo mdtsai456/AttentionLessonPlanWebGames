@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// SITE_ROOT 可指向其他版本的程式碼（例如舊版）做回歸比對
+// SITE_ROOT 可指定其他版本的程式碼，用於回歸比對。
 const siteRoot = process.env.SITE_ROOT
   ? path.resolve(process.env.SITE_ROOT)
   : path.resolve(import.meta.dirname, '../..');
@@ -61,7 +61,7 @@ test('正式模式：遊戲實際的呼叫方式 generateQuestionSet(1, false) �
     assert.equal(list.length, 1);
     counts[list[0].type]++;
   }
-  // 二項分布 n=400、p=0.5，落在 [120, 280] 之外的機率可忽略
+  // 二項分布 n=400、p=0.5 時，結果落在 [120, 280] 外的機率極低。
   assert.ok(counts[COLOR_LABEL] >= 120 && counts[COLOR_LABEL] <= 280, JSON.stringify(counts));
   assert.ok(counts[MATH_LABEL] >= 120 && counts[MATH_LABEL] <= 280, JSON.stringify(counts));
 });
@@ -72,7 +72,7 @@ test('正式模式：題目沒有練習前綴，一次產生多題也是隨機�
   assert.ok(list.every((q) => q.type === COLOR_LABEL || q.type === MATH_LABEL));
   const colorCount = list.filter((q) => q.type === COLOR_LABEL).length;
   assert.ok(colorCount > 0 && colorCount < 200, `顏色題 ${colorCount} / 200`);
-  // 舊寫法 i % 2 會讓題型嚴格交替；隨機出題時 200 題中幾乎必定出現連續同題型
+  // 原寫法 i % 2 會使題型固定交替。隨機產生 200 題時，通常會出現連續的相同題型。
   const strictlyAlternating = list.every((q, i) => i === 0 || q.type !== list[i - 1].type);
   assert.equal(strictlyAlternating, false);
 });

@@ -56,7 +56,7 @@ export const QUESTION_KINDS = [
 export function generateQuestionSet(count, practice = false) {
   const list = [];
   for (let i = 0; i < count; i++) {
-    // 練習模式固定顏色、數學各一題；正式模式每題隨機
+    // 練習模式固定出一題顏色題與一題數學題。正式模式隨機選擇每題的題型。
     const kind = practice
       ? QUESTION_KINDS[i % QUESTION_KINDS.length]
       : pickRandom(QUESTION_KINDS);

@@ -1,5 +1,5 @@
-// Run: npm --prefix tools/tgame-tests test -- [round|images|viewport|flow]
-// Tests exercise real pages. Remote services and image loading/decoding failures are intercepted.
+// 執行：npm --prefix tools/tgame-tests test -- [round|images|viewport|flow]
+// 測試操作實際頁面，並攔截遠端服務請求及圖片載入、解碼失敗的情況。
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

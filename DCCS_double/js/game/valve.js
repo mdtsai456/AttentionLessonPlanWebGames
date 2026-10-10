@@ -1,5 +1,5 @@
-// 單向環狀選項輪盤（SPEC 4.8）。step() 排入整格動作，update() 負責動畫；
-// slots() 僅計算單側顯示位置，答案始終由 centerIndex() 決定。
+// 單向環狀選項輪盤（SPEC 4.8）。step() 將整格轉動加入佇列。update() 更新動畫。
+// slots() 僅計算單側顯示位置。centerIndex() 決定答案。
 
 import { CONFIG } from '../config.js';
 
@@ -23,7 +23,7 @@ export class Valve {
     this.z = z;
     this.kind = kind;
 
-    // 累計完成格數保持整數，避免 theta 停靠時產生浮點殘差。
+    // 完成的累計格數保持為整數，避免 theta 停止轉動時產生浮點誤差。
     this._settledSteps = 0;
     this._pendingSteps = 0;
     this._progress = 0;
@@ -41,13 +41,13 @@ export class Valve {
     return this._pendingSteps;
   }
 
-  /** 排入 count 格；動畫進行中可繼續累積。 */
+  /** 將 count 格轉動加入佇列。動畫進行期間可繼續累加。 */
   step(count = 1) {
     if (!Number.isFinite(count) || count <= 0) return;
     this._pendingSteps += Math.floor(count);
   }
 
-  /** 推進動畫；單幀可跨越多格，但不超過已排入的格數。 */
+  /** 更新動畫。單幀可轉動多格，但不超過佇列中的格數。 */
   update(dt) {
     let remaining = dt;
     while (remaining > 0 && this._pendingSteps > 0) {
@@ -66,8 +66,8 @@ export class Valve {
 
   centerIndex() {
     const n = this.items.length;
-    // 先停在已轉完的那一格。轉動到一半時，兩邊一樣近就維持這一格，
-    // 避免 Math.round 在負向閥門提早跳到下一格，把還在正中間的正確答案判錯。
+    // 先使用已完成轉動的選項。轉動至中點且兩側距離相同時，維持原選項，
+    // 避免 Math.round 在負向閥門提早切換，將仍在中央的正確答案判為錯誤。
     let best = wrapUnsigned(this.direction * this._settledSteps, n);
     let bestAbs = Infinity;
     const theta = this.theta;

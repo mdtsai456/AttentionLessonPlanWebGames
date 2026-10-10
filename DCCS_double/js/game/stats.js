@@ -1,7 +1,7 @@
 // 統計彙整（SPEC 4.11）。level 是關卡序號；同一題兩列共用 trialIndex。
-// correct_count／accuracy 以題為單位（兩道閥都對才算對）；分項計數以閥為單位。
-// duration 只來自 setDuration() 的模擬遊玩時間；本模組不碰牆上時鐘，
-// 以免分頁切走的時間被算進這個理應為常數的欄位。
+// correct_count／accuracy 以題為單位。兩道閥皆答對才算答對。分項計數以閥為單位。
+// duration 僅使用 setDuration() 設定的模擬遊玩時間，不使用實際時間，
+// 避免將離開分頁的時間計入固定的遊玩時長。
 
 export function createStats() {
   const rows = [];
@@ -36,7 +36,7 @@ export function createStats() {
     });
   }
 
-  /** 一題兩道閥都判定完後呼叫一次；correct 表示整題都對。 */
+  /** 每題的兩道閥皆判定完成後，呼叫一次。correct 表示整題答對。 */
   function recordTrial({ trialIndex, level, correct }) {
     trials.push({ trialIndex, level, correct: !!correct });
   }

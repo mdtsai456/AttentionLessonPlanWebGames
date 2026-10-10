@@ -1,7 +1,7 @@
-"""場域／老師名錄端點的測試。
+"""場域與老師名錄端點的測試。
 
-不碰資料庫：回應模型的欄位與型別。
-碰測試資料庫：排序、場域隔離、404 vs 空陣列、外鍵與 UNIQUE 約束。
+不存取資料庫的測試驗證回應模型的欄位與型別。
+資料庫測試驗證排序、場域隔離、404 與空陣列、外鍵及 UNIQUE 約束。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pytest
 from models import SchoolListResponse, TeacherListResponse, TeacherStudentsResponse
 
 
-# --- 不碰資料庫 ---
+# 不存取資料庫
 
 
 def test_school_list_response_shape():
@@ -46,7 +46,7 @@ def test_teacher_students_response_counts_match():
     assert resp.studentCount == len(resp.students) == 1
 
 
-# --- 碰測試資料庫 ---
+# 存取測試資料庫
 
 
 def test_schools_are_ordered_by_sort_order(client, db):
@@ -133,7 +133,7 @@ def test_teacher_students_excludes_other_school_same_case_id(
 
 
 def test_teacher_students_rejects_other_teachers_id(client, db, login_as_teacher):
-    """老師只能查自己名下的學生——改 URL 裡的 teacherId 查別人要 403。"""
+    """老師只能查詢自己名下的學生。teacherId 指定其他老師時，回傳 403。"""
     db.insert_school("A")
     other_teacher_id = db.insert_teacher("林老師", "A")
     _, headers = login_as_teacher(name="吳老師", school="A")
@@ -146,11 +146,10 @@ def test_teacher_students_rejects_other_teachers_id(client, db, login_as_teacher
 
 
 def test_teachers_students_requires_login(client, db):
-    """沒帶 token 一律 401——不管 teacherId 存不存在，先過身份這關。
+    """缺少 token 時，先回傳 401，不檢查 teacherId 是否存在。
 
-    「未知 teacherId」本身的 404 分支現在只在極端情況下才會走到（自己的
-    teacherId 剛好被刪掉），登入的老師永遠查得到自己，所以不容易單獨測；
-    「查別人」已經在 test_teacher_students_rejects_other_teachers_id 涵蓋（403）。
+    未知 teacherId 的 404 分支，僅在登入老師的 teacherId 已被刪除時觸發。
+    查詢其他老師的 403 行為由 test_teacher_students_rejects_other_teachers_id 驗證。
     """
     response = client.get("/api/teachers/99999/students")
     assert response.status_code == 401

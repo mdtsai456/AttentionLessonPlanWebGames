@@ -1,13 +1,10 @@
-"""帳密登入／登出端點。
+"""帳號與密碼登入、登出端點。
 
-見 docs/adr/0004-teacher-student-password-login.md：廠商從「選單式登入、無密碼」
-改口為帳密登入，登入頁前端 mockup（圖2～圖4）確認登入表單**只有帳號＋密碼兩欄**，
-沒有選場域這一步。teacher.name 只在 school 內唯一、studentKey（grade_caseId）
-每個場域都會重複，都不能直接當登入帳號，所以 teacher／student 表另外各自加了
-全域唯一的 account 欄位（見 tests/schema.sql），登入一律用 account 查人。
+登入表單只包含帳號與密碼，不選擇場域，見 docs/adr/0004-teacher-student-password-login.md。
+teacher.name 僅在 school 內唯一，studentKey（grade_caseId）也可能在不同場域重複。
+teacher／student 表各有全域唯一的 account，登入使用此欄位查詢，見 tests/schema.sql。
 
-「每次 API 呼叫都驗身份」的 dependency（Identity／get_current_identity 等）在
-routers/identity.py，不在這裡。
+routers/identity.py 提供 Identity／get_current_identity 等依賴，驗證每次 API 請求的身分。
 """
 
 from __future__ import annotations

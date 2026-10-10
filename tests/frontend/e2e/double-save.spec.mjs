@@ -23,7 +23,7 @@ for (const name of ['DAT', 'EFT', 'TGame', 'DCCS']) {
       await page.evaluate(() => saveBoth(3));
     } else {
       await expect(page.locator('#player1-game canvas')).toBeVisible();
-      // 先確認第 1 關提示；除錯場次在 5 秒後經真正結算路徑送兩筆。
+      // 先確認第 1 關提示。除錯場次在 5 秒後，透過結算流程送出兩筆成績。
       await page.click("#shared-continue");
     }
     await expect.poll(() => writes.filter((request) => /\/api\/sessions$/.test(request.url)).length, { timeout: 12000 }).toBe(2);

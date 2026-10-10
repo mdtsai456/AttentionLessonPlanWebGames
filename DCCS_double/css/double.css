@@ -255,8 +255,8 @@ select {
   display: none;
 }
 
-/* 操作說明獨立鋪滿視窗，不受雙人遊戲 16:9 畫布限制。
-   其餘版型直接使用 overlays.js 的 .dccs-overlay-tutorial / .dccs-panel。 */
+/* 操作說明填滿視窗，不受雙人遊戲的 16:9 畫布限制。
+   其餘版型使用 overlays.js 的 .dccs-overlay-tutorial／.dccs-panel。 */
 .shared-overlay.tutorial-mode {
   position: fixed;
 }

@@ -1,11 +1,11 @@
-// sessionSeconds 只供開發驗收；縮短場次仍會送出成績，啟用時必須顯示警告。
+// sessionSeconds 僅供開發驗收。縮短場次仍會送出成績，啟用時須顯示警告。
 
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 3600;
 
 /**
- * 讀取 ?sessionSeconds=；未提供或不合法時回傳 null。
- * @param {string} [search] 預設取目前網址的 query string
+ * 讀取 ?sessionSeconds=。未提供或無效時，回傳 null。
+ * @param {string} [search] 預設使用目前網址的 query string
  * @returns {number | null}
  */
 export function readSessionSecondsOverride(search) {

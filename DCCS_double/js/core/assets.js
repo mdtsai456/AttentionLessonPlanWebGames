@@ -1,4 +1,4 @@
-// Manifest 載入與圖片預載（SPEC 4.4）。資產網址一律相對於 assetBase。
+// 載入 manifest 並預載圖片（SPEC 4.4）。素材網址皆相對於 assetBase。
 
 export async function loadManifest(url) {
   const res = await fetch(url);
@@ -16,7 +16,7 @@ function loadOneImage(id, src, assetBase) {
       if (img.decode) {
         img.decode().then(
           () => resolve([id, img]),
-          () => resolve([id, img]) // onload 成功即視為可用，兼容 decode() 失敗的瀏覽器
+          () => resolve([id, img]) // onload 成功時，視為圖片可用，以支援 decode() 失敗的瀏覽器。
         );
       } else {
         resolve([id, img]);
@@ -30,10 +30,10 @@ function loadOneImage(id, src, assetBase) {
 }
 
 /**
- * 載入 manifest 內所有圖片（背景、shapes、所有 categories 的 images）。
- * 全部 decode() 完成後才 resolve。任何一張失敗即 reject 並指出檔名。
+ * 載入 manifest 中的所有圖片，包含背景、shapes 與各 categories 的 images。
+ * 所有 decode() 完成後才 resolve。任一圖片失敗時，reject 並提供檔名。
  * @param {object} manifest
- * @param {string | URL} assetBase manifest 相對資產路徑的基準網址
+ * @param {string | URL} assetBase manifest 相對素材路徑的基準網址
  * @returns {Promise<Map<string, HTMLImageElement>>}
  */
 export async function preloadImages(manifest, assetBase) {

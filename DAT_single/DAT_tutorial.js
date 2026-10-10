@@ -1,4 +1,4 @@
-    // 1. 題型說明資料庫 (可動態擴充題型數量)
+    // 1. 題型說明資料。可新增題型。
 const questionTypes = [
   {
     title: "當問題的顏色與文字相同時，按下選擇鍵。",
@@ -16,7 +16,7 @@ const questionTypes = [
     text: "2 + 3 = 5",
     hint: "算式正確的話，按下選擇鍵"
   },
-  // 若需新增題型，直接在此新增物件即可
+  // 新增題型時，在此陣列加入物件。
 ];
 
 let currentTypeIndex = 0;
@@ -44,7 +44,7 @@ document.getElementById('btn-to-step3').addEventListener('click', () => {
   step3.hidden = false;
 });
 
-// 渲染題型輪播內容
+// 繪製題型輪播內容。
 function renderTypeCard() {
   const data = questionTypes[currentTypeIndex];
   typeTitle.textContent = data.title;
@@ -57,7 +57,7 @@ function renderTypeCard() {
     <div class="preview-hint">${data.hint}</div>
   `;
 
-  // 更新按鈕啟用/停用狀態
+  // 更新按鈕的啟用與停用狀態。
   prevBtn.disabled = currentTypeIndex === 0;
   nextBtn.disabled = currentTypeIndex === questionTypes.length - 1;
 }
@@ -79,11 +79,11 @@ nextBtn.addEventListener('click', () => {
 
 // 畫面三：模式選擇事件
 document.getElementById('btn-practice').addEventListener('click', () => {
-  // 跳轉至練習模式
+  // 導向練習模式。
   window.location.href = 'DAT_single.html?mode=practice';
 });
 
 document.getElementById('btn-start').addEventListener('click', () => {
-  // 跳轉至正式遊戲
+  // 導向正式遊戲。
   window.location.href = 'DAT_single.html?mode=game';
 });

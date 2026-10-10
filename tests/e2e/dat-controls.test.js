@@ -1,4 +1,4 @@
-// 桌面 Chrome 實際幾何：保留真實準心與動物位置，使用鍵盤、滑鼠操控。
+// 桌面 Chrome 的實際位置測試。使用真實準心與動物位置，透過鍵盤與滑鼠操作。
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startStaticServer, launchBrowser, openGame, RESULT_RE } from './helpers.js';
@@ -39,7 +39,7 @@ describe('動物追擊令桌面鍵盤滑鼠', () => {
       const movementKeys = game === 'double' ? ['KeyD', 'ArrowRight'] : ['ArrowRight'];
       try {
         await session.page.evaluate(() => { Math.random = () => 0.25; });
-        // 雙人於開始正式局時已產生首題；先固定亂數再以畫面按鈕開始正式局。
+        // 雙人模式開始正式場次時，已產生第一題。先固定亂數，再點擊畫面按鈕開始遊戲。
         if (game === 'double') await session.page.locator('#enter-formal-btn').click({ timeout: 5000 });
         assert.deepEqual(await positions(session.page, game), players.map(() => ({ x: 25, y: 50 })));
         for (const p of players) {
@@ -57,7 +57,7 @@ describe('動物追擊令桌面鍵盤滑鼠', () => {
           (count) => window.__qa.questions.slice(0, count).every((list) => list.length === 1),
           '以實際準心碰到動物開始題目', { arg: players.length, stepMs: 20, maxMs: 3000 },
         );
-        // 剛進入命中邊緣時仍持續移動一個畫格，讓兩人的準心都進到動物內部。
+        // 進入命中邊界後，持續移動一幀，使兩位玩家的準心皆進入動物範圍。
         await session.page.clock.runFor(100);
         for (const key of movementKeys) await session.page.keyboard.up(key);
         const aimed = await positions(session.page, game);

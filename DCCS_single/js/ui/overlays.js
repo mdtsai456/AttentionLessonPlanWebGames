@@ -615,17 +615,16 @@ function renderSummaryFields(dl, summary) {
   }
 }
 
-/** 供雙人版等外部畫面使用：確保 .dccs-* 樣式已注入。 */
+/** 供雙人模式等外部畫面使用，確保已注入 .dccs-* 樣式。 */
 export function ensureOverlayStyles() {
   injectStyleOnce();
 }
 
 /**
- * 把單頁操作說明的內容畫進指定元素（只建 DOM，不管顯示與互動）。
- * 單人版由 showTutorial() 使用；雙人版自己有一套共用畫面，直接用這支，
- * 才不會變成左右兩側各跑一次教學。
+ * 在指定元素中建立單頁操作說明的 DOM，不處理顯示與互動。
+ * 單人模式由 showTutorial() 呼叫。雙人模式直接呼叫此函式，建立共用教學畫面，避免兩側分別顯示。
  *
- * @param {HTMLElement} element 目標容器，內容會被清空
+ * @param {HTMLElement} element 目標容器，原內容會被清除
  * @param {object} content 見 showTutorial 的 content 參數
  */
 export function renderTutorialInto(element, content) {
@@ -722,7 +721,7 @@ function buildTutorialRowElement(row) {
   for (const item of row.images || []) {
     const img = document.createElement('img');
     img.src = item.src;
-    // 教學圖只是示意，讀屏軟體念出檔名沒有意義。
+    // 教學圖片僅供示意，不讓螢幕閱讀器讀出檔名。
     img.alt = '';
     if (item.framed) img.className = 'dccs-tutorial-frame';
     stripEl.appendChild(img);
