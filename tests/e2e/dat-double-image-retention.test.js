@@ -33,7 +33,7 @@ describe('雙人升級圖片失敗仍保留已顯示的貓', () => {
         for (let i = 0; i < 5; i++) await session.driver.playQuestion('correct', 'correct');
         assert.ok((await session.driver.snapshot()).every((state) => state.image.endsWith('/cat.png')));
         for (let i = 0; i < 5; i++) await session.driver.playQuestion('correct', 'correct');
-        // driver等待預載／期限回退；CSS transition使用真實畫面時間，另外等還原完成。
+        // driver 等待預載或期限到達後的替代流程。CSS transition 使用實際時間，須另行等待還原完成。
         for (let i = 0; i < 80; i++) {
           const ready = await session.page.locator('[data-ui="animal-image"]').evaluateAll((list) => list.every((img) => {
             const style = getComputedStyle(img);

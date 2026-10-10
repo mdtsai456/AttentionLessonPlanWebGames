@@ -1,5 +1,5 @@
 // 測試共用：受測網站根目錄與頁面清單。
-// SITE_ROOT 可指向別的 checkout（例如修正前的版本），用來確認測試抓得到 bug。
+// SITE_ROOT 可指定其他 checkout，例如修正前的版本，以確認測試能偵測錯誤。
 import path from "node:path";
 
 export const SITE_ROOT = path.resolve(
@@ -8,7 +8,7 @@ export const SITE_ROOT = path.resolve(
 
 export const DCCS_PAGE = "DCCS_single/index.html";
 
-// 010 範圍：全部 11 個學生單人頁共用相同登入守門。
+// 010 範圍：全部 11 個學生單人頁面共用登入驗證。
 export const GUARDED_PAGES = [
   "Select/index.html",
   "Tutorial/DCCS_tutorial.html",

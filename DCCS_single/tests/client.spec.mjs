@@ -43,7 +43,7 @@ test('送出逾時會暫存；重送成功才刪除原始成績', async ({ page 
 test('回應本文卡住也會逾時，不能把未完成的回應當作成功', async ({ page }) => {
   await page.clock.install();
   await page.evaluate(({ payload, url }) => {
-    // 模擬已收到 200 headers，但本文永遠不結束的伺服器。
+    // 模擬回傳 200 headers 後，持續等待回應本文的伺服器。
     window.fetch = async (_url, { signal }) => new Response(new ReadableStream({
       start(controller) {
         signal.addEventListener('abort', () => {

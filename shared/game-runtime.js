@@ -1,4 +1,4 @@
-// 返回 bfcache 等待驗證時凍結遊戲排程；時間扣除離頁及驗證等待，保留原遊戲狀態。
+// 從 bfcache 返回並等待驗證時，暫停遊戲排程。計時扣除離開頁面與等待驗證的時間，並保留遊戲狀態。
 (function (global) {
   const timeout = global.setTimeout.bind(global);
   const clear = global.clearTimeout.bind(global);

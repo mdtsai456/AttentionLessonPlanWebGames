@@ -1,4 +1,4 @@
-// 真實 HTTP + MariaDB 驗收；先按 README 準備獨立 _test 庫並啟動本機後端。
+// HTTP 與 MariaDB 整合驗收。先依 README 準備獨立的 _test 資料庫，並啟動本機後端。
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 const base = process.env.LIVE_BASE_URL || 'http://127.0.0.1:19368';
@@ -85,7 +85,7 @@ try {
         await page.waitForFunction(() => typeof saveBoth === 'function');
         await page.evaluate(() => saveBoth(3));
       }
-      await page.waitForFunction(() => true); // 讓 response body promise 完成。
+      await page.waitForFunction(() => true); // 等待回應本文的 Promise 完成。
       const deadline = Date.now() + 10000;
       while (saves.length < before + (mode === 'double' ? 2 : 1) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
       const mine = saves.slice(before);

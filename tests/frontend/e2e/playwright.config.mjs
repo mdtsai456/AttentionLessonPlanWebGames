@@ -1,14 +1,14 @@
-// 前端 E2E：用 python http.server 直接提供 repo 根目錄（同 Zeabur 靜態部署）。
+// 前端 E2E：使用 Python 的 http.server 提供專案根目錄，與 Zeabur 靜態部署相同。
 import { defineConfig } from "@playwright/test";
 import { SITE_ROOT } from "../site.mjs";
 
-// 預設不用 8000/8765 這類常見 port，避免連到別的 workspace 開著的伺服器。
+// 避免預設使用 8000／8765 等常用連接埠，以免連至其他工作區的伺服器。
 const PORT = Number(process.env.E2E_PORT || 18931);
 
 export default defineConfig({
   testDir: ".",
   fullyParallel: true,
-  // 每個測試都要開整頁遊戲（大圖、字型），機器忙時光啟動瀏覽器就要十幾秒。
+  // 每個測試都載入完整遊戲頁面，包含大型圖片與字型。主機忙碌時，啟動瀏覽器可能需要十多秒。
   workers: Number(process.env.E2E_WORKERS || 4),
   timeout: 90_000,
   retries: 0,
@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: `node "${new URL("../server.mjs", import.meta.url).pathname}"`,
     url: `http://127.0.0.1:${PORT}/Home/index.html`,
-    // port 被佔用就直接失敗，不要誤測到別人的伺服器。
+    // 連接埠已被使用時，立即失敗，避免測試其他伺服器。
     reuseExistingServer: false,
     stdout: "ignore",
     stderr: "ignore",

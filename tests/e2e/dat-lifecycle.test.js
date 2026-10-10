@@ -1,4 +1,4 @@
-// 完整生命週期與存檔契約；openGame 攔截全部外部流量。
+// 完整生命週期與存檔契約測試。openGame 攔截所有外部流量。
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameDriver, RESULT_RE, startStaticServer, launchBrowser, openGame } from './helpers.js';
@@ -217,7 +217,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           routeOverride: async ({ route, request, url }) => {
             if (!isSessionPost(request, url)) return false;
             if (failure === 'abort') await route.abort('failed');
-            // timeout 故意不完成路由，讓真正 fetch 的逾時保護處理未知寫入結果。
+            // timeout 情況不完成路由回應，讓 fetch 的逾時處理應對未知的寫入結果。
             return true;
           },
         });

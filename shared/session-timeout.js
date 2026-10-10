@@ -1,5 +1,5 @@
-// 學生／老師登入滿 1 小時後清掉本機登入狀態，並回到 Home。
-// 時間以登入回應的 expiresAt 為準；舊分頁沒有這個值時，從第一次打開頁面起算 1 小時。
+// 學生或老師登入滿 1 小時後，清除本機登入狀態，並返回 Home。
+// 到期時間使用登入回應的 expiresAt。舊分頁缺少此值時，從首次開啟頁面起算 1 小時。
 (function (global) {
   const TTL_MS = 60 * 60 * 1000;
   const EXPIRES_KEY = "login_expires_at";
