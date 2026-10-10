@@ -82,7 +82,7 @@ button:focus-visible {
   border-radius: 3cqw 0 0 3cqw;
 }
 
-/* 題數往內移，避開右側進度條。 */
+/* 題數顯示向內移動，避開右側進度條。 */
 .player-2 .round {
   right: auto;
   width: max-content;
@@ -185,7 +185,7 @@ button:focus-visible {
   border-radius: 2em;
 }
 
-/* 泡泡區域：left / top 調位置，width / height 調範圍 */
+/* 泡泡區域：left／top 設定位置，width／height 設定範圍。 */
 .bubble-field {
   position: absolute;
   left: 12%;
@@ -194,7 +194,7 @@ button:focus-visible {
   height: 48%;
 }
 
-/* 泡泡大小：width 為泡泡區域寬度的百分比；各顆位置由 JS 的 positions 設定 */
+/* width 以泡泡區域寬度的百分比設定泡泡大小。JS 的 positions 設定每顆泡泡的位置。 */
 .bubble {
   position: absolute;
   width: 22%;
@@ -250,7 +250,7 @@ button:focus-visible {
   margin: .15em 0;
 }
 
-/* 左右作答按鈕：width 調大小，bottom 調垂直位置 */
+/* 左右作答按鈕：width 設定大小，bottom 設定垂直位置。 */
 .direction {
   position: absolute;
   bottom: 5%;

@@ -1,10 +1,6 @@
-/**
- * DAT_double 資料庫 API 溝通模組
- */
+/** DAT_double 的資料庫 API 通訊模組 */
 
-/**
- * 產生符合 GUID 規範的 UUID v4 供雙人局 pairId 使用
- */
+/** 產生符合 GUID 規範的 UUID v4，用作雙人場次的 pairId。 */
 export function generateUUID() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {

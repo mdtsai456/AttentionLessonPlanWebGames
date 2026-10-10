@@ -1,4 +1,4 @@
-// 鍵盤輸入（SPEC 4.3）。bindings 由外部注入，便於建立互不干擾的雙人實例。
+// 鍵盤輸入（SPEC 4.3）。外部傳入 bindings，以建立互不干擾的雙人實例。
 
 export function createInput(bindings) {
   const codeToActions = new Map();
@@ -12,7 +12,7 @@ export function createInput(bindings) {
   }
 
   const down = new Set();
-  // action -> 尚未消費的 keydown 次數。
+  // action 對應尚未處理的 keydown 次數。
   const pressCounts = new Map();
 
   function onKeyDown(e) {
@@ -21,7 +21,7 @@ export function createInput(bindings) {
     e.preventDefault();
     for (const action of actions) {
       down.add(action);
-      // 按住不放只算一次，不消費瀏覽器自動重複的 keydown。
+      // 長按只計算一次，不處理瀏覽器自動重複的 keydown。
       if (!e.repeat) {
         pressCounts.set(action, (pressCounts.get(action) || 0) + 1);
       }
@@ -37,7 +37,7 @@ export function createInput(bindings) {
     }
   }
 
-  // 失焦可能漏掉 keyup；清空可避免切回頁面後補套用舊輸入。
+  // 頁面失去焦點時可能未收到 keyup。清除輸入狀態，避免返回頁面後套用舊輸入。
   function clearAll() {
     down.clear();
     pressCounts.clear();

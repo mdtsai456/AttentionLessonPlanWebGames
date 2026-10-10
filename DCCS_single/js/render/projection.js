@@ -1,4 +1,4 @@
-// SPEC 4.5 — 透視投影。純函式，無狀態，必須可在 Node 中單獨測試。
+// 透視投影（SPEC 4.5）。使用無狀態的純函式，須能在 Node 中獨立測試。
 
 import { CONFIG } from '../config.js';
 
@@ -39,8 +39,8 @@ export function project(z, lane, viewport) {
 }
 
 /**
- * 目標物專用大小。閥門選項仍使用 project() 的線性透視；指數小於 1
- * 可提升遠處目標的辨識度。TARGET_PERSPECTIVE 為 1 時與 project() 相同。
+ * 計算目標物專用尺寸。閥門選項使用 project() 的線性透視。
+ * 指數小於 1 時，遠處目標較容易辨識。TARGET_PERSPECTIVE 為 1 時，結果與 project() 相同。
  * @param {number} z 世界深度
  * @param {{x:number,y:number,w:number,h:number}} viewport
  * @returns {number}

@@ -1,8 +1,8 @@
 // 關卡可行性、固定素材組與出題器（SPEC 4.10）。
-// shapeCount 與 objectCount 獨立；所有隨機性使用注入的 rng。
+// shapeCount 與 objectCount 各自獨立。所有隨機操作使用傳入的 rng。
 
 /**
- * 依類別 id 找到 manifest.categories 裡對應的那一項；找不到回傳 null。
+ * 依類別 id 查找 manifest.categories 中的項目。找不到時，回傳 null。
  * @param {object} manifest
  * @param {string} id
  * @returns {object|null}
@@ -34,7 +34,7 @@ export function levelFeasibility(manifest, level) {
 
   let object;
   if (level.objectRule === 'model') {
-    // 素材不足回報不可玩；設定格式錯誤才由 manifest 產生器攔截。
+    // 素材不足時，回報關卡不可玩。manifest 產生器處理設定格式錯誤。
     const cat = categoryById(manifest, level.sourceCategory);
     if (!cat) {
       object = false;
@@ -49,7 +49,7 @@ export function levelFeasibility(manifest, level) {
       }
     }
   } else if (level.objectRule === 'category') {
-    // 防禦性檢查陣列長度與每個類別是否存在。
+    // 檢查陣列長度與每個類別是否存在。
     const ids = Array.isArray(level.sourceCategories) ? level.sourceCategories : [];
     const missing = ids.filter((id) => !categoryById(manifest, id));
     const lengthOk = ids.length === objectCount;
@@ -71,14 +71,14 @@ export function levelFeasibility(manifest, level) {
 }
 
 /**
- * 建立整關共用的固定素材組（SPEC 1.7）。順序以 manifest 為準；category
- * 關的 objects 是各類別代表圖，targetObjects 則包含各類別全部圖片。
+ * 建立整個關卡共用的固定素材組（SPEC 1.7）。順序使用 manifest 的順序。
+ * category 關卡的 objects 包含各類別代表圖。targetObjects 包含各類別的所有圖片。
  *
  * @param {object} manifest
  * @param {{shapeCount: number, objectCount: number, objectRule: 'model'|'category',
  *          sourceCategory?: string, sourceCategories?: Array<string>}} level
  * @returns {{shapes: Array<object>, objects: Array<object>, targetObjects: Array<object>}|null}
- *   不可行回傳 null。
+ *   關卡不可行時，回傳 null。
  */
 export function buildLevelDeck(manifest, level) {
   const feas = levelFeasibility(manifest, level);
@@ -102,7 +102,7 @@ export function buildLevelDeck(manifest, level) {
       const cat = categoryById(manifest, id);
       return cat.images[0];
     });
-    // 目標池涵蓋所有圖片，next() 以洗牌袋避免一輪內重複。
+    // 目標池包含所有圖片。next() 使用洗牌袋，避免同一輪重複選取。
     targetObjects = level.sourceCategories.flatMap((id) => {
       const cat = categoryById(manifest, id);
       return cat.images;
@@ -113,7 +113,7 @@ export function buildLevelDeck(manifest, level) {
 }
 
 /**
- * Fisher-Yates 洗牌，透過注入的 rng 取得隨機性，不動原陣列。
+ * 使用 Fisher-Yates 洗牌與傳入的 rng，不變更原陣列。
  * @param {() => number} rng
  * @param {Array<object>} arr
  * @returns {Array<object>}
@@ -139,7 +139,7 @@ function pickIndex(rng, length) {
  * @returns {{ next(level: object, deck: object|null): object|null }}
  */
 export function createTrialGenerator(manifest, rng) {
-  // 每個 deck 有獨立洗牌袋，不共享跨實例狀態。
+  // 每個 deck 使用獨立的洗牌袋，不共用跨實例狀態。
   const categoryTargetBags = new WeakMap();
 
   function nextCategoryTarget(deck) {
@@ -152,12 +152,12 @@ export function createTrialGenerator(manifest, rng) {
   }
 
   /**
-   * 洗牌兩道閥門並挑選目標；category 目標一輪內不重複。
+   * 洗牌兩道閥的選項，並選取目標。category 目標在同一輪內不重複。
    * @param {{levelNo: number, shapeCount: number, objectCount: number,
-   *          objectRule: 'model'|'category'}} level manifest.levels 的一整項。
+   *          objectRule: 'model'|'category'}} level manifest.levels 中的完整項目
    * @param {{shapes: Array<object>, objects: Array<object>, targetObjects: Array<object>}|null} deck
-   *   buildLevelDeck() 的回傳值；該關不可行時為 null。
-   * @returns {object|null} Trial，見 SPEC 4.10；deck 為 null 時回傳 null。
+   *   buildLevelDeck() 的回傳值。關卡不可行時為 null。
+   * @returns {object|null} Trial，見 SPEC 4.10。deck 為 null 時，回傳 null。
    */
   function next(level, deck) {
     if (!deck) return null;
@@ -165,15 +165,15 @@ export function createTrialGenerator(manifest, rng) {
     const shapeItems = shuffle(rng, deck.shapes);
     const objectItems = shuffle(rng, deck.objects);
 
-    // 外框從本題形狀選項抽出，所以一定在 shapeItems 裡。
+    // 目標外框從本題形狀選項中選取，因此必定包含在 shapeItems 中。
     const frame = shapeItems[pickIndex(rng, shapeItems.length)];
     let content =
       level.objectRule === 'category'
         ? nextCategoryTarget(deck)
         : objectItems[pickIndex(rng, objectItems.length)];
 
-    // category 題目來自該類全部圖片，選項原本只有代表圖。
-    // 把同 categoryId 的那一格換成這張題目圖，中間圖案才一定出現在選項裡。
+    // category 題目從該類別的所有圖片中選取。原選項只包含代表圖。
+    // 以題目圖片取代相同 categoryId 的選項，使目標圖案包含在選項中。
     if (level.objectRule === 'category' && content) {
       const optionIndex = objectItems.findIndex(
         (item) => item.categoryId === content.categoryId
