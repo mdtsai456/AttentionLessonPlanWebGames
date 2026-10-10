@@ -1,4 +1,4 @@
-"""/demo 驗收畫面。不碰資料庫。"""
+"""/demo 驗收畫面測試，不存取資料庫。"""
 
 from __future__ import annotations
 

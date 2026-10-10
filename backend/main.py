@@ -6,29 +6,29 @@
     uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 端點：
-    POST /api/sessions                              ← 學生 token；雙人另帶搭檔 token
+    POST /api/sessions                              學生 token，雙人另需搭檔 token
     POST /api/auth/teacher/login
     POST /api/auth/student/login
     POST /api/auth/logout
-    GET /api/schools                                ← 公開，登入前要用
-    GET /api/schools/{school}/teachers               ← 公開，登入前要用
-    GET /api/me/students                             ← 老師專用，須帶 token
-    GET /api/students?school=測試場域                  ← 須帶 token（老師）
-    GET /api/students/{studentKey}/sessions?school=…  ← 須帶 token
-    GET /api/students/{studentKey}/report?school=…    ← 須帶 token
-    GET /api/teachers/{teacherId}/students            ← 須帶 token（老師本人）
-    GET /api/games                                   ← 公開，靜態遊戲清單
-    GET /api/attention/me                            ← 學生專用，轉發手錶專心判定
-    GET /demo                                       ← 轉 /app/Teacher_platform/index.html
+    GET /api/schools                                公開端點
+    GET /api/schools/{school}/teachers               公開端點
+    GET /api/me/students                             老師 token
+    GET /api/students?school=測試場域                  老師 token
+    GET /api/students/{studentKey}/sessions?school=…  需要 token
+    GET /api/students/{studentKey}/report?school=…    需要 token
+    GET /api/teachers/{teacherId}/students            老師本人 token
+    GET /api/games                                   公開的靜態遊戲清單
+    GET /api/attention/me                            學生 token，轉發手錶專心判定
+    GET /demo                                       轉至 /app/Teacher_platform/index.html
 
-前端：正式前端是 repo 根目錄，由 Zeabur 以靜態網站部署（zbpack.json），
-透過 shared/api.js 跨網域呼叫本服務的 /api/*。
-/app 只在這些目錄真的在本機時才掛載。Zeabur 的 API 服務若只有 backend/，
-缺少的目錄會略過，API 仍可啟動。不再掛載已移除的 frontend/。
+正式前端位於專案根目錄。Zeabur 依 zbpack.json 部署為靜態網站。
+前端透過 shared/api.js 跨網域呼叫本服務的 /api/*。
+/app 只掛載本機存在的目錄。API 服務只有 backend/ 時，略過缺少的目錄，仍可啟動。
+不掛載已移除的 frontend/。
 
-CORS：前端部署在別的網域，需在 CORS_ALLOW_ORIGINS 放行其 origin。用環境變數
-CORS_ALLOW_ORIGINS 設定（逗號分隔的清單，或單一 `*` 放行全部）。未設定時
-預設放行常見的本機前端 dev server（localhost 的 3000 / 5173 / 5500 / 8080）。
+前端位於其他網域時，須在 CORS_ALLOW_ORIGINS 允許其 origin。
+多個 origin 以逗號分隔。單一 * 允許全部來源。
+未設定時，允許 localhost 的 3000／5173／5500／8080 開發伺服器。
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ from routers import attention, auth, directory, sessions, students
 
 load_dotenv()
 
-# 未設定 CORS_ALLOW_ORIGINS 時放行的本機前端 dev server。
+# 未設定 CORS_ALLOW_ORIGINS 時，允許此清單中的本機前端開發伺服器。
 _DEFAULT_DEV_ORIGINS = [
     f"http://{host}:{port}"
     for host in ("localhost", "127.0.0.1")
@@ -59,9 +59,9 @@ _DEFAULT_DEV_ORIGINS = [
 def _cors_origins() -> list[str]:
     """解析 CORS_ALLOW_ORIGINS。
 
-    - 未設定 / 空白 → 預設的本機 dev server 清單。
-    - `*` → 放行所有 origin（早期開發方便用，正式環境請改成明確清單）。
-    - 其他 → 以逗號分隔，逐項去空白。
+    未設定或為空白時，使用預設的本機開發伺服器清單。
+    值為 * 時，允許所有 origin。正式環境須使用明確清單。
+    其他值以逗號分隔，並移除各項目前後的空白。
     """
     raw = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
     if not raw:
@@ -81,7 +81,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="ADHD Game Data API", version="0.3.0", lifespan=lifespan)
 
 # 使用 Bearer token，不使用 cookie，故 allow_credentials=False。
-# 安全邊界是 allow_origins 這份明確清單，不是靠 method／header 限制。
+# allow_origins 清單限制可存取的來源，不以 method／header 限制來源。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -149,7 +149,7 @@ def legacy_redirect(target: str):
 for source, target in _LEGACY_REDIRECTS.items():
     app.add_api_route(source, legacy_redirect(target), include_in_schema=False)
 
-# 白名單掛載現行功能頁；不提供 repo 根、backend、.env 或已移除的 frontend/。
+# 依白名單掛載目前的功能頁面。不提供專案根目錄、backend、.env 或已移除的 frontend/。
 _SITE_ROOT = Path(__file__).parent.parent
 _SITE_DIRECTORIES = (
     "Home", "Select", "Teacher_platform", "shared", "Tutorial", "DCCS_single",
@@ -159,7 +159,7 @@ _SITE_DIRECTORIES = (
 
 
 def mount_site_directories(application: FastAPI, site_root: Path) -> None:
-    """只掛存在的目錄。StaticFiles 在目錄缺失時會在啟動當下拋出。"""
+    """只掛載存在的目錄。目錄不存在時，StaticFiles 會在啟動時拋出錯誤。"""
     for directory_name in _SITE_DIRECTORIES:
         directory = site_root / directory_name
         if not directory.is_dir():

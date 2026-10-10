@@ -1,4 +1,4 @@
-"""所有 SQL。這是唯一碰資料庫的模組。"""
+"""SQL 查詢模組，負責查詢資料庫。"""
 
 from __future__ import annotations
 
@@ -37,10 +37,10 @@ def fetch_assessment_rows(
     game_type: str | None = None,
     mode: str | None = None,
 ) -> list[dict[str, Any]]:
-    """查場次索引表 assessment_result。
+    """查詢場次索引表 assessment_result。
 
-    SELECT 也帶出 mode / pair_id。pair_id 目前組裝時不外露，但取出成本為零，
-    留著給日後「雙人局搭檔對照」用。
+    SELECT 也取得 mode／pair_id。目前組裝回應時，不提供 pair_id。
+    保留此欄位供後續比對雙人搭檔。
     """
     sql = """
         SELECT uuid, game_type, mode, pair_id, current_day, start_time, end_time
@@ -69,10 +69,10 @@ def fetch_game_stats_by_uuids(
     table_name: str,
     uuids: list[str],
 ) -> dict[str, dict[str, Any]]:
-    """依 uuid 批次查遊戲細部表。
+    """依 uuid 批次查詢遊戲明細表。
 
-    table_name 以 f-string 拼入 SQL，這是安全的，因為它的唯一來源是
-    GAME_RESULT_TABLES 白名單的值，不會來自外部輸入。uuids 仍然參數化。
+    table_name 以 f-string 加入 SQL，來源僅限 GAME_RESULT_TABLES 白名單，不接受外部輸入。
+    uuids 使用參數化查詢。
     """
     if not uuids:
         return {}
@@ -93,10 +93,10 @@ def fetch_game_stats_by_uuids(
 
 
 def fetch_stats_for_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """把場次列依 game_type 分組，逐表查出統計，合成 uuid → stats row。
+    """依 game_type 將場次分組，再逐表查詢統計，建立 uuid 與統計列的對應關係。
 
-    這是 build_play_records 裡唯一碰資料庫的部分，抽出來之後，
-    合併邏輯就成為可以餵 dict 測試的純函式。
+    此函式負責 build_play_records 所需的資料庫查詢。
+    合併邏輯使用純函式，可直接以 dict 測試。
     """
     stats_by_uuid: dict[str, dict[str, Any]] = {}
     uuids_by_game_type: dict[str, list[str]] = {}
@@ -114,20 +114,17 @@ def fetch_stats_for_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]
 
 
 def fetch_students(school: str | None = None) -> list[dict[str, Any]]:
-    """查學生名冊與遊玩概況。零場次的學生也會出現在結果裡。
+    """查詢學生名冊與遊玩概況，包含沒有場次的學生。
 
-    三個容易寫錯而且不會拋錯的地方：
+    1. 使用 COUNT(a.uuid)。LEFT JOIN 會為零場次學生產生一列，右側欄位為 NULL。
+       COUNT(*) 會將該列計為一場。
+    2. WHERE 只篩選 s.school。零場次學生的 a.school 為 NULL。
+       篩選 a.school 會排除這些學生，使 LEFT JOIN 產生 INNER JOIN 的結果。
+    3. ON 包含全部三個鍵欄位。缺少 school 時，不同場域的同名學生會互相連接，增加場次數。
 
-    1. COUNT(a.uuid) 不能寫成 COUNT(*)。LEFT JOIN 對零場次學生產生一列，
-       右側欄位皆為 NULL，COUNT(*) 數列數會算成 1。
-    2. WHERE 只能過濾 s.school。若過濾 a.school，零場次學生的 a.school 是
-       NULL，條件為假，LEFT JOIN 會退化成 INNER JOIN，零場次學生全被濾掉。
-    3. ON 必須包含全部三個鍵欄位。少了 school，不同場域的同名學生會互相
-       join，場次數被放大。
-
-    刻意不分頁。現有規模是數十至數百位學生，一次全撈沒有問題。若 student
-    表成長到數萬列，這裡要加 LIMIT/OFFSET，並同時為 school 加索引 ——
-    school 不是主鍵的最左前綴，這個查詢會全表掃描 student。
+    目前有數十至數百位學生，查詢不分頁。
+    若 student 增至數萬列，須加入 LIMIT/OFFSET 與 school 索引。
+    school 不是主鍵的最左前綴，此查詢會掃描整張 student 表。
     """
     sql = """
         SELECT s.grade, s.case_id, s.school,
@@ -156,7 +153,7 @@ def fetch_students(school: str | None = None) -> list[dict[str, Any]]:
             return list(cursor.fetchall())
 
 
-# --- 參照資料：場域與老師名錄（見 teacher-directory-login-design） ---
+# 參照資料：場域與老師名錄，見 teacher-directory-login-design。
 
 
 def fetch_schools() -> list[dict[str, Any]]:
@@ -190,7 +187,7 @@ def fetch_teachers(school: str) -> list[dict[str, Any]]:
 
 
 def fetch_teacher(teacher_id: int) -> dict[str, Any] | None:
-    """查單一老師。None 表示查無此老師（router 轉 404）。"""
+    """查詢單一老師。查無資料時，回傳 None，由 router 轉為 404。"""
     with get_read_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -200,14 +197,14 @@ def fetch_teacher(teacher_id: int) -> dict[str, Any] | None:
             return cursor.fetchone()
 
 
-# --- 帳密登入（見 docs/adr/0004-teacher-student-password-login.md） ---
+# 帳號與密碼登入，見 docs/adr/0004-teacher-student-password-login.md。
 
 
 def fetch_teacher_by_account(account: str) -> dict[str, Any] | None:
-    """登入用：依全域唯一的 account 查老師，含 password_hash。None 表示查無此人。
+    """依全域唯一的 account 查詢老師，包含 password_hash。查無資料時，回傳 None。
 
-    teacher.name 只在 school 內唯一（uq_teacher_school_name），不能拿來登入；
-    account 才是全域唯一、真正拿來登入的欄位（見 ADR 0004）。
+    teacher.name 僅在 school 內唯一，受 uq_teacher_school_name 約束，不用於登入。
+    登入使用全域唯一的 account，見 ADR 0004。
     """
     with get_read_connection() as connection:
         with connection.cursor() as cursor:
@@ -220,10 +217,10 @@ def fetch_teacher_by_account(account: str) -> dict[str, Any] | None:
 
 
 def fetch_student_by_account(account: str) -> dict[str, Any] | None:
-    """登入用：依全域唯一的 account 查學生，含 password_hash。None 表示查無此人。
+    """依全域唯一的 account 查詢學生，包含 password_hash。查無資料時，回傳 None。
 
-    grade_caseId（studentKey）每個場域都會重複，不能拿來登入；account 才是
-    全域唯一、真正拿來登入的欄位（見 ADR 0004）。
+    grade_caseId，也就是 studentKey，可能在不同場域重複，不用於登入。
+    登入使用全域唯一的 account，見 ADR 0004。
     """
     with get_read_connection() as connection:
         with connection.cursor() as cursor:
@@ -236,7 +233,7 @@ def fetch_student_by_account(account: str) -> dict[str, Any] | None:
 
 
 def fetch_login_session(token: str) -> dict[str, Any] | None:
-    """查登入 token。None 表示 token 不存在（router 轉 401，不分辨是否過期）。"""
+    """查詢登入 token。不存在時，回傳 None，由 router 轉為 401，不區分過期狀態。"""
     with get_read_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
