@@ -52,6 +52,7 @@ for (const game of ['single', 'double']) {
       await session.page.locator(lobby).click();
       await session.page.waitForURL('**/Select/index.html');
       assert.equal(session.sessionPosts.length, count);
+      assert.deepEqual(session.dialogs, [], '回大廳不可跳出瀏覽器的離開詢問');
     } finally {
       await session?.context.close();
       await browser.close();

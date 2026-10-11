@@ -117,4 +117,24 @@ describe('DAT_single 單人版', () => {
       await session.context.close();
     }
   });
+
+  // 亂數固定偏低（原本兩題都是顏色題）或偏高（原本兩題都是數學題），練習仍要顏色、數學各 1 題
+  for (const randomValue of [0.25, 0.75]) {
+    test(`練習模式：2 題固定為顏色、數學各 1 題（亂數 ${randomValue}）`, async () => {
+      const session = await openGame(browser, server.origin, { game: 'single', mode: 'practice', randomValue });
+      try {
+        const types = [];
+        for (let i = 0; i < 2; i++) {
+          const [r] = await session.driver.playQuestion('correct');
+          types.push(r.questionType);
+        }
+        assert.match(types[0], /^顏色判斷/);
+        assert.match(types[1], /^數學判斷/);
+        await session.driver.waitFor(() => !document.querySelector('#results').hidden, '練習結束');
+        expectNoErrors(session);
+      } finally {
+        await session.context.close();
+      }
+    });
+  }
 });

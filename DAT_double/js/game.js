@@ -58,7 +58,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   let focusMs = 0;
   let clearedMidBreak = false;
   let stageDeadline = 0;
-  let pendingSave = null;
+  let midStageStats = null; // 第 3 關結束時的統計，供第 4–5 關離開時的中場檢查點使用
 
   // 雙人彩蛋機制變數與切換函式
   let animalAssetList = [];
@@ -159,6 +159,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     reactionSamples = [];
     activeMs = 0;
     focusMs = 0;
+    midStageStats = null;
 
     loadStageQuestions();
     totalStageQuestionsCount = 0;
@@ -239,26 +240,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
 
   function isOnAnimal() {
-    const field = $('field').getBoundingClientRect();
-    const aimX = field.left + aim.x / 100 * field.width;
-    const aimY = field.top + aim.y / 100 * field.height;
-    const animalRect = $('animal').getBoundingClientRect();
-    if (animalRect.width && animalRect.height) {
-      const radius = Math.min(animalRect.width, animalRect.height) * 0.36;
-      const centerX = animalRect.left + animalRect.width / 2;
-      const centerY = animalRect.top + animalRect.height / 2;
-      if (Math.hypot(aimX - centerX, aimY - centerY) <= radius) return true;
-    }
-    if (typeof RABBIT_HIT_MASK === 'undefined') return false;
-    const rect = ($('animal-image') || element.querySelector('.animal-image')).getBoundingClientRect();
-    const size = Math.min(rect.width, rect.height);
-    if (!size) return false;
-    const left = rect.left + (rect.width - size) / 2;
-    const top = rect.top + (rect.height - size) / 2;
-    const x = Math.floor((aimX - left) / size * 128);
-    const y = Math.floor((aimY - top) / size * 128);
-    if (x < 0 || y < 0 || x >= 128 || y >= 128) return false;
-    return RABBIT_HIT_MASK[y][x] === '1';
+    return window.DatAssets.isOnAnimal($('field'), $('animal'), $('animal-image') || element.querySelector('.animal-image'), aim);
   }
 
   function answerLimitMs() {
@@ -283,8 +265,11 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('time-fill').style.width = `${Math.max(0, (1 - elapsed / limit) * 100)}%`;
   }
 
+  // 遊戲時鐘暫停時（例如確認離開後正在存檢查點、視窗太小）不接受作答與移動，分數不能再變。
+  const runtimePaused = () => Boolean(window.WebGameRuntime?.paused);
+
   function answer() {
-    if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= answerLimitMs()) return;
+    if (phase !== 'answer' || paused || runtimePaused() || document.hidden || submitted || elapsed >= answerLimitMs()) return;
     submitted = true;
     recordResult(true);
     enableAnswers(false);
@@ -296,7 +281,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     const isSuccess = correct && onTarget;
     const hadStreak = consecutiveCorrect > 0;
     let message;
-    reactionSamples.push(elapsed);
+    // 只有實際按鍵才有反應時間；「不要按」的等待與漏答不列入平均
+    if (pressed) reactionSamples.push(elapsed);
 
     if (isSuccess) {
       consecutiveCorrect++;
@@ -343,12 +329,21 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     stageHits = [];
   }
 
+  // 目前累計的統計；at 為取樣時的遊戲時間
+  function statsSnapshot() {
+    return {
+      score, wrong, offTarget, activeMs, focusMs,
+      reactionSamples: [...reactionSamples],
+      at: window.WebGameRuntime.now(),
+    };
+  }
+
   // 瓢蟲追擊令成績送 DAT；素材 API 也讀 DAT。
-  function datStats(stage, durationMs) {
-    const metrics = sessionMetrics();
+  function datStats(stage, stats, durationMs) {
+    const metrics = sessionMetrics(stats);
     return [
-      { apiname: 'DAT_correct', value: score },
-      { apiname: 'DAT_wrong', value: wrong },
+      { apiname: 'DAT_correct', value: stats.score },
+      { apiname: 'DAT_wrong', value: stats.wrong },
       { apiname: 'DAT_accuracy', value: metrics.accuracy },
       { apiname: 'DAT_duration', value: durationMs },
       { apiname: 'DAT_stage', value: stage },
@@ -360,7 +355,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     ];
   }
 
-  function sessionMetrics() {
+  function sessionMetrics({ score, wrong, offTarget, reactionSamples, activeMs, focusMs }) {
     const questionCount = score + wrong + offTarget;
     const avgReactionMs = reactionSamples.length
       ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
@@ -420,6 +415,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
 
     commitStageAccuracy();
+    if (!isPractice && currentStage === 3) midStageStats = statsSnapshot();
     if (isPractice) {
       finishPractice();
     } else if (currentStage < stageCount) {
@@ -467,8 +463,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
 
-    pendingSave = saveRun(stageCount);
-    await pendingSave;
+    await saveRun(stageCount);
   }
 
   function move(delta) {
@@ -523,7 +518,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
     if (event.target?.disabled) return;
-    if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
+    if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused && !runtimePaused()) {
       event.preventDefault(); keys.add(event.code);
     }
     if (answerCodes.includes(event.code)) {
@@ -540,7 +535,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   document.addEventListener('keyup', (event) => keys.delete(event.code));
   element.querySelectorAll('[data-move]').forEach((button) => {
     button.addEventListener('pointerdown', (event) => {
-      if (paused || !['aiming', 'answer'].includes(phase)) return;
+      if (paused || runtimePaused() || !['aiming', 'answer'].includes(phase)) return;
       event.preventDefault();
       button.setPointerCapture(event.pointerId);
       pointerDirections.set(event.pointerId, button.dataset.move);
@@ -575,6 +570,9 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         || '1',
       10
     );
+    // 第 4–5 關離開時存的是第 3 關檢查點，統計停在第 3 關結束，不含之後的作答
+    const stats = stage === 3 && midStageStats ? midStageStats : statsSnapshot();
+    const startedAt = startTimeMs || stats.at;
     return saver.save(stage, {
       lessonId: '1140908_DAT',
       data: {
@@ -582,11 +580,11 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
         caseId,
         school: schoolKey,
         currentDay,
-        startTime: window.WebGameRuntime.toWallTime(startTimeMs || window.WebGameRuntime.now()),
-        endTime: Date.now(),
+        startTime: window.WebGameRuntime.toWallTime(startedAt),
+        endTime: window.WebGameRuntime.toWallTime(stats.at),
         mode: 'double',
         pairId: getState().currentGamePairId,
-        stats: datStats(stage, window.WebGameRuntime.now() - (startTimeMs || window.WebGameRuntime.now())),
+        stats: datStats(stage, stats, stats.at - startedAt),
       },
     }, playerIndex + 1);
   }
@@ -597,11 +595,14 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     tick,
     completedStages,
     saveRun,
-    // 供離開流程等待 finishGame() 的存檔請求結束
-    whenSaved: () => pendingSave || Promise.resolve(),
+    // 供離開流程等待最終成績存檔：每次都向 saver 查詢目前狀態，
+    // 失敗後人工重試成功即回傳 true，重試進行中則等待重試結果（同一關不會重送）。
+    whenSaved: () => (phase === 'finished' && saver ? saveRun(stageCount) : Promise.resolve()),
     canRestart: () => phase === 'finished' && saver?.canRestart(),
     saveStatus: () => saver?.status || 'idle',
     retrySave: () => saver?.retry(),
+    // 失敗或結果不明（有 submissionId，重送不會多一筆）都可以重試
+    canRetrySave: () => Boolean(saver?.retryable),
     // 由 main.js 呼叫：若本玩家還在瞄準階段，就一起開始出題
     forceStart: () => { if (phase === 'aiming' && !paused) showQuestion(); },
     setAnimalAssets,

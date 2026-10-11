@@ -150,12 +150,20 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   const sessionPosts = [];
   const blocked = [];
 
+  // 瀏覽器原生對話框（例如 beforeunload「要離開網站嗎？」）一律記錄後取消；離開流程不應出現任何原生對話框
+  const dialogs = [];
+  page.on('dialog', (dialog) => { dialogs.push(dialog.type()); dialog.dismiss().catch(() => {}); });
   page.on('pageerror', (err) => { pageErrors.push(err.message); errors.push(`pageerror: ${err.message}`); });
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
   });
 
   const placeholderPng = await readFile(path.join(SITE_ROOT, 'DAT_double/assets/animals/rabbit.png'));
+  // 假時鐘起點；登入到期時間以頁面看到的「現在」為準，不可寫死遠未來日期：
+  // require-student.js 會以 setTimeout(到期 − 現在) 排程登出，延遲超過 2^31−1 ms 會立即觸發
+  const start = new Date('2026-10-04T09:00:00+08:00').getTime();
+  const pageNow = () => (realClock ? Date.now() : start);
+  const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
   await context.route('**/*', async (route) => {
     const req = route.request();
     const url = req.url();
@@ -180,7 +188,7 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
           caseId,
           school: 'KMU',
           studentKey: `G1_${caseId}`,
-          expiresAt: '2099-01-01T00:00:00.000Z',
+          expiresAt: new Date(pageNow() + SESSION_TTL_MS).toISOString(),
         }),
       });
     }
@@ -213,7 +221,6 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   });
 
   // 假時鐘在載入前就暫停，之後只靠 runFor 推進，讓每次執行的流程一致
-  const start = new Date('2026-10-04T09:00:00+08:00').getTime();
   if (!realClock) {
     await page.clock.install({ time: start });
     await page.clock.pauseAt(start + 1000);
@@ -249,7 +256,7 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   const driver = new GameDriver(page, game, players);
   if (realClock) await page.waitForFunction(() => window.__qa.feedback[0].some((t) => /動物身上/.test(t)));
   else await driver.waitFor(() => window.__qa.feedback[0].some((t) => /動物身上/.test(t)), '遊戲載入完成');
-  return { page, context, driver, errors, pageErrors, sessionPosts, blocked };
+  return { page, context, driver, errors, pageErrors, sessionPosts, blocked, dialogs };
 }
 
 export class GameDriver {
@@ -390,4 +397,9 @@ export class GameDriver {
 
 export function hintFor(remaining) {
   return `（再連續答對 ${remaining} 題變身）`;
+}
+
+// 遊戲內的離開確認框（shared/leave-confirm.js）
+export function leaveDialog(page) {
+  return page.getByRole('dialog', { name: '確定要離開嗎？' });
 }
