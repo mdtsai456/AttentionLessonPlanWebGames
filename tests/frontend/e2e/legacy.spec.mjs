@@ -1,17 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT, DOUBLE, TEACHER, HOME_URL, loginAs } from './helpers.mjs';
+// 舊網址轉址。repo 根目錄的 frontend/ 已在 PR #22（1e1162b）整個移除，
+// 靜態部署不再提供 frontend/*.html 轉址頁；舊的 /app/... 網址改由後端
+// main.py 的 _LEGACY_REDIRECTS 處理，見 backend/tests/test_legacy_redirects.py。
+// 這裡只剩仍以靜態轉址頁存在的 backend/demo/index.html。
 const redirects = {
-  'frontend/index.html': 'Home/index.html',
-  'frontend/dms.html': 'Teacher_platform/index.html',
-  'frontend/games.html': 'Select/index.html',
-  'frontend/dccs/index.html': 'DCCS_single/index.html',
-  'frontend/dccs/double.html': 'DCCS_double/index.html',
-  'frontend/DAT_single/DAT_single.html': 'DAT_single/DAT_single.html',
-  'frontend/DAT_single/DAT_tutorial.html': 'Tutorial/DAT_tutorial.html',
-  'frontend/DAT_double/DAT_double.html': 'DAT_double/DAT_double.html',
-  'frontend/EFT_single/EFT_single.html': 'EFT_single/EFT_single.html',
-  'frontend/EFT_double/EFT_double.html': 'EFT_double/EFT_double.html',
-  'frontend/bubblegame/index.html': 'Select/index.html',
   'backend/demo/index.html': 'Teacher_platform/index.html',
 };
 for (const [old, current] of Object.entries(redirects)) {

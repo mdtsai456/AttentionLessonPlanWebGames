@@ -1,26 +1,34 @@
 // 010：單人遊戲讀不到登入學生就不送成績；有登入時照送，payload 是登入學生。
 import { test, expect } from "@playwright/test";
-import { STUDENT, loginAs, recordWrites } from "./helpers.mjs";
+import { STUDENT, loginAs, recordWrites, stubAssetServer } from "./helpers.mjs";
 
 const RESULT = { score: 3, wrong: 1, accuracy: 75, duration: 1000, stage: 3, levelAccuracy: "", avgReactionMs: 500, questionCount: 4, aimRatio: 0.5, focusMs: 500 };
 
 // 直接呼叫各遊戲的存檔函式（中場與全破存檔都走這裡）。
+// started：遊戲正式開局的條件。DAT_single 的存檔器 saver 在 startGame() 才建立，
+// 而 startGame() 要等素材預載完；遊戲只會在開局後存檔，測試也要等開局後再呼叫。
 const GAMES = [
-  { name: "DAT_single", page: "DAT_single/DAT_single.html", save: "window.saveGameDataToBackend" },
+  { name: "DAT_single", page: "DAT_single/DAT_single.html", save: "window.saveGameDataToBackend", started: "typeof saver !== 'undefined' && !!saver" },
   { name: "EFT_single", page: "EFT_single/EFT_single.html", save: "window.EFTSingle?.saveGameDataToBackend" },
   { name: "TGame_single", page: "TGame_single/index.html", save: "window.submitResult" },
   { name: "IM_single", page: "IM_single/index.html", save: "window.submitResult" },
 ];
 
+async function waitForGame(page, game) {
+  await page.waitForFunction(`typeof ${game.save} === "function"`);
+  if (game.started) await page.waitForFunction(game.started);
+}
+
 async function openGameAndSave(page, game, session) {
   const writes = await recordWrites(page);
+  await stubAssetServer(page);
   const warnings = [];
   page.on("console", (message) => {
     if (message.type() === "warning") warnings.push(message.text());
   });
   await loginAs(page, session);
   await page.goto(game.page);
-  await page.waitForFunction(`typeof ${game.save} === "function"`);
+  await waitForGame(page, game);
   writes.length = 0; // 只看手動存檔這一次
   await page.evaluate(`${game.save}(${JSON.stringify(RESULT)})`);
   await page.waitForTimeout(300);
@@ -31,9 +39,10 @@ for (const game of GAMES) {
   for (const missing of ['grade', 'caseId', 'school']) {
     test(`${game.name}：登入後清除 ${missing}，不使用預設學生存檔`, async ({ page }) => {
       const writes = await recordWrites(page);
+      await stubAssetServer(page);
       await loginAs(page, STUDENT);
       await page.goto(game.page);
-      await page.waitForFunction(`typeof ${game.save} === "function"`);
+      await waitForGame(page, game);
       await page.evaluate((missing) => {
         sessionStorage.removeItem(missing);
         sessionStorage.removeItem({ grade: 'student1_grade', caseId: 'student1_case', school: 'student1_school' }[missing]);
