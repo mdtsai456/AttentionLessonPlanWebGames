@@ -60,6 +60,10 @@ for (const game of GAMES) {
     expect(writes[0].headers.authorization).toMatch(/^Bearer student-token\./);
     expect(writes[0].url).toMatch(/\/api\/sessions$/);
     expect(writes[0].body.data).toMatchObject({ grade: "G9", caseId: "S99", school: "TEST", currentDay: 3, mode: "single" });
+    // 後端要求整數毫秒；null 或缺漏會回 422（測試的假伺服器一律回 201，這裡要自己檢查）。
+    expect(Number.isInteger(writes[0].body.data.startTime)).toBe(true);
+    expect(Number.isInteger(writes[0].body.data.endTime)).toBe(true);
+    expect(writes[0].body.data.endTime).toBeGreaterThanOrEqual(writes[0].body.data.startTime);
   });
 
   test(`${game.name}：只有 student1_* 欄位時用 student1_* 的值`, async ({ page }) => {
