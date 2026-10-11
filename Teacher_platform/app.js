@@ -230,7 +230,7 @@ function fillStudentMeta() {
 }
 
 function renderRecords() {
-  // 後端時間都是 UTC 且固定寬度，直接比字串就是實際先後；顯示時才轉本地時間。
+  // 後端時間都是 UTC 且固定寬度，直接比字串就是實際先後；顯示時才轉台灣時間。
   const rows = state.sessions
     .filter((session) => Number(session.currentDay) === Number(state.selectedDay))
     .slice()
@@ -328,17 +328,23 @@ function formatAccuracy(value) {
   return `${percent}%`;
 }
 
+/** 施測都在台灣，時間一律以台灣時間（UTC+8）顯示，不跟著裝置時區。 */
+const TAIPEI_TIME = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+
 /**
  * 後端時間字串是 UTC（"YYYY-MM-DD HH:MM:SS"，不帶時區），
- * 轉成瀏覽器本地時間後用同樣格式顯示。空值回空字串；看不懂的字串原樣顯示。
+ * 換成台灣時間後用同樣格式顯示。空值回空字串；看不懂的字串原樣顯示。
  */
 function formatUtcTimestamp(value) {
   if (typeof value !== "string" || !value) return "";
   const date = new Date(`${value.trim().replace(" ", "T")}Z`);
   if (Number.isNaN(date.getTime())) return value;
-  const pad = (number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
-    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  const part = Object.fromEntries(TAIPEI_TIME.formatToParts(date).map(({ type, value: text }) => [type, text]));
+  return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}:${part.second}`;
 }
 
 function teacherToken() {

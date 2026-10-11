@@ -168,3 +168,20 @@ test.describe("台北時區", () => {
     await expect(rows.nth(2).locator("td").last()).toHaveText("2026-07-02 08:10:00");
   });
 });
+
+test.describe("裝置時區不是台灣（例如美東）", () => {
+  test.use({ timezoneId: "America/New_York" });
+
+  test("一律顯示台灣時間（UTC+8），不跟著裝置時區", async ({ page }) => {
+    const records = {
+      G9_A01: [
+        { gameType: "DCCS", mode: "single", currentDay: 1, startTime: "2026-07-01 03:40:00", stats: { stage: 6 } },
+      ],
+    };
+    await openTeacher(page, { records });
+    await page.selectOption("#student-select", "G9_A01");
+    await expect(page.locator("#view-last-played")).toHaveText("2026-07-01 11:40:00");
+    await dayButton(page, 1).click();
+    await expect(page.locator("#records-tbody tr").first().locator("td").last()).toHaveText("2026-07-01 11:40:00");
+  });
+});
