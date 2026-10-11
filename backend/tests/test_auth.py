@@ -262,11 +262,11 @@ def test_auth_me_includes_remaining_lifetime(monkeypatch):
 
 def test_teacher_login_succeeds_with_correct_password(client, db):
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "right-password"},
+        json={"account": "T001", "password": "right-password"},
     )
 
     assert response.status_code == 200
@@ -278,11 +278,11 @@ def test_teacher_login_succeeds_with_correct_password(client, db):
 
 def test_teacher_login_rejects_wrong_password(client, db):
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "wrong"},
+        json={"account": "T001", "password": "wrong"},
     )
 
     assert response.status_code == 401
@@ -304,12 +304,12 @@ def test_teacher_login_account_is_global_not_scoped_to_a_school(client, db):
     不管哪個場域建的，登入只認 account+password，不用也不能再帶 school。"""
     db.insert_school("A")
     db.insert_school("B")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
-    db.insert_teacher("陳老師", "B", password="other-password", account="T0002")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    db.insert_teacher("陳老師", "B", password="other-password", account="T002")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0002", "password": "other-password"},
+        json={"account": "T002", "password": "other-password"},
     )
 
     assert response.status_code == 200
@@ -317,11 +317,11 @@ def test_teacher_login_account_is_global_not_scoped_to_a_school(client, db):
 
 
 def test_student_login_succeeds_with_correct_password(client, db):
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     response = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "right-password"},
+        json={"account": "S001", "password": "right-password"},
     )
 
     assert response.status_code == 200
@@ -341,17 +341,17 @@ def _as_utc(value: datetime) -> datetime:
 def test_teacher_and_student_login_expire_after_one_hour(client, db):
     """登入憑證 1 小時後失效。回應的 expiresAt 與 login_session 一致。"""
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     before = datetime.now(timezone.utc)
     teacher = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "right-password"},
+        json={"account": "T001", "password": "right-password"},
     )
     student = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "right-password"},
+        json={"account": "S001", "password": "right-password"},
     )
     after = datetime.now(timezone.utc)
 
@@ -371,11 +371,11 @@ def test_teacher_and_student_login_expire_after_one_hour(client, db):
 
 
 def test_student_login_rejects_wrong_password(client, db):
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     response = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "wrong"},
+        json={"account": "S001", "password": "wrong"},
     )
 
     assert response.status_code == 401
@@ -485,3 +485,14 @@ def test_logout_invalidates_token(client, db, login_as_teacher):
 def test_logout_without_token_is_a_no_op(client, db):
     response = client.post("/api/auth/logout")
     assert response.status_code == 204
+
+
+# 登入帳號格式：三位數（S001、T001），與目前資料庫裡實際指派的帳號一致；超過 999 自然變四位數。
+def test_account_format_is_three_digits():
+    from auth import student_account, teacher_account
+
+    assert student_account(1) == "S001"
+    assert student_account(18) == "S018"
+    assert teacher_account(1) == "T001"
+    assert teacher_account(329) == "T329"
+    assert student_account(1000) == "S1000"

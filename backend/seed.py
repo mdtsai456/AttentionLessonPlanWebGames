@@ -266,6 +266,7 @@ def main() -> None:
 
     # 讓 db.get_db_config() 連到解析出的目標庫。
     os.environ["DB_NAME"] = target_db
+    from auth import student_account
     from db import get_connection
 
     student_rows, session_rows, detail_rows = generate()
@@ -296,13 +297,13 @@ def main() -> None:
             )
 
             # 假學生的 account（登入帳號）沒辦法在上面的 INSERT 裡一起算好：
-            # 格式是 S0001 這種，要用 student_id（AUTO_INCREMENT，insert 當下
+            # 格式是 S001 這種，要用 student_id（AUTO_INCREMENT，insert 當下
             # 才知道），所以 insert 完再補一次 UPDATE（跟 seed_directory.py
             # 補老師 account 的手法一樣）。
             cursor.execute("SELECT grade, case_id, school, student_id FROM student")
             sample_account = None
             for row in cursor.fetchall():
-                account = f"S{row['student_id']:04d}"
+                account = student_account(row["student_id"])
                 cursor.execute(
                     "UPDATE student SET account = %s "
                     "WHERE grade = %s AND case_id = %s AND school = %s",
@@ -336,7 +337,7 @@ def main() -> None:
     print(f"  assessment_result {len(session_rows):>5}")
     print(f"  各遊戲明細合計      {detail_total:>5}")
     print(f"所有假學生密碼統一是：{TEST_STUDENT_PASSWORD}（測試/本機 demo 用）")
-    print(f"帳號依 student_id 依序指派為 S0001、S0002……（帳號不會出現在任何 API 回應裡，")
+    print(f"帳號依 student_id 依序指派為 S001、S002……（帳號不會出現在任何 API 回應裡，")
     print(f"要看完整清單請直接查 DB 的 student.account 欄位）；隨便挑一個試登入，例如：{sample_account}")
 
 

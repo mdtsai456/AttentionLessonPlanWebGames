@@ -50,7 +50,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 帳號不存在，或帳號存在但 `password_hash` 是空的／NULL／格式錯誤／演算法不符／迭代次數不合法時，
 後端都會改對一組假雜湊跑一次 PBKDF2 並回登入失敗，「帳號不存在」與「密碼錯誤」回應時間相同。
 
-`account` 是後端另外指派的**全域唯一**帳號（老師 `T0001`、學生 `S0001` 這種格式），
+`account` 是後端另外指派的**全域唯一**帳號（老師 `T001`、學生 `S001` 這種格式），
 **不是**老師姓名或 `studentKey`——兩者都只在單一 `school` 內唯一，撐不住不選場域、
 單靠帳號查到唯一一個人的登入表單。帳號由管理者用 `seed_directory.py`／
 `manage_passwords.py` 指派，見 §3.4。
@@ -121,7 +121,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | `name` | varchar(50) | 老師姓名，`UNIQUE(school, name)`——只在場域內唯一 |
 | `school` FK→`school` | varchar(100) | 所屬場域 |
 | `password_hash` | varchar(255) | pbkdf2 雜湊，預設空字串（尚未指派） |
-| `account` | varchar(20) NULL, UNIQUE | 登入帳號，全域唯一，格式 `T0001`（見 §1.2） |
+| `account` | varchar(20) NULL, UNIQUE | 登入帳號，全域唯一，格式 `T001`（見 §1.2） |
 
 **`student`** — 學生名冊
 
@@ -131,7 +131,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | `school` FK→`school` | varchar(100) | |
 | `password_hash` | varchar(255) | 同上 |
 | `student_id` | int AUTO_INCREMENT, UNIQUE | 純粹為登入帳號加的代理鍵，不影響原本複合主鍵/外鍵 |
-| `account` | varchar(20) NULL, UNIQUE | 登入帳號，全域唯一，格式 `S0001` |
+| `account` | varchar(20) NULL, UNIQUE | 登入帳號，全域唯一，格式 `S001` |
 
 ### 2.2 登入憑證
 

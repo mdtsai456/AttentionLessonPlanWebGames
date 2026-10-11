@@ -113,11 +113,11 @@ def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
     新指派的（原本 account 是 NULL 的老師）——已經有帳號的老師不會被覆蓋，
     重跑這支腳本不會讓既有帳密失效。
 
-    account 不能跟 school+name 一起在 INSERT 時算好：帳號用 T0001 這種格式，
+    account 不能跟 school+name 一起在 INSERT 時算好：帳號用 T001 這種格式，
     需要 teacher_id（AUTO_INCREMENT，insert 當下才知道），所以分兩步——
     先 upsert school/name，再對 account 還是 NULL 的列補上 account + 密碼。
     """
-    from auth import hash_password
+    from auth import hash_password, teacher_account
 
     with connection.cursor() as cursor:
         cursor.execute(CREATE_SCHOOL)
@@ -148,7 +148,7 @@ def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
         teachers_needing_credentials = cursor.fetchall()
         new_credentials: list[tuple[str, str, str, str]] = []
         for row in teachers_needing_credentials:
-            account = f"T{row['teacher_id']:04d}"
+            account = teacher_account(row["teacher_id"])
             plaintext = _generate_readable_password()
             cursor.execute(
                 "UPDATE teacher SET account = %s, password_hash = %s WHERE teacher_id = %s",

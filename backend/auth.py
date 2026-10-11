@@ -80,6 +80,16 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(candidate.hex(), digest_hex)
 
 
+def student_account(student_id: int) -> str:
+    """學生登入帳號：S 加三位數 student_id（S001）；超過 999 自然變成四位數。"""
+    return f"S{student_id:03d}"
+
+
+def teacher_account(teacher_id: int) -> str:
+    """老師登入帳號：T 加三位數 teacher_id（T001）。"""
+    return f"T{teacher_id:03d}"
+
+
 def generate_token() -> str:
     """產生一組不可預測的登入 token（url-safe，適合放進 Authorization header）。"""
     return secrets.token_urlsafe(32)

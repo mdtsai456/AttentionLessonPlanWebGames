@@ -35,7 +35,7 @@
 
 - 登入表單**只有「帳號＋密碼」兩欄**（跟你的 mockup 圖2～圖4 對齊），老師、學生
   皆同，**沒有選場域這一步**。
-- 帳號是後端另外指派的**全域唯一**字串（老師 `T0001` 這種格式、學生 `S0001` 這種
+- 帳號是後端另外指派的**全域唯一**字串（老師 `T001` 這種格式、學生 `S001` 這種
   格式），**跟老師姓名／`studentKey`（`grade_caseId`）是兩回事**——姓名只在
   `school` 內唯一、`studentKey` 每個場域都會重複，都不能拿來當登入帳號，這是
   這次特地加 `account` 欄位的原因（見 ADR 0004）。姓名／`studentKey`/`school`
@@ -139,9 +139,9 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 #### `POST /api/auth/teacher/login`
 
-**Request body**（帳號是後端另外指派的字串，例如 `T0001`，不是老師姓名）
+**Request body**（帳號是後端另外指派的字串，例如 `T001`，不是老師姓名）
 ```json
-{ "account": "T0001", "password": "..." }
+{ "account": "T001", "password": "..." }
 ```
 
 **Response 200**
@@ -163,9 +163,9 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 #### `POST /api/auth/student/login`
 
-**Request body**（帳號是後端另外指派的字串，例如 `S0001`，不是 `studentKey`）
+**Request body**（帳號是後端另外指派的字串，例如 `S001`，不是 `studentKey`）
 ```json
-{ "account": "S0001", "password": "..." }
+{ "account": "S001", "password": "..." }
 ```
 
 **Response 200**
@@ -599,7 +599,7 @@ const url = `${BASE}/api/schools/${encodeURIComponent(school)}/teachers`;
 後端本機跑起來（`uv run uvicorn main:app --port 5001`）+ 灌好參照資料
 （`uv run python seed_directory.py`，會印出這次新指派的老師「場域/姓名/帳號/密碼」，
 記下帳號+密碼）+ 灌好假學生（`uv run python seed.py`，假學生密碼統一是
-`test1234`，帳號印出一個範例如 `S0001`，其餘依序 `S0002`…）後：
+`test1234`，帳號印出一個範例如 `S001`，其餘依序 `S002`…）後：
 
 ```bash
 BASE=http://127.0.0.1:5001
@@ -610,7 +610,7 @@ curl "$BASE/api/games"
 # 登入（把下面換成 seed_directory.py 印出來的帳號/密碼，不是姓名）
 TOKEN=$(curl -s -X POST "$BASE/api/auth/teacher/login" \
   -H "Content-Type: application/json" \
-  -d '{"account":"T0001","password":"<貼上印出來的密碼>"}' \
+  -d '{"account":"T001","password":"<貼上印出來的密碼>"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
 # 帶 token 打受保護端點
@@ -620,10 +620,10 @@ curl "$BASE/api/students/G1_S01/report?school=KMU" -H "Authorization: Bearer $TO
 # 沒帶 token 會被擋
 curl -i "$BASE/api/me/students"   # 401
 
-# 學生登入（帳號換成 seed.py 印出來的那個，例如 S0001）
+# 學生登入（帳號換成 seed.py 印出來的那個，例如 S001）
 curl -X POST "$BASE/api/auth/student/login" \
   -H "Content-Type: application/json" \
-  -d '{"account":"S0001","password":"test1234"}'
+  -d '{"account":"S001","password":"test1234"}'
 ```
 
 （假資料的 `studentKey` 由 `seed.py` 產生，實際值以 `/api/me/students` 回應為準。

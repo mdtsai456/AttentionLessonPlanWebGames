@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `student` (
   -- AUTO_INCREMENT 欄位；不動原本的複合主鍵，assessment_result 等表的外鍵不受影響。
   `student_id` int NOT NULL AUTO_INCREMENT,
   -- account：真正拿來登入的全域唯一帳號，由 seed.py / 之後的正式灌檔流程指派
-  -- 成 S0001 這種格式（見該檔）。DEFAULT NULL 而不是 DEFAULT ''：同一時間多筆
+  -- 成 S001 這種格式（見該檔）。DEFAULT NULL 而不是 DEFAULT ''：同一時間多筆
   -- 都還沒指派帳號時，UNIQUE 索引才不會因為「多個空字串重複」而炸掉
   -- （MySQL 的 UNIQUE 對 NULL 不視為重複，對空字串會）。
   `account` varchar(20) DEFAULT NULL,
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS `teacher` (
   `school` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL DEFAULT '',
   -- account：登入用的全域唯一帳號（見 student.account 的說明——teacher.name 只在
-  -- 同一場域內唯一，不能直接當登入帳號）。由 seed_directory.py 指派成 T0001 這種格式。
+  -- 同一場域內唯一，不能直接當登入帳號）。由 seed_directory.py 指派成 T001 這種格式。
   `account` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`teacher_id`),
   UNIQUE KEY `uq_teacher_school_name` (`school`, `name`),

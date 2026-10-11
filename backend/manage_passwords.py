@@ -51,7 +51,7 @@ def set_teacher_password(connection, school: str, name: str, new_password: str) 
     """更新密碼；若這位老師還沒有 account（例如手動建的、沒走過 seed_directory.py），
     順便補一個。回傳最終的 account，None 表示查無此老師。
     """
-    from auth import hash_password
+    from auth import hash_password, teacher_account
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -62,7 +62,7 @@ def set_teacher_password(connection, school: str, name: str, new_password: str) 
         if row is None:
             return None
 
-        account = row["account"] or f"T{row['teacher_id']:04d}"
+        account = row["account"] or teacher_account(row["teacher_id"])
         cursor.execute(
             "UPDATE teacher SET password_hash = %s, account = %s WHERE teacher_id = %s",
             [hash_password(new_password), account, row["teacher_id"]],
@@ -75,7 +75,7 @@ def set_student_password(
     connection, school: str, student_key: str, new_password: str
 ) -> str | None:
     """同 set_teacher_password，但對象是學生；查無此學生回傳 None。"""
-    from auth import hash_password
+    from auth import hash_password, student_account
 
     grade, case_id = _parse_student_key(student_key)
     with connection.cursor() as cursor:
@@ -88,7 +88,7 @@ def set_student_password(
         if row is None:
             return None
 
-        account = row["account"] or f"S{row['student_id']:04d}"
+        account = row["account"] or student_account(row["student_id"])
         cursor.execute(
             "UPDATE student SET password_hash = %s, account = %s "
             "WHERE grade = %s AND case_id = %s AND school = %s",
