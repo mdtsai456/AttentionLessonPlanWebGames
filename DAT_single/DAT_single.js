@@ -580,7 +580,8 @@ async function saveGameDataToBackend(data) {
       school: school,
       currentDay: currentDay,
       startTime: window.WebGameRuntime.toWallTime(gameStartTime),
-      endTime: window.WebGameRuntime.toWallTime(data.endTime),
+      // 檢查點帶的是該關結束的時間；沒帶時（直接呼叫）用現在，不能送出 null。
+      endTime: data.endTime == null ? Date.now() : window.WebGameRuntime.toWallTime(data.endTime),
       mode: "single",
       stats: [
         { apiname: "DAT_correct",  value: data.score },
