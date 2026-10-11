@@ -839,7 +839,8 @@ export function returnToLobby() -> void
 - `resolveCurrentDay` 打 `GET /api/students/{key}/sessions?school=...`
   推導施測日：今天已有場次→沿用其 `currentDay`（同一施測日的 5 款遊戲
   共用一個值）；否則歷史最大值 +1；無紀錄→1。後端存的是 UTC naive，
-  而施測日是**本地日曆**的一天，故比對前先轉回本地時區。
+  而施測日是**台灣日曆**的一天，故比對前一律轉成台灣時間（UTC+8），
+  不跟著裝置的時區設定。
 - **推導失敗一律 `throw`，不得默默猜值**——`currentDay` 猜錯會污染研究
   資料，寧可退回讓現場人員手動填。雙人時兩位算出來不一致也視為失敗。
 

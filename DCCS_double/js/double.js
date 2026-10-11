@@ -2,7 +2,7 @@ import { mountDCCS, buildTutorialContent } from './dccs.js?v=7';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js?v=4';
-import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
+import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js?v=2';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
 const form =
