@@ -184,6 +184,30 @@ select {
   display: none;
 }
 
+/* 各側顯示該玩家的個案編號，避免兩位學生坐錯邊；樣式比照 HUD 的半透明膠囊。 */
+.player-case {
+  position: absolute;
+  top: 10.5%;
+  left: 8%;
+  z-index: 1;
+
+  margin: 0;
+  padding: 0.25rem 0.9rem;
+
+  color: #fff;
+  background: rgba(17, 17, 17, 0.55);
+  border-radius: 999px;
+
+  font-size: 1rem;
+  font-weight: 700;
+
+  pointer-events: none;
+}
+
+.player-case[hidden] {
+  display: none;
+}
+
 .game-root {
   position: absolute;
   inset: 0;

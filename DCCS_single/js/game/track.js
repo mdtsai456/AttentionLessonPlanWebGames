@@ -293,18 +293,6 @@ export class Track {
 
     stepTarget(target, dt, CONFIG.TARGET_SPEED);
 
-    // 以移動後的 target.ageMs 記錄本幀輸入，與判定共用時間基準。
-    if (this._valveShape && shapePresses > 0) {
-      this._shapePressCount += shapePresses;
-      if (this._shapeFirstPressAgeMs === null) this._shapeFirstPressAgeMs = target.ageMs;
-      this._shapeLastPressAgeMs = target.ageMs;
-    }
-    if (this._valveObject && objectPresses > 0) {
-      this._objectPressCount += objectPresses;
-      if (this._objectFirstPressAgeMs === null) this._objectFirstPressAgeMs = target.ageMs;
-      this._objectLastPressAgeMs = target.ageMs;
-    }
-
     if (this._valveShape && !target.passedShape && hasReachedZ(target, CONFIG.Z_VALVE_SHAPE)) {
       target.passedShape = true;
       this._judge(this._valveShape, target);
@@ -316,6 +304,20 @@ export class Track {
     }
 
     this._finishTrialIfJudged(target);
+
+    // 本幀按鍵在判定之後才記錄：它們下一幀才開始轉，不影響本幀答案，
+    // 也就不能算進剛判定那道閥的 slotsRotated／settleMs／firstInputMs。
+    // 時間以移動後的 target.ageMs 為準，與判定共用時間基準。
+    if (this._valveShape && shapePresses > 0) {
+      this._shapePressCount += shapePresses;
+      if (this._shapeFirstPressAgeMs === null) this._shapeFirstPressAgeMs = target.ageMs;
+      this._shapeLastPressAgeMs = target.ageMs;
+    }
+    if (this._valveObject && objectPresses > 0) {
+      this._objectPressCount += objectPresses;
+      if (this._objectFirstPressAgeMs === null) this._objectFirstPressAgeMs = target.ageMs;
+      this._objectLastPressAgeMs = target.ageMs;
+    }
 
     if (this._valveShape && shapePresses > 0) this._valveShape.step(shapePresses);
     if (this._valveObject && objectPresses > 0) this._valveObject.step(objectPresses);

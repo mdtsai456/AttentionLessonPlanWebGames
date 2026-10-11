@@ -98,8 +98,13 @@ export function buildPayload({ lessonId, student, summary }) {
  * @returns {Promise<string>} 伺服器回應的原始內容
  */
 async function postPayload(payload, url, player) {
+  // 逾時用原生計時器：確定離開後遊戲時鐘會暫停到導頁，包過的 setTimeout 也跟著停，
+  // 後端不回應時就永遠等不到逾時（shared/game-runtime.js）。
+  const runtime = window.WebGameRuntime;
+  const startTimer = runtime ? runtime.nativeSetTimeout : setTimeout;
+  const stopTimer = runtime ? runtime.nativeClearTimeout : clearTimeout;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
+  const timeout = startTimer(() => controller.abort(), SUBMIT_TIMEOUT_MS);
 
   try {
     const res = window.WebGameApi?.submitSession
@@ -125,8 +130,19 @@ async function postPayload(payload, url, player) {
     return text;
   } finally {
     // 包含回應本文的讀取，避免只收到 headers 就永遠停在送出中。
-    clearTimeout(timeout);
+    stopTimer(timeout);
   }
+}
+
+/**
+ * 每筆成績第一次送出前配一個 submissionId，暫存與重送都沿用它。
+ * 回應逾時但伺服器其實已寫入時，重送同一個 id 會被後端認出來，不會多一列。
+ * 回傳新物件，不改呼叫端的 payload。
+ */
+function withSubmissionId(payload) {
+  if (!payload || !payload.data || payload.data.submissionId) return payload;
+  // UUID 由 shared/api.js 產生（遊戲頁都會先載入它）。
+  return { ...payload, data: { ...payload.data, submissionId: window.WebGameApi.uuid() } };
 }
 
 /**
@@ -136,6 +152,7 @@ async function postPayload(payload, url, player) {
  * @returns {Promise<{ok: boolean, detail: string}>}
  */
 export async function submitResult(payload, { url = resolveSubmitUrl(), player } = {}) {
+  payload = withSubmissionId(payload);
   try {
     const detail = await postPayload(payload, url, player);
     return { ok: true, detail };
@@ -228,7 +245,7 @@ async function flushPending({ url = resolveSubmitUrl() } = {}) {
       try {
         window.localStorage.removeItem(key);
       } catch (_removeErr) {
-        // 送出去了但刪不掉——下次會重送一次，由後端的唯一鍵擋掉重複。
+        // 送出去了但刪不掉——下次會重送一次；同一個 submissionId 後端只會存一列。
       }
       sent += 1;
     } catch (err) {

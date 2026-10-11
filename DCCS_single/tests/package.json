@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "test:unit": "node --test engine.test.mjs",
     "test:full": "DCCS_FULL_LENGTH=1 playwright test"
   },
   "devDependencies": {

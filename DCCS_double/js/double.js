@@ -1,7 +1,7 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=4';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=7';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
-import { submitResult } from './net/client.js?v=2';
+import { submitResult } from './net/client.js?v=4';
 import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
@@ -58,20 +58,6 @@ const sharedContinue =
 
 const sharedErrorMessage =
   document.getElementById('shared-error-message');
-
-function createPairId() {
-  if (
-    window.crypto &&
-    typeof window.crypto.randomUUID === 'function'
-  ) {
-    return window.crypto.randomUUID();
-  }
-
-  return (
-    `dccs-${Date.now()}-` +
-    Math.random().toString(16).slice(2)
-  ).slice(0, 36);
-}
 
 function showSharedScreen(target) {
   const screens = [
@@ -270,8 +256,9 @@ async function startSession(player1, player2) {
         ? { sessionSeconds: sessionSecondsOverride }
         : {};
 
+    // UUID 由 shared/api.js 產生（遊戲頁都會先載入它）。
     const pairId =
-      createPairId();
+      window.WebGameApi.uuid();
 
     form.hidden = true;
     const setupShell = document.getElementById('setup-shell');
@@ -287,6 +274,18 @@ async function startSession(player1, player2) {
       sharedPlayerInfo.textContent =
         `玩家 1：${player1.caseId}　｜　` +
         `玩家 2：${player2.caseId}`;
+    }
+
+    // 標題畫面在雙人版不會出現，所以兩側面板各自標出是哪位學生。
+    for (const [playerNumber, player] of [[1, player1], [2, player2]]) {
+      const label =
+        document.getElementById(`player${playerNumber}-case`);
+
+      if (label) {
+        label.textContent =
+          `玩家 ${playerNumber}：${player.caseId}`;
+        label.hidden = false;
+      }
     }
 
     const playerPhases = {
@@ -667,23 +666,78 @@ async function startSession(player1, player2) {
         ...sessionSecondsOption,
       });
 
-    document.getElementById('leave-btn').addEventListener('click', async () => {
-      const completed = Math.min(
-        player1Handle.completedLevel,
-        player2Handle.completedLevel
-      );
-      const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
-      if (stage) {
-        const payloads = [player1Handle, player2Handle]
-          .map((handle) => handle.buildLeavePayload(stage))
-          .filter(Boolean);
-        await Promise.all(payloads.map((payload, index) =>
-          submitPlayerResult(makeDoublePayload({ payload }, pairId), index + 1).catch((error) => {
-            console.error(error);
-          })
-        ));
+    // 離開與正常結束共用：每個關卡檢查點（stage）兩位玩家各只送一次。
+    // 離開要先確認；取消時什麼都不送，遊戲照常進行。
+    const stageSubmissions = new Map();
+    let leaving = false;
+    let finalSubmitting = false;
+
+    function submitStageOnce(stage, payloads) {
+      if (!stageSubmissions.has(stage)) {
+        stageSubmissions.set(
+          stage,
+          Promise.allSettled(
+            payloads.map((payload, index) =>
+              payload ? submitPlayerResult(payload, index + 1) : null
+            )
+          )
+        );
       }
-      window.askLeave('../Select/index.html');
+
+      return stageSubmissions.get(stage);
+    }
+
+    const leaveButton =
+      document.getElementById('leave-btn');
+
+    leaveButton.addEventListener('click', async () => {
+      // 連點，或最終成績已在送出（送完會自動回大廳），都不再送一次。
+      if (leaving || finalSubmitting) return;
+      leaving = true;
+      leaveButton.disabled = true;
+      let confirmed = false;
+
+      try {
+        // 先問再存檔：取消時什麼都不送，按鈕恢復可按。
+        if (!(await window.confirmLeave())) return;
+        // 確認期間場次已結束：交給結束流程送出並導頁。
+        if (finalSubmitting) return;
+        confirmed = true;
+        // 兩位玩家的引擎各有離開保護，確定離開後先拿掉，導頁才不會再跳瀏覽器詢問。
+        player1Handle.releaseUnloadGuard();
+        player2Handle.releaseUnloadGuard();
+
+        const completed = Math.min(
+          player1Handle.completedLevel,
+          player2Handle.completedLevel
+        );
+        const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+        // 確定離開後遊戲維持暫停到導頁；這段只等送出（逾時用原生計時器），不等遊戲計時器。
+        // 組不出成績也照樣導頁：學生已確定離開，不能停在暫停的畫面上。
+        if (stage) {
+          try {
+            const payloads = [player1Handle, player2Handle]
+              .map((handle) => handle.buildLeavePayload(stage))
+              .map((payload) => payload && makeDoublePayload({ payload }, pairId));
+            const results = await submitStageOnce(stage, payloads);
+            for (const result of results) {
+              if (result.status === 'rejected') console.error(result.reason);
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        // 送出期間場次已結束：交給結束流程導頁。
+        if (finalSubmitting) return;
+        window.leaveTo('../Select/index.html');
+      } finally {
+        // 已確定離開就維持停用，導頁前不能再按。
+        if (!confirmed) {
+          leaving = false;
+          if (!finalSubmitting) leaveButton.disabled = false;
+        }
+      }
     });
 
     const player2Handle =
@@ -730,6 +784,9 @@ async function startSession(player1, player2) {
 
       removeSharedEvents();
 
+      finalSubmitting = true;
+      leaveButton.disabled = true;
+
       const payload1 =
         makeDoublePayload(
           result1,
@@ -752,11 +809,17 @@ async function startSession(player1, player2) {
         payload2
       );
 
+      const finalStage = Math.max(
+        result1.summary.stage,
+        result2.summary.stage
+      );
+
+      // 同一檢查點若已由「離開」送過（例如取消離開後在中場選返回大廳），
+      // 不再重送；導頁前等所有送出完成，避免中斷還在送的請求。
       const submissions =
-        await Promise.allSettled([
-          submitPlayerResult(payload1, 1),
-          submitPlayerResult(payload2, 2),
-        ]);
+        await submitStageOnce(finalStage, [payload1, payload2]);
+
+      await Promise.all(stageSubmissions.values());
 
       const player1Accuracy =
         (
@@ -880,6 +943,7 @@ async function startSession(player1, player2) {
           );
       }
       */
+      // 場次已結束、成績已送，直接導頁。
       window.location.href = '../Select/index.html';
     } catch (error) {
       removeSharedEvents();
