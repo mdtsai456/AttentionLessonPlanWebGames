@@ -3,7 +3,8 @@
   const DEV_HOSTS = { localhost: true, "127.0.0.1": true };
 
   function resolveApiBase() {
-    if (global.API_BASE_URL) return global.API_BASE_URL;
+    // 覆寫網址結尾的斜線要去掉，否則接上 /sessions 會變成 //sessions。
+    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, "");
     if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
     const { hostname, protocol } = global.location;
     if (DEV_HOSTS[hostname]) {
@@ -132,10 +133,12 @@
   function sessionPlayer(payload, player) {
     const auth = global.WebGameAuth;
     const session = auth && auth.session;
-    if (!auth || !auth.active || !session || session.bodies[0].role !== 'student') return -1;
-    if (payload.data.mode === 'double' && session.mode !== 'double') return -1;
-    const index = player == null ? session.bodies.findIndex((body) => sameStudent(body, payload.data)) : player - 1;
-    return sameStudent(session.bodies[index], payload.data) ? index : -1;
+    // 待送佇列裡可能有損壞的資料（沒有 data）；回 -1 讓呼叫端略過，不要整批重送中斷。
+    const data = payload && payload.data;
+    if (!auth || !auth.active || !data || !session || session.bodies[0].role !== 'student') return -1;
+    if (data.mode === 'double' && session.mode !== 'double') return -1;
+    const index = player == null ? session.bodies.findIndex((body) => sameStudent(body, data)) : player - 1;
+    return sameStudent(session.bodies[index], data) ? index : -1;
   }
 
   /** 雙人每筆使用本人 token 與另一位學生 token，不把 token 放入 payload。 */
@@ -152,7 +155,18 @@
     return res;
   }
 
+  /** UUID v4（成績的 submissionId、雙人局的 pairId 共用）。非 https 的區網網址沒有 randomUUID，改用 getRandomValues。 */
+  function uuid() {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
   global.WebGameApi = {
+    uuid,
     submitSession,
     sessionPlayer,
     resolveApiBase,
