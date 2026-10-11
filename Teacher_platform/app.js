@@ -27,10 +27,18 @@ const dayTitle = document.getElementById("day-title");
 const recordsBody = document.getElementById("records-tbody");
 const logoutBtn = document.getElementById("logout-btn");
 
+const DAY_PROMPT = "請選擇第幾天，查看當天成績。";
+const DAY_PROMPT_LOADING = "成績載入中…";
+const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重新整理頁面。";
+
+/** 每次換學生加一；回應回來時編號不同就是舊學生的，直接丟掉。 */
+let reportRequestId = 0;
+
 const state = {
   students: [], // [{ id, name, username }]
   days: [], // 固定第 1～24 天
   sessions: [], // 目前學生的場次，選天時直接從這裡算進度
+  reportStatus: "idle", // "idle" | "loading" | "ready" | "error"：目前學生的場次讀取狀態
   selectedStudentId: "",
   selectedDay: null, // 尚未選天時為 null
   progressByGame: {}, // { [gameId]: 0 | 50 | 100 }
@@ -79,23 +87,39 @@ dayRow.addEventListener("click", (event) => {
 });
 
 /**
- * 換成另一位學生時，清掉已選天數與進度，再重抓該學生的天數。
+ * 換成另一位學生時，先清掉上一位的場次、已選天數與進度，再重抓該學生的場次。
+ * 載入中與讀取失敗時天數按鈕停用；較晚回來的舊學生回應一律丟掉。
  * @param {string} studentId 下拉選單的 value；空字串代表回到「請選擇學生」
  */
 async function selectStudent(studentId) {
+  const requestId = ++reportRequestId;
   state.selectedStudentId = studentId;
   state.selectedDay = null;
   state.progressByGame = {};
   state.detailByGame = {};
-  state.sessions = studentId ? await fetchStudentReport(studentId) : [];
+  state.sessions = [];
+  state.reportStatus = studentId ? "loading" : "idle";
   state.days = TRAINING_DAYS;
+  renderDays();
+  renderProgress();
+  if (!studentId) return;
+
+  let sessions = null;
+  try {
+    sessions = await fetchStudentReport(studentId);
+  } catch (_err) {
+    sessions = null;
+  }
+  if (requestId !== reportRequestId) return; // 期間已換成別的學生
+  state.sessions = sessions || [];
+  state.reportStatus = sessions ? "ready" : "error";
   renderDays();
   renderProgress();
 }
 
 /** 選天立刻更新按下狀態與進度；場次已在選學生時抓好。 */
 function selectDay(day) {
-  if (!state.selectedStudentId) return;
+  if (!state.selectedStudentId || state.reportStatus !== "ready") return;
   state.selectedDay = day;
   state.progressByGame = progressFromSessions(state.sessions, day);
   state.detailByGame = detailFromSessions(state.sessions, day);
@@ -129,10 +153,10 @@ const TRAINING_DAYS = Array.from({ length: 24 }, (_, index) => index + 1);
 
 /**
  * 畫第 1～24 天按鈕。
- * 還沒選學生時全部 disabled。
+ * 還沒選學生、場次還在載入或讀取失敗時全部 disabled。
  */
 function renderDays() {
-  const hasStudent = Boolean(state.selectedStudentId);
+  const hasStudent = Boolean(state.selectedStudentId) && state.reportStatus === "ready";
   const days = TRAINING_DAYS;
 
   dayRow.innerHTML = days
@@ -163,6 +187,10 @@ function renderProgress() {
   emptyHint.hidden = hasStudent;
   reportView.hidden = !hasStudent;
   dayPrompt.hidden = !hasStudent || hasDay;
+  dayPrompt.textContent =
+    state.reportStatus === "loading" ? DAY_PROMPT_LOADING
+      : state.reportStatus === "error" ? DAY_PROMPT_ERROR
+        : DAY_PROMPT;
   dayDetail.hidden = !hasDay;
   if (hasStudent) fillStudentMeta();
   if (!hasDay) {
@@ -198,10 +226,11 @@ function fillStudentMeta() {
   document.getElementById("view-school-name").textContent =
     `所屬場域：${student.school || teacherSchool()}`;
   document.getElementById("view-total-sessions").textContent = String(student.sessionCount || 0);
-  document.getElementById("view-last-played").textContent = student.lastPlayedAt || "尚無評測紀錄";
+  document.getElementById("view-last-played").textContent = formatUtcTimestamp(student.lastPlayedAt) || "尚無評測紀錄";
 }
 
 function renderRecords() {
+  // 後端時間都是 UTC 且固定寬度，直接比字串就是實際先後；顯示時才轉本地時間。
   const rows = state.sessions
     .filter((session) => Number(session.currentDay) === Number(state.selectedDay))
     .slice()
@@ -223,7 +252,7 @@ function renderRecords() {
         <td>${stats.correctCount ?? "—"} / ${stats.wrongCount ?? "—"}</td>
         <td>${formatDuration(stats.duration)}</td>
         <td>${stats.stage ?? "—"}</td>
-        <td>${session.startTime || "—"}</td>
+        <td>${formatUtcTimestamp(session.startTime) || "—"}</td>
       </tr>
     `;
   }).join("");
@@ -299,6 +328,19 @@ function formatAccuracy(value) {
   return `${percent}%`;
 }
 
+/**
+ * 後端時間字串是 UTC（"YYYY-MM-DD HH:MM:SS"，不帶時區），
+ * 轉成瀏覽器本地時間後用同樣格式顯示。空值回空字串；看不懂的字串原樣顯示。
+ */
+function formatUtcTimestamp(value) {
+  if (typeof value !== "string" || !value) return "";
+  const date = new Date(`${value.trim().replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function teacherToken() {
   return sessionStorage.getItem("token");
 }
@@ -322,7 +364,7 @@ async function fetchStudentReport(studentKey) {
     `/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(school)}`,
     token
   );
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error(`讀取成績失敗（HTTP ${res.status}）`);
   const body = await res.json();
   return Array.isArray(body.records) ? body.records : [];
 }
