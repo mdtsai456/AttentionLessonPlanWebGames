@@ -34,7 +34,12 @@ const ALL_ITEMS = [
 ];
 
 const DEFAULT_STAGE_RULES = [
-  { prompt: "請選擇符合「可以吃的食物」的方向", correct: ["apple", "banana", "carrot"] },
+  // 魚也能吃，不能當「可以吃的食物」的錯誤選項，所以這一關明列錯誤項目
+  {
+    prompt: "請選擇符合「可以吃的食物」的方向",
+    correct: ["apple", "banana", "carrot"],
+    wrong: ["boot", "book", "chair", "hammer", "hat", "key", "soccer", "umbrella"],
+  },
   { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
   { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
   { prompt: "請選擇符合「下雨時用的」的方向", correct: ["umbrella"] },
@@ -66,6 +71,8 @@ const session = {
   startedAt: 0,
   timerId: null,
   endReason: "",
+  // 同一局兩位玩家共用，後端用來配對兩筆成績；每次開新局換新
+  pairId: "",
   // 用於追蹤計時器是否已開始
   timerStarted: false,
 };
@@ -100,14 +107,26 @@ function completedStage() {
   return Math.max(0, session.level - 1);
 }
 
+// 先確認再存檔：取消時什麼都不送，避免檢查點和之後打完的成績各留一筆。
+// 確定後遊戲維持暫停（計時凍結、按鍵不作答）直到導頁，存檔慢也不會打完下一關多送一筆。
+// 這段只等 fetch，不等遊戲的計時器；萬一出錯沒導頁就解除暫停，讓遊戲繼續。
 async function leaveGame() {
   const leaveBtn = document.getElementById("leave-btn");
   leaveBtn.disabled = true;
-  const completed = completedStage();
-  const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-  if (stage) await saveBoth(stage);
-  window.askLeave("../Select/index.html");
-  leaveBtn.disabled = false;
+  try {
+    if (!(await window.confirmLeave())) return;
+    try {
+      const completed = completedStage();
+      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      if (stage) await saveBoth(stage);
+      window.leaveTo("../Select/index.html");
+    } catch (err) {
+      console.error("離開失敗：", err);
+      window.cancelLeave();
+    }
+  } finally {
+    leaveBtn.disabled = false;
+  }
 }
 
 async function saveBoth(stage) {
@@ -158,6 +177,7 @@ async function savePlayer(player, index, stage) {
         startTime: window.WebGameRuntime.toWallTime(session.startedAt || window.WebGameRuntime.now()),
         endTime: Date.now(),
         mode: "double",
+        pairId: session.pairId,
         stats: [
           { apiname: "TGame_correct", value: player.score },
           { apiname: "TGame_wrong", value: wrong },
@@ -180,12 +200,19 @@ async function savePlayer(player, index, stage) {
 document.getElementById("mid-lobby").addEventListener("click", async () => {
   document.getElementById("mid-continue").disabled = true;
   document.getElementById("mid-lobby").disabled = true;
-  await saveBoth(MID_STAGE);
-  location.href = "../Select/index.html";
+  try {
+    await saveBoth(MID_STAGE);
+    location.href = "../Select/index.html";
+  } finally {
+    // 中場回大廳是明確選擇，不再確認。萬一導向沒有發生，恢復按鈕避免卡在中場畫面；已存過不會重送
+    document.getElementById("mid-continue").disabled = false;
+    document.getElementById("mid-lobby").disabled = false;
+  }
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.repeat || !session.playing || session.paused) return;
+  // 遊戲時鐘暫停時（例如確定離開、存檔中）不作答
+  if (event.repeat || !session.playing || session.paused || window.WebGameRuntime.paused) return;
 
   if (event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -290,6 +317,7 @@ function makePlayerAssets(base) {
 function startGame(rules = buildStageRules()) {
   clearInterval(session.timerId);
   savedStage = 0;
+  session.pairId = window.WebGameApi.uuid();
   session.startedAt = window.WebGameRuntime.now();
   session.endReason = "";
   stageRules = rules;
@@ -345,7 +373,12 @@ function startLevel(level) {
 function startLevelTimer() {
   if (session.timerStarted) return;
   session.timerStarted = true;
-  session.levelDeadline = window.WebGameRuntime.now() + TIME_LIMIT_MS;
+  const now = window.WebGameRuntime.now();
+  session.levelDeadline = now + TIME_LIMIT_MS;
+  // 按鍵開始前的等待（說明、休息）不算反應時間：題目已顯示的玩家從開始計時這一刻起算
+  [players.p1, players.p2].forEach((player) => {
+    if (player.ready) player.questionShownAt = now;
+  });
   session.timerId = setInterval(tick, HUD_TICK_MS);
   renderAllHud();
 }
@@ -463,11 +496,13 @@ async function chooseDirection(player, choice) {
   const question = currentQuestion(player);
   if (!question) return;
 
+  // 開始計時的那一下同時是作答，但量不到反應時間，計分照算、不列入反應時間
+  const startsTimer = !session.timerStarted;
   startLevelTimer();
 
   const token = session.roundToken;
   player.busy = true;
-  player.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - player.questionShownAt));
+  if (!startsTimer) player.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - player.questionShownAt));
   const isCorrect = choice === question.correct;
   player.pendingCorrect = isCorrect;
   if (isCorrect) player.score += 1;
