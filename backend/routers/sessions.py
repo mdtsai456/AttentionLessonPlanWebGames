@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID, uuid5
 
 import pymysql
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -23,6 +26,9 @@ KNOWN_GAME_NAMES = frozenset({"DCCS", "DAT", "EFT", "IM", "TGame"})
 # 指令出擊沒有雙人版。勇闖迷宮雙人會打到第 3 關後回選單，必須能寫入才有 50% 進度。
 DOUBLE_CAPABLE_GAMES = frozenset({"DCCS", "DAT", "EFT", "TGame"})
 PAIR_ID_MAX_LENGTH = 36
+# 由 submissionId 推導場次 UUID 用的固定命名空間（uuid5）。改了它，已寫入的場次
+# 重送時就推導不出同一個 UUID，會多寫一列 —— 不要改。
+SUBMISSION_SESSION_NAMESPACE = UUID("6f1c2a4e-8b3d-4e5f-9a7b-1c2d3e4f5a6b")
 UNITY_CORE_STATS = (
     ("correct", "correct_count", to_int),
     ("wrong", "wrong_count", to_int),
@@ -59,6 +65,10 @@ class UnityGamePayload(BaseModel):
     stats: list[UnityStat]
     mode: str = "single"
     pairId: str | None = None
+    # 前端為每筆成績產生一次的 UUID；逾時後重送同一筆時沿用。後端用「學生身分 +
+    # submissionId」推導場次 UUID（見 submission_session_id），重複寫入撞主鍵就當作
+    # 已收過（見 create_session）。沒帶就由後端產生。
+    submissionId: str | None = None
 
     @field_validator("grade", "caseId", "school")
     @classmethod
@@ -146,7 +156,7 @@ def optional_float(value: Any, name: str) -> float | None:
         number = float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} 必須是數字") from exc
-    if number != number or number < 0:
+    if not math.isfinite(number) or number < 0:
         raise ValueError(f"{name} 必須是不小於 0 的數字")
     return number
 
@@ -174,7 +184,10 @@ def unity_core_stats(game_name: str, stats: list[UnityStat]) -> dict[str, Any]:
         key = f"{game_name}_{suffix}"
         if key not in by_name:
             raise ValueError(f"缺少必要統計：{key}")
-        result[column] = cast(by_name[key])
+        try:
+            result[column] = cast(by_name[key])
+        except ValueError as exc:
+            raise ValueError(f"{key} 必須是數字") from exc
     level_key = f"{game_name}_levelAccuracy"
     if level_key in by_name:
         result["level_accuracy"] = format_level_accuracy(by_name[level_key])
@@ -189,6 +202,32 @@ def unity_core_stats(game_name: str, stats: list[UnityStat]) -> dict[str, Any]:
         if key in by_name:
             result[column] = cast(by_name[key])
     return result
+
+
+def normalize_submission_id(value: str | None) -> str | None:
+    """submissionId 必須是 UUID；統一成小寫標準格式，重送時大小寫不同也認得出來。"""
+    if value is None:
+        return None
+    try:
+        return str(UUID(value.strip()))
+    except (AttributeError, ValueError) as exc:
+        raise ValueError("submissionId 格式錯誤") from exc
+
+
+def submission_session_id(data: UnityGamePayload) -> str | None:
+    """由學生身分與 submissionId 推導場次 UUID；沒帶 submissionId 回 None（由寫入層產生）。
+
+    不直接拿 submissionId 當 uuid：assessment_result 主鍵是 (grade, case_id, school, uuid)，
+    別的學生送同一個 submissionId 不會撞主鍵，會出現兩列同 uuid；而報表
+    （queries.fetch_game_stats_by_uuids）把 uuid 當全域唯一，會配錯學生的成績。
+    uuid5 是確定性的：同一位學生重送得到同一個 UUID（撞主鍵 → 冪等），
+    不同學生得到不同 UUID。用 JSON 陣列編碼身分欄位，欄位內容含分隔符也不會混淆。
+    """
+    submission_id = normalize_submission_id(data.submissionId)
+    if submission_id is None:
+        return None
+    name = json.dumps([data.grade, data.caseId, data.school, submission_id], ensure_ascii=False)
+    return str(uuid5(SUBMISSION_SESSION_NAMESPACE, name))
 
 
 def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptResponse:
@@ -224,6 +263,7 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
                        data.school, data.grade, data.caseId)
 
     session_id = writes.insert_session_with_stats(
+        session_id=submission_session_id(data),
         grade=data.grade,
         case_id=data.caseId,
         school=data.school,
@@ -258,6 +298,12 @@ def create_session(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except pymysql.IntegrityError as exc:
+        if exc.args and exc.args[0] == 1062 and data.submissionId is not None:
+            # 場次 UUID 由學生身分 + submissionId 推導，撞到的一定是這位學生先前已寫入的
+            # 同一筆（例如上次回應逾時）。
+            session_id = submission_session_id(data)
+            logger.info("重送的場次已存在，視為已接收：sessionId=%s", session_id)
+            return SessionAcceptResponse(sessionId=session_id)
         if exc.args and exc.args[0] == 1062:
             logger.exception("場次 UUID 重複")
             raise HTTPException(status_code=409, detail="場次已存在") from exc

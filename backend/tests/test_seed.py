@@ -7,6 +7,8 @@ tuple 欄位順序沿用 seed.generate():
   detail : (grade, case_id, school, uuid, correct, wrong, accuracy, duration, stage)
 """
 
+from datetime import timedelta
+
 import seed
 
 # session tuple 欄位索引
@@ -137,16 +139,21 @@ def test_round_b_beats_round_a_overall():
 
 
 def test_daily_timeline_single_block_noon_double_block_afternoon():
+    # 資料庫的時間一律是 UTC；施測排程是台灣時間（UTC+8）12:00／14:00，
+    # 存進去要減 8 小時，老師平台換回本地時間才會顯示 12:00。
     _, sessions, _ = seed.generate()
     for row in sessions:
         start, end = row[S_START], row[S_END]
         assert end > start        # 有時長
+        local_start = start + timedelta(hours=8)
+        local_end = end + timedelta(hours=8)
+        assert local_start.date() == local_end.date()
         if row[S_MODE] == "single":
-            assert start.hour == 12   # 上午 12:00 開始
-            assert end.hour < 13      # 整套單人版落在 13:00 前
+            assert local_start.hour == 12   # 台灣時間 12:00 開始
+            assert local_end.hour < 13      # 整套單人版落在 13:00 前
         else:
-            assert start.hour == 14   # 雙人版另一時段
-            assert end.hour < 15
+            assert local_start.hour == 14   # 雙人版另一時段
+            assert local_end.hour < 15
 
 
 def test_play_days_are_mon_wed_fri_across_two_rounds():

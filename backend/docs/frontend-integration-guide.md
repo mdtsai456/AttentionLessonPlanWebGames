@@ -83,7 +83,7 @@
 |---|---|
 | 編碼 | 一律 UTF-8，回應 `Content-Type: application/json` |
 | 中文路徑參數 | `school` 出現在網址路徑時（端點 2）要 `encodeURIComponent()` |
-| 時間字串 | 格式一律 `"YYYY-MM-DD HH:MM:SS"`（空格分隔、到秒）。**沒有時區**，當本地時間看即可 |
+| 時間字串 | 格式一律 `"YYYY-MM-DD HH:MM:SS"`（空格分隔、到秒），字串本身不帶時區，但**一律是 UTC**（`startTime`、`endTime`、`lastPlayedAt`、trends 的 `time` 都是）。顯示前要轉成本地時間，例如 `new Date(value.replace(" ", "T") + "Z")`；直接印出來在台灣會早 8 小時。同格式的 UTC 字串直接比字串就是實際先後，排序不用先轉 |
 | 未結束的場次 | `endTime` 會是**空字串 `""`**（不是 `null`）。要判斷「未結束」用 `endTime === ""` |
 | 零場次的欄位 | `lastPlayedAt` 是 `null`；`stats` 是 `null` |
 | 空結果 | 集合端點回 `200` + 空陣列，**不是 404**（見各端點說明） |
@@ -146,8 +146,13 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 **Response 200**
 ```json
-{ "token": "…", "teacherId": 1, "teacherName": "吳老師", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00" }
+{ "token": "…", "teacherId": 1, "teacherName": "吳老師", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 3600 }
 ```
+
+`expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數。前端算自動登出時間請用
+**「收到回應時的 `Date.now()` + `expiresIn` × 1000」**，不要拿 `expiresAt` 直接跟裝置時鐘比：
+裝置時鐘快 N 分鐘，登入就會少 N 分鐘，快超過 1 小時會一登入就被登出。只有舊後端沒有
+`expiresIn` 時才退回用 `expiresAt`。
 
 `teacherName`／`school` 是**顯示用**的資訊，登入成功才知道，不是登入輸入。
 
@@ -165,12 +170,13 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 **Response 200**
 ```json
-{ "token": "…", "studentKey": "G1_S01", "grade": "G1", "caseId": "S01", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00" }
+{ "token": "…", "studentKey": "G1_S01", "grade": "G1", "caseId": "S01", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 3600 }
 ```
 
 `studentKey`／`school` 同樣是顯示用資訊。
 
-**Response 401**：`{"detail":"帳號或密碼錯誤"}`（帳號不存在或密碼錯，不分辨）。
+**Response 401**：`{"detail":"帳號或密碼錯誤"}`（帳號不存在或密碼錯，不分辨；帳號不存在時後端
+也會跑一次同樣成本的密碼雜湊，回應時間不會透露帳號是否存在）。
 
 雙人模式呼叫兩次（兩位學生的帳密各自驗證），**兩次都成功才算登入完成**；哪一次
 失敗就告訴使用者是「學生1」還是「學生2」的帳密有問題。
@@ -641,7 +647,8 @@ Windows PowerShell 環境用 curl 傳中文/JSON body 容易被殼層引號吃�
 
 ## 功能頁與成績寫入授權
 
-`GET /api/auth/me` 帶 `Authorization: Bearer <token>`，回傳 `role`、`school`、`expiresAt`。
+`GET /api/auth/me` 帶 `Authorization: Bearer <token>`，回傳 `role`、`school`、`expiresAt`、
+`expiresIn`（剩餘秒數，整數；前端以收到回應的本機時間加上它當到期時間）。
 學生另有 `grade`、`caseId`、`studentKey`；老師另有 `teacherId`、`teacherName`。
 成功與失敗回應皆 `Cache-Control: no-store`。無效、過期或撤銷 token 回 401。
 功能頁驗證成功後才載入原有腳本；雙人驗證兩個學生，老師頁僅接受老師。

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -42,12 +44,30 @@ def format_datetime(value: Any) -> str:
     return str(value)
 
 
+def _finite_number(value: Any, cast: Callable[[Any], Any]) -> Any:
+    """None 視為 0；NaN／Infinity、陣列／物件等非數字一律 ValueError。
+
+    呼叫端（POST /api/sessions）把 ValueError 對應成 400；TypeError／OverflowError
+    會落到 500「資料庫寫入失敗」，所以這裡統一轉成 ValueError。
+    """
+    if value is None:
+        return cast(0)
+    try:
+        number = float(value)
+        result = cast(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"不是有限數字：{value!r}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"不是有限數字：{value!r}")
+    return result
+
+
 def to_int(value: Any) -> int:
-    return 0 if value is None else int(value)
+    return _finite_number(value, int)
 
 
 def to_float(value: Any) -> float:
-    return 0.0 if value is None else float(value)
+    return _finite_number(value, float)
 
 
 def format_optional_datetime(value: Any) -> str | None:

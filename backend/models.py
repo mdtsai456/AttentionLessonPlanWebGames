@@ -151,6 +151,7 @@ class TeacherLoginResponse(BaseModel):
     teacherName: str
     school: str
     expiresAt: datetime
+    expiresIn: int  # 登入剩餘秒數；前端以本機收到回應的時間加上它計算到期，避開裝置時鐘誤差
 
 
 class StudentLoginResponse(BaseModel):
@@ -160,6 +161,7 @@ class StudentLoginResponse(BaseModel):
     caseId: str
     school: str
     expiresAt: datetime
+    expiresIn: int  # 登入剩餘秒數；前端以本機收到回應的時間加上它計算到期，避開裝置時鐘誤差
 
 
 class AttentionResponse(BaseModel):

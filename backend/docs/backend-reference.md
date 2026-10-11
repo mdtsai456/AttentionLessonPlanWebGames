@@ -40,9 +40,15 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 
 | 方法 | 路徑 | 驗證 | 說明 |
 |---|---|---|---|
-| POST | `/api/auth/teacher/login` | 公開 | body `{account, password}`。成功回 `{token, teacherId, teacherName, school}`；失敗 `401` |
-| POST | `/api/auth/student/login` | 公開 | body `{account, password}`。成功回 `{token, studentKey, grade, caseId, school}`；失敗 `401` |
+| POST | `/api/auth/teacher/login` | 公開 | body `{account, password}`。成功回 `{token, teacherId, teacherName, school, expiresAt, expiresIn}`；失敗 `401` |
+| POST | `/api/auth/student/login` | 公開 | body `{account, password}`。成功回 `{token, studentKey, grade, caseId, school, expiresAt, expiresIn}`；失敗 `401` |
 | POST | `/api/auth/logout` | 公開（帶 token 才有作用） | 登出當前 token；找不到 token 也回 `204`（冪等） |
+| GET | `/api/auth/me` | 老師或學生 | 由 token 查身分：`{role, school, expiresAt, expiresIn, …}`，`Cache-Control: no-store` |
+
+`expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數（登入回應固定 3600）。前端
+以「收到回應的本機時間 + `expiresIn`」算自動登出時間，裝置時鐘快慢不影響登入長度。
+帳號不存在，或帳號存在但 `password_hash` 是空的／NULL／格式錯誤／演算法不符／迭代次數不合法時，
+後端都會改對一組假雜湊跑一次 PBKDF2 並回登入失敗，「帳號不存在」與「密碼錯誤」回應時間相同。
 
 `account` 是後端另外指派的**全域唯一**帳號（老師 `T0001`、學生 `S0001` 這種格式），
 **不是**老師姓名或 `studentKey`——兩者都只在單一 `school` 內唯一，撐不住不選場域、
@@ -78,7 +84,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 
 | 方法 | 路徑 | 驗證 | 說明 |
 |---|---|---|---|
-| POST | `/api/sessions` | 無（機對機） | 接收 Unity GameData，寫入一場遊戲結果，成功回 `201 {sessionId}`。這支刻意不驗證使用者身份，也不是這次帳密登入的對象（見 ADR 0004「不在範圍」） |
+| POST | `/api/sessions` | 學生（本人） | 接收 Unity GameData，寫入一場遊戲結果，成功回 `201 {sessionId}`。`data.grade`／`caseId`／`school` 必須是 Authorization 本人；雙人另帶 `X-Partner-Authorization`（見 `unity-integration-guide.md`）。核心 stat 不是有限數字（`NaN`／`Infinity`／陣列／物件）回 `400` |
 
 ### 1.7 通用錯誤
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 import pytest
 
@@ -73,6 +74,26 @@ def test_to_float_of_none_is_zero():
 
 def test_to_float_converts():
     assert to_float(3) == 3.0
+
+
+@pytest.mark.parametrize(
+    "value", ["nan", "Infinity", "-inf", float("nan"), float("inf"), pytest.param(10**400, id="10**400"), [1], {"a": 1}, object()]
+)
+def test_to_int_and_to_float_reject_non_finite_or_non_numeric(value):
+    """非有限數字與非數字型別一律 ValueError（API 層對應 400），不可拋 TypeError／OverflowError。"""
+    with pytest.raises(ValueError):
+        to_float(value)
+    if not isinstance(value, int):
+        with pytest.raises(ValueError):
+            to_int(value)
+
+
+def test_to_int_and_to_float_still_accept_db_numeric_types():
+    """students.py 讀 DB 欄位也用這兩個函式：Decimal、負數照常轉換。"""
+    assert to_int(Decimal("5")) == 5
+    assert to_float(Decimal("0.83")) == 0.83
+    assert to_float(-1) == -1.0
+    assert to_int(7.9) == 7
 
 
 def test_format_optional_datetime_of_none_is_none():
