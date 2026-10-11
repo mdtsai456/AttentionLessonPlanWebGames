@@ -37,6 +37,8 @@ const WALK_FRAME_MS = 90;
 const ROOM_FADE_MS = 280;
 /** GoTo 題走進正確房間後，多等一下再過關，讓玩家看清楚。 */
 const GOTO_WAIT_MS = 1000;
+/** 「背包滿了」這類短提示顯示多久後自動收起。 */
+const HINT_MS = 1200;
 /** 後端進度只允許 0 / 50 / 100 三檔。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
@@ -193,6 +195,9 @@ const backBtn = document.getElementById("back-btn");
 const keys = { left: false, right: false };
 window.addEventListener("webgame:pause", () => { keys.left = keys.right = false; });
 
+/** 這一局已送出到第幾關（3 中場 / 6 全破），避免同一關存兩次。 */
+let savedStage = 0;
+
 const state = {
   questions: [], // 本題題庫（後端或本地）
   index: 0, // 保留給地圖尺寸；正式關卡用 stage
@@ -226,6 +231,7 @@ const state = {
   completedItems: [], // 本關已正確完成的目標物品 id
   stageResults: [], // 每關紀錄，交卷用
   lastTime: 0, // requestAnimationFrame 上一幀時間戳
+  feedbackTimer: null, // 短提示自動收起的 timeout
 };
 
 init();
@@ -261,6 +267,8 @@ function bindEvents() {
   document.getElementById("leave-btn").addEventListener("click", leaveGame);
 
   document.addEventListener("keydown", (event) => {
+    // 遊戲暫停時（例如確定離開、成績還在送）不收操作，免得存檔期間還能撿東西、過關。
+    if (inputPaused()) return;
     if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
       keys.left = true;
       state.walkTarget = null; // 手動移動會取消「自動走近」
@@ -271,6 +279,8 @@ function bindEvents() {
       event.preventDefault();
     } else if (event.key === " " || event.key === "Enter") {
       event.preventDefault();
+      // 按住不放的自動重複不算，免得同一格反覆撿起又放回。
+      if (event.repeat) return;
       tryInteract();
     }
   });
@@ -319,6 +329,7 @@ function startGame() {
   state.finishedStages = 0;
   state.taskCursor = 0;
   state.endingStage = false;
+  savedStage = 0; // 新的一局，上一局存過哪關不算數
   resultEl.classList.add("is-hidden");
   midwayPanel.classList.add("is-hidden");
   continueBtn.disabled = false;
@@ -735,14 +746,15 @@ function tickMove(now) {
 
 /**
  * 點門或物品：已經靠近就立刻互動，否則記下目標讓 tickMove 自動走過去。
+ * 左右側門在玩家可走範圍外（8 / 92），目標要夾回邊界，否則永遠走不到。
  */
 function goToward(x, action) {
-  if (!state.playing || !state.stageLive || state.busy) return;
+  if (!state.playing || !state.stageLive || state.busy || inputPaused()) return;
   if (Math.abs(state.playerX - x) <= NEAR_RANGE) {
     action();
     return;
   }
-  state.walkTarget = { x, action };
+  state.walkTarget = { x: clamp(x, PLAYER_MIN, PLAYER_MAX), action };
 }
 
 /**
@@ -766,7 +778,7 @@ function updateNearHints() {
 
 /** 空白鍵／Enter：在靠近範圍內優先走門，否則與最近的放置點互動。 */
 function tryInteract() {
-  if (!state.playing || !state.stageLive || state.busy) return;
+  if (!state.playing || !state.stageLive || state.busy || inputPaused()) return;
   const door = nearest(doorsEl.querySelectorAll(".door"));
   const zone = nearest(zonesEl.querySelectorAll(".zone"));
   const doorDist = door ? Math.abs(state.playerX - Number(door.dataset.x)) : 99;
@@ -793,7 +805,7 @@ function nearest(nodes) {
 
 /**
  * 進相鄰房間：淡出 → 換格子與入場位置（左右門從對面進來）→ 淡入。
- * GoTo 題若進到目標房，多等 GOTO_WAIT_MS 後過關。
+ * GoTo 題若進到目標房，抵達當下就記過關並停表，再停 GOTO_WAIT_MS 讓玩家看清楚。
  */
 async function useDoor(dir) {
   if (state.busy) return;
@@ -830,11 +842,12 @@ async function useDoor(dir) {
   const problem = currentProblem();
   const success =
     problem.problemType === "GoTo" && problem.targetRoom === currentRoom().type;
-  await wait(success ? GOTO_WAIT_MS : 80);
   if (success && state.stageLive) {
-    passStage();
+    // 等待那一秒倒數不能再跑，否則最後一秒抵達會被判逾時，用時也會多算。
+    passStage(GOTO_WAIT_MS);
     return;
   }
+  await wait(80);
   state.busy = false;
 }
 
@@ -850,6 +863,7 @@ function useZone(zoneId) {
   if (!zone.item) {
     const first = state.bag[0];
     if (!first) return;
+    hideFeedback(); // 背包有空位了，收起「背包滿了」
     state.bag.shift();
     zone.item = first.id;
     renderZones(currentRoom());
@@ -860,7 +874,7 @@ function useZone(zoneId) {
   }
 
   if (state.bag.length >= BAG_SIZE) {
-    showFeedback("背包滿了", false);
+    showFeedback("背包滿了", false, HINT_MS);
     return;
   }
   const taken = zone.item;
@@ -923,7 +937,8 @@ function completedItemTask() {
   }
 }
 
-function passStage() {
+/** holdMs：記完成績後多停一下再換關（GoTo 抵達時用）。 */
+function passStage(holdMs = 0) {
   if (!state.stageLive || state.endingStage) return;
   state.stageLive = false;
   state.busy = true;
@@ -931,7 +946,7 @@ function passStage() {
   state.score += 1;
   renderHud();
   showFeedback("完成！", true);
-  endStage();
+  endStage(holdMs);
 }
 
 /** 本關 60 秒到：這一題算沒完成，進入下一關或結算。 */
@@ -946,20 +961,22 @@ function timeOut() {
 /** 把這一關（一題）的對錯推進紀錄。 */
 function commitStage(passed) {
   const problem = currentProblem();
+  const now = window.WebGameRuntime.now();
   const record = {
     problemID: problem.id,
     type: problem.problemType,
     timeLimit: TIME_LIMIT_SEC,
     targetItemCount: problem.targetItems.length,
     passed,
-    timeUsage: (window.WebGameRuntime.now() - state.stageStartedAt) / 1000,
+    timeUsage: (now - state.stageStartedAt) / 1000,
+    elapsedMs: now - state.startedAt, // 整局開始到這關結束，中途離開存檔用
   };
   state.stageResults.push(record);
   state.stageTasks.push(record);
 }
 
 /** 做完或 60 秒到就換下一關。第 3 關先中場，第 6 關結算。 */
-async function endStage() {
+async function endStage(holdMs = 0) {
   if (state.endingStage) return;
   state.endingStage = true;
   state.busy = true;
@@ -970,7 +987,7 @@ async function endStage() {
   const rate = tasks.length ? tasks.filter((item) => item.passed).length / tasks.length : 0;
   state.levelAccuracies.push(Number(rate.toFixed(4)));
   state.finishedStages = state.stage;
-  await wait(700);
+  await wait(700 + holdMs);
   hideFeedback();
   if (state.stage >= 6) {
     finishGame("complete");
@@ -1008,33 +1025,55 @@ function finishGame(reason) {
   resultHint.textContent = "六關都結束了";
   resultEl.classList.remove("is-hidden");
 
-  void saveCurrentRun(6);
+  // 第 6 關結束等待的空檔裡按過「離開」就已經存過了，不再重送。
+  if (savedStage !== 6) void saveCurrentRun(6);
 }
 
-let savedStage = 0;
-
+/**
+ * 先在頁面內確認，確定後才存檔並回大廳；取消什麼都不送，遊戲照常繼續。
+ * 確認框開著時遊戲時鐘暫停，第 6 關結束的等待不會在這時結算；確定後先存第 6 關，
+ * 之後才跑完的結算看到 savedStage 就不再重送。
+ */
 async function leaveGame() {
   const leaveBtn = document.getElementById("leave-btn");
   leaveBtn.disabled = true;
+  if (!(await window.confirmLeave())) {
+    leaveBtn.disabled = false;
+    return;
+  }
   const completed = state.finishedStages;
   const stage = completed >= 6 ? 6 : completed >= MIDWAY_STAGE ? MIDWAY_STAGE : 0;
   if (stage && stage !== savedStage) await saveCurrentRun(stage);
-  window.askLeave("../Select/index.html");
+  window.leaveTo("../Select/index.html");
+  // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
   leaveBtn.disabled = false;
 }
 
+/**
+ * 送出到第 stage 關為止的成績。每關一題，所以只取前 stage 筆紀錄：
+ * 第 4–6 關中途離開存的是 stage 3，答對數、用時等都不能把第 4 關之後算進去。
+ */
 function saveCurrentRun(stage) {
   savedStage = stage;
-  const answered = Math.max(state.stageResults.length, 1);
-  const failed = state.stageResults.filter((item) => !item.passed).length;
+  const records = state.stageResults.slice(0, stage);
+  const passed = records.filter((item) => item.passed).length;
+  const answered = Math.max(records.length, 1);
+  // 時長一律算到第 stage 關結束當下：不含中場畫面停留、第 6 關結束後的等待，
+  // 也不含之後關卡。只有還沒有該關紀錄時才算到現在。
+  const stageRecord = records[stage - 1];
+  const endClock = stageRecord
+    ? state.startedAt + stageRecord.elapsedMs
+    : window.WebGameRuntime.now();
+  const duration = endClock - state.startedAt;
   return submitResult({
-    score: state.score,
-    wrong: failed,
-    accuracy: Math.round((state.score / answered) * 100),
-    duration: window.WebGameRuntime.now() - state.startedAt,
+    endTime: window.WebGameRuntime.toWallTime(endClock),
+    score: passed,
+    wrong: records.length - passed,
+    accuracy: Math.round((passed / answered) * 100),
+    duration,
     stage,
     levelAccuracy: state.levelAccuracies.slice(0, stage).join(","),
-    avgReactionMs: averageReaction(state.stageResults),
+    avgReactionMs: averageReaction(records),
   });
 }
 
@@ -1098,7 +1137,10 @@ function objectSrc(id) {
   return `img/object/${id}.png`;
 }
 
-function showFeedback(text, ok) {
+/** 顯示提示；給 autoHideMs 時時間到自動收起（關卡結束的提示由 endStage 收）。 */
+function showFeedback(text, ok, autoHideMs = 0) {
+  clearTimeout(state.feedbackTimer);
+  state.feedbackTimer = autoHideMs ? setTimeout(hideFeedback, autoHideMs) : null;
   feedbackEl.textContent = text;
   feedbackEl.classList.toggle("is-correct", ok);
   feedbackEl.classList.toggle("is-wrong", !ok);
@@ -1106,6 +1148,8 @@ function showFeedback(text, ok) {
 }
 
 function hideFeedback() {
+  clearTimeout(state.feedbackTimer);
+  state.feedbackTimer = null;
   feedbackEl.classList.remove("is-show", "is-correct", "is-wrong");
   feedbackEl.textContent = "";
 }
@@ -1178,6 +1222,11 @@ function key(r, c) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+/** 遊戲時鐘暫停中（離開確認、確定離開後存檔中、視窗太小等）：不收玩家操作。 */
+function inputPaused() {
+  return Boolean(window.WebGameRuntime && window.WebGameRuntime.paused);
 }
 
 function wait(ms) {
@@ -1258,7 +1307,8 @@ async function submitResult(data) {
       school,
       currentDay,
       startTime: window.WebGameRuntime.toWallTime(state.startedAt),
-      endTime: Date.now(),
+      // 第 stage 關結束當下，endTime − startTime 才會等於 IM_duration。
+      endTime: data.endTime ?? Date.now(),
       mode: "single",
       stats: [
         { apiname: "IM_correct", value: data.score },

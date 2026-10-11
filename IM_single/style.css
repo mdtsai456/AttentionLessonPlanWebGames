@@ -57,10 +57,13 @@ body {
   position: absolute;
   inset: 0;
   z-index: 2;
+  /* 兩層都蓋滿畫面；容器本身不吃點擊，才點得到下面那層的門 */
+  pointer-events: none;
 }
 
 .door {
   position: absolute;
+  pointer-events: auto;
   bottom: 3.5%;
   width: min(18vw, 230px);
   height: min(56vh, 540px);
@@ -118,6 +121,7 @@ body {
   transform: translateX(-50%);
   z-index: 3;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .zone img {
