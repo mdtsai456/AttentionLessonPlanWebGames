@@ -72,6 +72,9 @@ async function gamePage(game, { stall = false, width = 1440, height = 810 } = {}
   }, game === 'TGame_double' ? 'double' : 'single');
   await page.clock.install();await page.clock.pauseAt(new Date());
   await page.goto(`${base}${process.env.TGAME_TEST_PATH || ""}/${game}/index.html`, { waitUntil: 'domcontentloaded' });
+  // 先完成登入與遊戲腳本載入，再快轉假時鐘，避免誤觸驗證的五秒逾時。
+  await page.waitForFunction(g => window.WebGameAuth?.active && (g === 'TGame_single'
+    ? typeof state !== 'undefined' : typeof players !== 'undefined'), game);
   const snapshot = () => page.evaluate(g => {
     const s = g === 'TGame_single' ? state : session;const ps=g==='TGame_single'?[state]:[players.p1,players.p2];
     return { level:s.level,playing:s.playing,paused:!!s.paused,timerStarted:s.timerStarted,remaining:g==='TGame_single'?s.remaining:Math.max(0,Math.ceil(((s.paused?s.pausedRemainingMs:s.levelDeadline-Date.now()))/1000)),players:ps.map(p=>({busy:p.busy,seq:p.questionSeq,score:p.score,answers:p.answers.map(a=>({...a}))})) };
