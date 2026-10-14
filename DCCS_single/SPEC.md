@@ -99,9 +99,10 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
 | 3 | 2 | 4 | `category` | 4 個類別各固定一張 |
 | 4 | 2 | 4 | `model` | `assets/4/` 全部 4 張 |
 | 5 | 2 | 5 | `model` | `assets/5/` 全部 5 張 |
+| 6 | 2 | 4 | `category` | 4 個類別各固定一張（同第 3 關） |
 
 **現有素材剛好全部用得到，一張都不必補。** 四個數字資料夾各對應一個
-`model` 關，四個類別合起來湊第 3 關的 `category`。
+`model` 關，四個類別合起來湊第 3、6 關的 `category`。
 
 形狀閥的素材永遠是 `shapes` 依檔名排序的**前 `shapeCount` 個**。
 
@@ -111,13 +112,17 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
 > 物件閥的 `2/3/4/4/5` 是影片實際值 `2/4/5/5/6` 的同構下移（現有素材剛好夠用）。
 > **不要改成 `2/4/5/5/6`，也不要為了難度單調把第 3、4 關對調。**
 > 形狀閥的 `5/5/2/2/2` 完全照影片，不要動；形狀最多用 5 個，不需要第 6 個形狀。
+>
+> 第 6 關是後來加上的第二個 `category` 關。`category` 關每個類別只佔一個選項，
+> 現有素材只有 4 個類別，所以物件閥是 **4** 個選項（`objectCount` 必須等於
+> `sourceCategories` 的長度，見 1.6）。
 
-第 3 關是唯一的 `category` 關，其餘四關都是 `model`。
+第 3、6 關是 `category` 關，其餘四關都是 `model`。
 
 `model` 關的素材來源寫在 `levels.json` 的 `sourceCategory`，
 **不是靠資料夾名稱推導**（換素材只要改 `levels.json`）。
 
-**每關時長 = `SESSION_SECONDS / 關卡數` = 600 / 5 = 120 秒**，仍由 `Track`
+**每關時長 = `SESSION_SECONDS / 關卡數` = 360 / 6 = 60 秒**，仍由 `Track`
 依 `manifest.levels.length` 推導，**不得寫死**。
 
 ### 1.6 出題可行性
@@ -137,7 +142,7 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
 遊戲照常進行，只是那一關空過；warnings 只留在 `DCCSResult`，不送平台、
 也不寫入成績 TXT。
 
-**目前沒有素材缺口**：五關全部 playable，`warnings` 為空。
+**目前沒有素材缺口**：六關全部 playable，`warnings` 為空。
 
 ### 1.7 素材固定（每關一組，整關不換）
 
@@ -150,12 +155,16 @@ Target = { frame: ShapeAsset | null , content: ImageAsset | null }
   **每類固定取一張作為閥門代表圖**（取該類別依檔名排序的第一張，可預測、
   跨場次可比）。但目標物的內容圖片池要囊括這些類別底下的**全部圖片**；
   用洗牌袋逐張出題，整袋全部出完以前不得重複，出完後才重新洗牌。
+  **每一題出題時，物件閥上與目標同類別的那一格會換成目標圖本身**，其餘類別
+  仍是代表圖。這樣中間的目標圖案一定也出現在選項裡，玩家不會因為看不到
+  同一張圖而無從比對（2026-09 起的行為，見 4.10）。
 
-因此**每一題變化的只有兩件事**：
+因此**每一題變化的只有這幾件事**：
 
 1. 目標圖片：形狀與 `model` 物件從固定選項中選；`category` 物件則從四個
-   類別的完整圖片池中取下一張（不要求與閥門代表圖是同一張，只要類別相同）
-2. 選項在閥上的**排列順序**（每題重新洗牌，兩道閥各自洗）
+   類別的完整圖片池中取下一張
+2. `category` 關物件閥上目標類別那一格的圖（換成這一題的目標圖）
+3. 選項在閥上的**排列順序**（每題重新洗牌，兩道閥各自洗）
 
 第 1 關的物件閥只有 2 張圖、組合數很少，這是刻意的：那一關的難度靠形狀閥的
 5 選 1。
@@ -247,8 +256,8 @@ lane = -direction * off * SLOT_LANE_SPACING                   // SLOT_LANE_SPACI
 （單位是 lane，換算成像素要乘 `ROAD_HALF_W * W * s(z)`）——
 **日後若再動 `CAM_DEPTH`，這個常數必須重算。**
 
-靜止時的可見數量：形狀閥在第 1、2 關是 3 個、第 3–5 關是 2 個；
-物件閥五關一律 2 個。
+靜止時的可見數量：形狀閥在第 1、2 關是 3 個、第 3–6 關是 2 個；
+物件閥六關一律 2 個。
 
 `theta` 是實數，滑動才會平滑；但它**只在動畫進行中才是非整數**。
 每次 `step()` 把目標格 `+1`（乘上方向），`update(dt)` 讓 `theta` 在
@@ -576,18 +585,21 @@ export function createTrialGenerator(manifest, rng) -> {
   objectCount: number,
   target: { frame: AssetRef, content: AssetRef },  // 兩者都不得為 null
   shapeItems: Array<AssetRef>,   // deck.shapes 洗牌後的排列，長度 shapeCount
-  objectItems: Array<AssetRef>,  // deck.objects 洗牌後的排列，長度 objectCount
+  objectItems: Array<AssetRef>,  // deck.objects 洗牌後的排列，長度 objectCount；
+                                 // category 關目標類別那一格換成目標圖本身
   objectRule: 'category' | 'model',
 }
 ```
 
 規則：
 - `next()` 把 `deck` 的兩組閥門素材**各自獨立**洗牌成這一題的排列；
-  `shapeItems` 與 `objectItems` 的集合必須恆等於 `deck` 對應的集合（見 1.7）。
+  `shapeItems` 與 `model` 關的 `objectItems` 集合必須恆等於 `deck` 對應的集合
+  （見 1.7）。
 - `frame` 目標必定在 `shapeItems` 中；`model` 目標必定在 `objectItems` 中。
 - `category` 目標從 `targetObjects` 的洗牌袋逐張取用；一袋全部圖片出完以前
-  不得重複。目標本身不必出現在 `objectItems`，但它的 `categoryId` 必須在
-  四張固定代表圖中恰好有一個對應答案。
+  不得重複。洗牌後把 `objectItems` 中與目標 `categoryId` 相同的那一格**換成
+  目標圖本身**，所以 `category` 目標也必定在 `objectItems` 中；其餘格仍是各類別
+  的固定代表圖，每個類別恰好一格。判定照舊只比 `categoryId`（見 4.9）。
 - `objectRule` 由 `level` 指定；出題器不得自行挑題型，也不得因為某個規則
   「這次剛好不可行」就換另一個規則出題。
 - `deck` 為 `null`（該關不可行）→ `next()` 回 `null`。
@@ -647,9 +659,9 @@ export function createStats() -> {
   的欄位）；**(b) 不可直接用 `track.elapsed * 1000`**，要夾上限（固定步長使
   最後一幀必定越過門檻，實測會得到 `600017` 而不是 `600000`）。
   `startTime` / `endTime` 則仍用牆上時鐘記錄真實時間戳。
-- `stage` 為本場到達的**最高關卡序號**（1–5）；玩到第五關即為 `5`
+- `stage` 為本場到達的**最高關卡序號**（1–6）；玩到第六關即為 `6`
 - `levelsPlayed` 為走過的**關卡序號**由小到大排序、去重、逗號連接，
-  例如 `"1,2,3,4,5"`
+  例如 `"1,2,3,4,5,6"`
 - `record()` 收到的 `level` 欄位即**關卡序號**（`levelNo`），由 `track.js` 傳入
 
 > **計分語意變更（待正式部署時確認實際生效時間）**：新版本正式部署生效前的
@@ -661,7 +673,7 @@ export function createStats() -> {
 > 還沒有這個欄位的逐閥資料。中斷的場次不適用。部署初期瀏覽器可能仍快取舊版
 > 計分程式，分界附近的資料以 `question_count` 判別為準。
 
-> `stage` 是**關卡序號**、不是選項數（選項數 2/3/4/4/5 不嚴格遞增，用它會讓
+> `stage` 是**關卡序號**、不是選項數（選項數 2/3/4/4/5/4 不嚴格遞增，用它會讓
 > 第 3、4 關算出同一個值）。資料庫欄位型別不變，只是填進去的語意是關卡序號。
 
 #### 4.11.1 三個行為時間欄位（不要加回 `rtMs`）
@@ -678,7 +690,11 @@ export function createStats() -> {
 
 `settleMs` 最接近反應時間的概念（多早定案）；`slotsRotated` 量到單向閥想測的
 規劃能力（轉過頭必須繞一整圈，數值大代表規劃失敗），**必定是整數**
-（＝這題對該閥按了幾下），不要補小數點。
+（＝這題在判定前對該閥按了幾下），不要補小數點。
+
+目標通過閥門的那一幀，`Track` 先推進動畫並判定，**這一幀新按的鍵下一幀才開始
+轉**，不影響這次答案；因此這些按鍵也**不計入**剛判定那道閥的 `slotsRotated`、
+`settleMs`、`firstInputMs`。
 
 `trialIndex` 由 `Track` 維護，複合題的兩次判定共用同一個值，才能在分析時
 把「同一題形狀對了但物件錯了」這種規則轉換模式撈出來。
@@ -772,6 +788,10 @@ export async function flushPendingResults({ url = resolveSubmitUrl() } = {}) -> 
   會讓暫存無限增生。`listPendingResults` 順便清掉 JSON 已損毀的殘留。
 - 暫存 key 為 `dccs_pending_<毫秒>_<亂數>`；亂數是必要的，雙人模式兩位玩家
   會在同一毫秒送出，只用時間戳會互相覆蓋。
+- `submitResult` 第一次送出前替 payload 的 `data` 補上 `submissionId`（UUID v4，由
+  `window.WebGameApi.uuid()` 產生，
+  不改呼叫端傳入的物件），暫存與重送都沿用同一個值。回應逾時但伺服器其實已寫入
+  時，重送同一個 `submissionId` 由後端認出是同一筆，不會多一列。
 
 ### 4.13b `js/net/apiBase.js`
 
@@ -819,7 +839,8 @@ export function returnToLobby() -> void
 - `resolveCurrentDay` 打 `GET /api/students/{key}/sessions?school=...`
   推導施測日：今天已有場次→沿用其 `currentDay`（同一施測日的 5 款遊戲
   共用一個值）；否則歷史最大值 +1；無紀錄→1。後端存的是 UTC naive，
-  而施測日是**本地日曆**的一天，故比對前先轉回本地時區。
+  而施測日是**台灣日曆**的一天，故比對前一律轉成台灣時間（UTC+8），
+  不跟著裝置的時區設定。
 - **推導失敗一律 `throw`，不得默默猜值**——`currentDay` 猜錯會污染研究
   資料，寧可退回讓現場人員手動填。雙人時兩位算出來不一致也視為失敗。
 
@@ -966,6 +987,11 @@ settle 時解除，不得殘留到遊戲中。
 **必須**在 `settleDone()` 之前呼叫，否則從大廳進場的場次跑完自動導回大廳時
 會誤跳確認框。
 
+遊戲內的「離開」按鈕不靠這個保護詢問：先用 `window.confirmLeave()` 在頁面內
+確認，取消時什麼都不送；確定後呼叫 `releaseUnloadGuard()`（之後的 `submitting`
+也不再掛回保護），送完檢查點再 `window.leaveTo()` 導頁，不會再跳瀏覽器確認。
+雙人版由 `double.js` 自己詢問，確定後對兩個引擎各呼叫 `handle.releaseUnloadGuard()`。
+
 兩個瀏覽器限制：提示文字**不可自訂**；使用者必須先與頁面互動過才會觸發
 （標題畫面要按空白鍵，此條件天然成立）。
 
@@ -1008,7 +1034,7 @@ settle 時解除，不得殘留到遊戲中。
 }
 ```
 
-（上面只列出五關中的三關示意欄位形狀；實際 `levels` 是五項，**目前五關全部
+（上面只列出六關中的三關示意欄位形狀；實際 `levels` 是六項，**目前六關全部
 `playable: true`、`warnings` 為空**。素材缺口時該關會變成
 `"playable": false, "reason": "model source category \"6\" not found"`，
 並在 `warnings` 多一行 `level 5 unplayable (model source category \"6\" not found)`。）
@@ -1040,7 +1066,8 @@ settle 時解除，不得殘留到遊戲中。
     { "shapeCount": 5, "objectCount": 3, "objectRule": "model",    "sourceCategory": "3" },
     { "shapeCount": 2, "objectCount": 4, "objectRule": "category", "sourceCategories": ["2", "3", "4", "5"] },
     { "shapeCount": 2, "objectCount": 4, "objectRule": "model",    "sourceCategory": "4" },
-    { "shapeCount": 2, "objectCount": 5, "objectRule": "model",    "sourceCategory": "5" }
+    { "shapeCount": 2, "objectCount": 5, "objectRule": "model",    "sourceCategory": "5" },
+    { "shapeCount": 2, "objectCount": 4, "objectRule": "category", "sourceCategories": ["2", "3", "4", "5"] }
   ]
 }
 ```
@@ -1059,7 +1086,7 @@ settle 時解除，不得殘留到遊戲中。
   這跟「素材還沒補齊」不同：後者是 `playable: false` + `WARN`，遊戲照跑。
 - **`sourceCategory` 指到不存在的類別不是設定錯誤**，而是素材還沒補
   （例如把某關改成 `"6"`，而 `assets/6/` 不存在），要走
-  `playable: false` + `WARN` 這條路。目前五關指到的類別都存在。
+  `playable: false` + `WARN` 這條路。目前六關指到的類別都存在。
 
 > 素材來源寫在這裡、而不是靠資料夾名稱推導，是刻意的：改素材對應只要改這個檔，
 > 而且新增一個類別資料夾**不會**憑空多出一個關卡。
@@ -1101,15 +1128,15 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 
 ## 8. 驗收條件
 
-**素材現況：五關全部可玩，沒有缺口，不需要補任何素材。**
+**素材現況：六關全部可玩，沒有缺口，不需要補任何素材。**
 
 ### 基本
 
 - `python3 tools/build_manifest.py` 產出 `DCCS_single/manifest.json`，可行性表格顯示
-  **五關全部 playable**、`warnings` 為空。
-- `manifest.levels` 的五項依序是（`levelNo`, `shapeCount`, `objectCount`, 規則, 素材）：
-  `(1,5,2,model,"2") (2,5,3,model,"3") (3,2,4,category,[2,3,4,5]) (4,2,4,model,"4") (5,2,5,model,"5")`
-- 一場結束後 `duration` 為 `600000`、`stage` 為 `5`、`levelsPlayed` 為 `1,2,3,4,5`。
+  **六關全部 playable**、`warnings` 為空。
+- `manifest.levels` 的六項依序是（`levelNo`, `shapeCount`, `objectCount`, 規則, 素材）：
+  `(1,5,2,model,"2") (2,5,3,model,"3") (3,2,4,category,[2,3,4,5]) (4,2,4,model,"4") (5,2,5,model,"5") (6,2,4,category,[2,3,4,5])`
+- 一場結束後 `duration` 為 `360000`、`stage` 為 `6`、`levelsPlayed` 為 `1,2,3,4,5,6`。
 
 ### 素材不足時要能優雅降級（不改 `assets/`，用複本驗）
 
@@ -1122,34 +1149,35 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 ### 兩道閥的選項數必須各自獨立（1.5 的核心）
 
 - 第 1、2 關的形狀閥有 **5** 個選項，物件閥分別是 2、3 個。
-- 第 3、4、5 關的形狀閥只有 **2** 個選項，物件閥分別是 4、4、5 個
-  （**不是** 4、5、6，見 1.5）。
+- 第 3–6 關的形狀閥只有 **2** 個選項，物件閥分別是 4、4、5、4 個
+  （第 3–5 關**不是** 4、5、6，見 1.5）。
 - 逐題紀錄中，同一題的 `shape` 列與 `object` 列的「選項數」欄**通常不同**，
   且各自等於該關設計表的 `shapeCount` / `objectCount`。
   兩列的選項數如果永遠相等，就是沒有把兩個數字拆開，是錯的。
 
 ### 每關開始提示
 
-- 第 1–5 關開始前都必須各顯示一次提示，按「繼續」後才開始或恢復遊戲。
+- 第 1–6 關開始前都必須各顯示一次提示，按「繼續」後才開始或恢復遊戲。
 - 提示上顯示的關卡號必須與接下來的 HUD 關卡一致。
 - 切關提示出現前，上一關最後一題必須已通過兩道閥並離場；按「繼續」後畫面
   上的目標必須是新關卡第一題，且仍停在 `Z_SPAWN`、尚未被提示期間推進。
 - 提示停留時 `handle.elapsed` 不得增加，目標與閥門不得移動。
-- 提示停留多久都不得改變最終 `duration = 600000` 或各關實際遊玩秒數。
+- 提示停留多久都不得改變最終 `duration = 360000` 或各關實際遊玩秒數。
 - `autoStart: true` 只略過總標題畫面，不得略過關卡提示。
 
 ### 每一關的素材必須固定（1.7 的核心）
 
-- 同一關之內，所有題目的 `objectItems` **集合**完全相同（順序可以不同），
-  `shapeItems` 亦然。跑完一場後逐題檢查，任何一關出現集合不一致就是錯的。
+- `model` 關之內，所有題目的 `objectItems` **集合**完全相同（順序可以不同）；
+  每一關的 `shapeItems` 亦然。跑完一場後逐題檢查，任何一關出現集合不一致就是錯的。
 - 第 1 關的 `objectItems` 集合恆等於 `assets/2/` 的 2 張圖；
-  第 2 關恆等於 `assets/3/` 的 3 張；第 3 關恆等於四個類別各一張；
-  第 4 關恆等於 `assets/4/` 的 4 張；第 5 關恆等於 `assets/5/` 的 5 張。
-- 第 3 關的四張 `objectItems` 仍固定為四類別各自依檔名排序的第一張；目標
-  `content` 則必須涵蓋四類別底下的全部圖片。以目前共 14 張素材而言，連續
+  第 2 關恆等於 `assets/3/` 的 3 張；第 4 關恆等於 `assets/4/` 的 4 張；
+  第 5 關恆等於 `assets/5/` 的 5 張。
+- 第 3、6 關的 `objectItems` 每個類別恰好一格：目標類別那一格是這一題的目標圖
+  本身，其餘三格固定為各類別依檔名排序的第一張（見 1.7、4.10）。目標
+  `content` 必須涵蓋四類別底下的全部圖片。以目前共 14 張素材而言，連續
   14 題的 `target.content.id` 必須恰好各出現一次，第 15 題才可開始重複。
 - 第 1、2 關的 `shapeItems` 集合恆等於前 5 個形狀；
-  第 3、4、5 關恆等於前 2 個形狀。
+  第 3–6 關恆等於前 2 個形狀。
 - 同一關內**排列順序要真的有在變**（不是每題都一樣的順序）。
 
 ### 閥的操作（1.2 的核心）
@@ -1159,7 +1187,8 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - **按住不放只轉一格**（瀏覽器的 `keydown` 自動重複必須被擋掉）。
 - 連按 3 下會依序轉 3 格，一下都不吞。
 - 判定時取到的 `answer()` 永遠是某個明確的選項，不會落在兩格之間。
-- `slotsRotated` 是整數，且等於該題對該閥的有效按鍵次數。
+- `slotsRotated` 是整數，且等於該題在判定前對該閥的有效按鍵次數；目標通過
+  閥門那一幀才按的鍵不影響答案，也不計入（見 4.11.1）。
 
 ### 純繪製常數不得影響任何資料（第 2 節的核心）
 
@@ -1177,8 +1206,8 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - 形狀閥的選項**只出現在賽道中央與中央右側**，物件閥**只出現在中央與左側**。
   任何一幀出現「形狀閥有選項在中央左側超過半格」就是錯的（滑出中央那半格
   的過渡除外）。
-- 靜止時畫面上的可見數量：第 1、2 關形狀閥 3 個、第 3–5 關形狀閥 2 個；
-  物件閥五關**一律 2 個**。
+- 靜止時畫面上的可見數量：第 1、2 關形狀閥 3 個、第 3–6 關形狀閥 2 個；
+  物件閥六關**一律 2 個**。
 - 靜止時中央那一個的 `lane` 精確為 `0`，且它就是 `answer()`。
 - 轉動時 `lane` 連續變化，唯一的不連續是 `off` 由 `-0.5` 環繞到 `N-0.5`
   （相鄰兩幀的 `lane` 差在此處以外不得超過
@@ -1216,7 +1245,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
   可以進入遊戲並實際遊玩。
 - 逐題紀錄的每一個 `#` 都恰好有兩列（`shape` 與 `object` 各一），
   且 `object` 那列的規則等於該關設計表的 `objectRule`：
-  第 1、2、4、5 關為 `model`，第 3 關為 `category`。
+  第 1、2、4、5 關為 `model`，第 3、6 關為 `category`。
 - 關卡時間門檻落在題目飛行途中時，須先完成該題的 shape/object 兩列紀錄，
   等目標離開後才切關；下一關提示按下「繼續」後不得出現上一關最後一題。
 - 每題仍要以**出題當下**的關卡固定屬性進行判定（見 4.12）。

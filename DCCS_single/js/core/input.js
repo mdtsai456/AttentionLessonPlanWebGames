@@ -19,6 +19,9 @@ export function createInput(bindings) {
     const actions = codeToActions.get(e.code);
     if (!actions) return;
     e.preventDefault();
+    // 遊戲暫停中（例如確定離開後存檔、視窗太小）的按鍵不記：'webgame:pause' 只清掉
+    // 暫停前的，暫停中按的若照記，恢復後會一次補轉。
+    if (window.WebGameRuntime && window.WebGameRuntime.paused) return;
     for (const action of actions) {
       down.add(action);
       // 長按只計算一次，不處理瀏覽器自動重複的 keydown。

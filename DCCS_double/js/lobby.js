@@ -81,7 +81,16 @@ export function readLobbySession() {
   return { mode: 'single', players: [player1] };
 }
 
-/** 將後端的 "YYYY-MM-DD HH:MM:SS" 格式 UTC naive 時間轉為本地時區的 Date。 */
+// 施測日以台灣時間（UTC+8）判斷，不使用裝置時區。
+const TAIPEI_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+function taipeiDateKey(date) {
+  return TAIPEI_DATE.format(date);
+}
+
+/** 將後端的 "YYYY-MM-DD HH:MM:SS" 格式 UTC naive 時間轉為 Date。 */
 function parseUtcTimestamp(value) {
   if (typeof value !== 'string' || !value) return null;
   const date = new Date(`${value.replace(' ', 'T')}Z`);
@@ -91,7 +100,7 @@ function parseUtcTimestamp(value) {
 /**
  * 推導學生今日的 currentDay。
  *
- * 施測日使用本地日曆日期。後端儲存 UTC 時間，比較前須轉為本地時區。
+ * 施測日使用台灣時間（UTC+8）。後端儲存 UTC 時間，比較前須轉為台灣時間。
  * 今日已玩過其他遊戲時，沿用當日值。否則使用歷史最大值加 1。沒有記錄時，使用 1。
  *
  * 失敗時拋出錯誤，不使用推測值，避免錯誤的 currentDay 影響研究資料。
@@ -122,7 +131,7 @@ export async function resolveCurrentDay(player) {
   const sessions = Array.isArray(body && body.sessions) ? body.sessions : [];
   if (sessions.length === 0) return 1;
 
-  const todayKey = new Date().toDateString();
+  const todayKey = taipeiDateKey(new Date());
   let maxSeen = 0;
   let todaysDay = null;
 
@@ -132,7 +141,7 @@ export async function resolveCurrentDay(player) {
     if (day > maxSeen) maxSeen = day;
 
     const startedAt = parseUtcTimestamp(session.startTime);
-    if (startedAt && startedAt.toDateString() === todayKey) {
+    if (startedAt && taipeiDateKey(startedAt) === todayKey) {
       // 同一施測日的五款遊戲共用 currentDay。取當日的最大值，
       // 避免先前場次的較低錯誤值影響當日結果。
       todaysDay = todaysDay === null ? day : Math.max(todaysDay, day);

@@ -5,150 +5,23 @@
 // 測試攔截所有成績 POST 請求，不連線至正式後端。
 
 import { test, expect } from '@playwright/test';
-import { fileURLToPath } from 'node:url';
-
-const FULL_LENGTH = process.env.DCCS_FULL_LENGTH === '1';
-const LEVEL_SECONDS = FULL_LENGTH ? 60 : 10;
-const QUERY = FULL_LENGTH ? '' : '?sessionSeconds=60';
-const SUBMIT_PATH = '/__test__/api/sessions';
-const screenshotPath = (name) => fileURLToPath(new URL(`../../.context/${name}.png`, import.meta.url));
-
-// 等待時間包含關卡時長與題目離場時間。主機忙碌時，影格更新較慢，遊戲時間可能落後實際時間。
-const LEVEL_TIMEOUT = (LEVEL_SECONDS * 2 + 30) * 1000;
-
-/**
- * 寫入大廳登入資料，並把成績送出位址改到可攔截的同源路徑。
- * @param {import('@playwright/test').Page} page
- * @param {'single' | 'double'} mode
- * @param {{delayMs?: number, fail?: boolean, hang?: boolean}} [submitOptions]
- */
-async function setup(page, mode, submitOptions = {}) {
-  const posts = [];
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-
-  await page.addInitScript(({ mode, submitPath }) => {
-    const s = window.sessionStorage;
-    if (mode === 'double') s.setItem('game_mode', 'double');
-    else s.removeItem('game_mode');
-    s.setItem('school', 'TEST');
-    s.setItem('student1_case', 'T01');
-    s.setItem('student1_grade', 'G1');
-    s.setItem('student1_day', '1');
-    s.setItem('student1_token', 'dummy');
-    if (mode === 'double') {
-      s.setItem('student2_case', 'T02');
-      s.setItem('student2_grade', 'G1');
-      s.setItem('student2_day', '1');
-      s.setItem('student2_token', 'dummy');
-    }
-    s.setItem('login_expires_at', String(Date.now() + 3600e3));
-    window.DCCS_SUBMIT_URL = submitPath;
-  }, { mode, submitPath: SUBMIT_PATH });
-
-  await page.route(`**${SUBMIT_PATH}`, async (route) => {
-    posts.push(route.request().postDataJSON());
-    if (submitOptions.hang) return;
-    if (submitOptions.delayMs) {
-      await new Promise((resolve) => setTimeout(resolve, submitOptions.delayMs));
-    }
-    if (submitOptions.fail) {
-      await route.abort();
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-  });
-
-  return { posts, pageErrors };
-}
-
-// 第 6 關目前沒有可行題目，Track 會警告並略過。依 SPEC 4.11，整場最多記錄到第 5 關。
-const FULL_SESSION_STAGE = 5;
-const FULL_SESSION_LEVELS = '1,2,3,4,5';
-
-/** 讀取 payload 中指定的 stats 欄位。 */
-function stat(payload, name) {
-  const entry = payload.data.stats.find((item) => item.apiname === `DCCS_${name}`);
-  return entry ? entry.value : undefined;
-}
-
-/**
- * 處理關卡提示與關間畫面，直到 stopWhen 成立。
- * @param {import('@playwright/test').Page} page
- * @param {'single' | 'double'} mode
- * @param {string} stopWhen 'break' | 'level4-clear' | 'session-end'
- * @param {number} timeoutMs
- */
-async function drive(page, mode, stopWhen, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (stopWhen === 'session-end' && /\/Select\/index\.html/.test(page.url())) {
-      return 'navigated';
-    }
-
-    const step = await page
-      .evaluate(({ mode, stopWhen }) => {
-        const visible = (el) => !!el && el.checkVisibility();
-        const stageClear = document.querySelector('.shared-stage-clear');
-
-        if (stageClear && !stageClear.hidden) {
-          const text = stageClear.textContent;
-          if (stopWhen === 'level4-clear' && text.includes('第 4 關結束')) {
-            return 'level4-clear';
-          }
-          document.querySelector('.shared-stage-clear-btn').click();
-          return 'stage-clear';
-        }
-
-        if (mode === 'double') {
-          if (visible(document.getElementById('shared-break'))) return 'break';
-          if (visible(document.getElementById('shared-title'))) return 'title';
-          if (visible(document.getElementById('shared-level'))) {
-            document.getElementById('shared-continue').click();
-            return 'level-prompt';
-          }
-          return 'running';
-        }
-
-        if ([...document.querySelectorAll('[data-break="continue"]')].some(visible)) return 'break';
-        const resultLobby = [...document.querySelectorAll('[data-result="lobby"]')].find(visible);
-        if (resultLobby) {
-          if (stopWhen === 'session-end') resultLobby.click();
-          return 'result';
-        }
-        const levelButton = [...document.querySelectorAll('.dccs-level-continue:not([data-break])')]
-          .find(visible);
-        if (levelButton) {
-          levelButton.click();
-          return 'level-prompt';
-        }
-        return 'running';
-      }, { mode, stopWhen })
-      // 導向頁面期間，evaluate 可能失敗。下一輪重新檢查。
-      .catch(() => 'navigating');
-
-    if (step === 'title') await page.keyboard.press('Space');
-    if (step === stopWhen) return step;
-    if (stopWhen === 'session-end' && step === 'break') {
-      throw new Error('session-end 不應再遇到中場休息畫面');
-    }
-
-    await page.waitForTimeout(250);
-  }
-
-  throw new Error(`drive: ${timeoutMs}ms 內沒有等到 ${stopWhen}`);
-}
-
-async function reachBreak(page, mode) {
-  await page.goto(`${mode === 'double' ? '/DCCS_double/index.html' : '/DCCS_single/index.html'}${QUERY}`);
-  await drive(page, mode, 'break', 3 * LEVEL_TIMEOUT + 15_000);
-}
-
+import {
+  FULL_SESSION_LEVELS,
+  FULL_SESSION_STAGE,
+  LEVEL_TIMEOUT,
+  drive,
+  reachBreak,
+  recordNativeDialogs,
+  screenshotPath,
+  setup,
+  stat,
+  unloadGuardActive,
+} from './helpers.mjs';
 // 觀察既有的 Track 實例，保留題目、計時與判定。透過鍵盤事件作答。
 async function observeTracks(page, mode) {
-  await page.evaluate(async () => {
-    const { Track } = await import('/DCCS_single/js/game/track.js');
+  // 雙人頁載入的是 DCCS_double 自己那份引擎，要改那一份的 Track 才觀察得到。
+  await page.evaluate(async (mode) => {
+    const { Track } = await import(`/DCCS_${mode}/js/game/track.js`);
     const render = Track.prototype.render;
     window.testTracks = new Set();
     window.getTestTracks = () => [...window.testTracks].sort((a, b) =>
@@ -157,7 +30,7 @@ async function observeTracks(page, mode) {
       window.testTracks.add(this);
       return render.apply(this, args);
     };
-  });
+  }, mode);
   await expect.poll(() => page.evaluate(() => window.testTracks.size))
     .toBe(mode === 'double' ? 2 : 1);
 
@@ -199,15 +72,6 @@ async function assertPlayable(page, mode) {
       && row.slotsRotated > 0 && Number.isFinite(row.firstInputMs)).length === 2
   ), before.map((t) => t.trial)), { timeout: 10_000 }).toBe(true);
   await page.screenshot({ path: screenshotPath(`dccs-${mode}-verified-play`) });
-}
-
-/** 模擬離開頁面。beforeunload 呼叫 preventDefault 時，表示離開保護生效。 */
-function unloadGuardActive(page) {
-  return page.evaluate(() => {
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    return event.defaultPrevented;
-  });
 }
 
 function anyVisible(page, selector) {
@@ -258,12 +122,8 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     await page.locator('#shared-break-continue').click();
     await expect(page.locator('#shared-overlay')).toBeHidden({ timeout: 2000 });
 
-    // 若遊戲結束時未解除離開保護，beforeunload 會阻止導向頁面。
-    const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.type());
-      void dialog.accept();
-    });
+    // 若遊戲結束時未解除離開保護，導頁會跳出瀏覽器的離開詢問。
+    const dialogs = recordNativeDialogs(page);
 
     await drive(page, 'double', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
     await page.waitForURL(/\/Select\/index\.html/);
@@ -283,6 +143,8 @@ test.describe('雙人版 第 3 關後中場休息', () => {
   test('點「返回遊戲大廳」：立即顯示送出中畫面、連點只送一次、送完回大廳', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'double', { delayMs: 3000 });
     await reachBreak(page, 'double');
+    // 中場「返回遊戲大廳」是明確的選擇：不再問要不要離開，也不能跳出瀏覽器的離開詢問。
+    const dialogs = recordNativeDialogs(page);
 
     const lobby = page.locator('#shared-break-lobby');
     const box = await lobby.boundingBox();
@@ -305,6 +167,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
 
     await page.waitForURL(/\/Select\/index\.html/, { timeout: 15_000 });
 
+    expect(dialogs).toEqual([]);
     expect(posts).toHaveLength(2);
     expect(posts.map((p) => p.data.caseId).sort()).toEqual(['T01', 'T02']);
     for (const payload of posts) {
@@ -380,11 +243,7 @@ test.describe('單人版 第 3 關後中場休息（回歸）', () => {
     await reachBreak(page, 'single');
     await page.locator('[data-break="continue"]').click();
 
-    const dialogs = [];
-    page.on('dialog', (dialog) => {
-      dialogs.push(dialog.type());
-      void dialog.accept();
-    });
+    const dialogs = recordNativeDialogs(page);
 
     await drive(page, 'single', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
     await page.waitForURL(/\/Select\/index\.html/);
@@ -400,10 +259,12 @@ test.describe('單人版 第 3 關後中場休息（回歸）', () => {
   test('點「返回遊戲大廳」：送出 3 關成績並回到大廳', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'single');
     await reachBreak(page, 'single');
+    const dialogs = recordNativeDialogs(page);
 
     await page.locator('[data-break="lobby"]').click();
     await page.waitForURL(/\/Select\/index\.html/, { timeout: 15_000 });
 
+    expect(dialogs).toEqual([]);
     expect(posts).toHaveLength(1);
     expect(stat(posts[0], 'stage')).toBe(3);
     expect(stat(posts[0], 'levelsPlayed')).toBe('1,2,3');
