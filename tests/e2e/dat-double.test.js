@@ -23,7 +23,7 @@ describe('DAT_double 雙人版', () => {
   test('正式模式：連續 5 題升級，失敗只歸零連擊不降級，回饋提示規則，兩位玩家互不影響', async () => {
     const session = await openGame(browser, server.origin, { game: 'double', mode: 'game' });
     try {
-      // P1：升級 → 漏答/誤按 → 無連擊時再失敗 → 答對 → 沒瞄準 → 再連續 5 題升級
+      // P1 的測試順序：升級、漏答或誤按、無連擊時再次失敗、答對、未瞄準、連續答對 5 題後升級。
       const p1Plan = [
         ...Array(5).fill('correct'),
         'miss',
@@ -32,7 +32,7 @@ describe('DAT_double 雙人版', () => {
         'offTarget',
         ...Array(5).fill('correct'),
       ];
-      // P2：在 P1 失敗時答對，在 P1 答對時失敗，驗證雙向互不影響
+      // P1 失敗時，P2 答對。P1 答對時，P2 失敗。驗證兩位玩家互不影響。
       const p2Plan = [
         'correct', 'correct', 'miss',
         ...Array(5).fill('correct'),
@@ -55,7 +55,7 @@ describe('DAT_double 雙人版', () => {
 
       assert.equal(p1.image, 'dog.png', 'P1 最後應升到第 3 級（狗）');
       assert.equal(p2.image, 'dog.png', 'P2 最後應升到第 3 級（狗）');
-      // 14 題會跨過第 1、2 關，確認動物等級跨關保留的情境確實有被測到
+      // 14 題會跨越第 1、2 關，以驗證換關後保留動物等級。
       const feedback = await session.page.evaluate(() => window.__qa.feedback);
       for (const list of feedback) {
         assert.ok(list.some((t) => t.startsWith('恭喜通過第 1 關')), '應跨過第 1 關');

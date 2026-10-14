@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 
-// 可使用專案外已安裝的 Playwright，避免把測試依賴放進靜態網站。
+// 可使用專案外已安裝的 Playwright，避免將測試依賴加入靜態網站。
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const baseUrl = process.env.DCCS_BASE_URL || 'http://127.0.0.1:8765';
 const screenshotDir = process.env.DCCS_SCREENSHOT_DIR;
@@ -60,7 +60,7 @@ async function playDouble(choice) {
         }
         assert.fail('選擇繼續遊玩後，共用休息提示仍遮住遊戲');
       }
-      // 後續過關提示也必須可以直接點擊，不按 Enter、不強制 click。
+      // 後續過關提示須能直接點擊，不使用 Enter 或強制 click。
       for (let level = 4; level <= 5; level++) {
         await page.locator('.shared-stage-clear-btn').click({ timeout: 12000 });
       }

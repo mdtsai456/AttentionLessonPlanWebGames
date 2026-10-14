@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["students"])
 
 
-# --- 工具函式 ---
+# 工具函式
 
 
 def parse_student_key(student_key: str) -> tuple[str, str]:
@@ -71,7 +71,7 @@ def session_fields_from_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def stored_level_accuracy(value: Any) -> list[float] | None:
-    """資料庫裡的逗號字串還原成每一關正確率。舊場次沒有這個欄位。"""
+    """將資料庫中以逗號分隔的字串轉為每關正確率。舊場次可能沒有此欄位。"""
     if value is None or value == "":
         return None
     levels = [float(part) for part in str(value).split(",") if part.strip() != ""]
@@ -91,7 +91,7 @@ def optional_stored_int(value: Any) -> int | None:
 
 
 def build_game_stats(row: dict[str, Any] | None) -> GameStats | None:
-    """從遊戲細部表列取出遊戲統計欄位。"""
+    """從遊戲明細表的資料列取得統計欄位。"""
     if row is None:
         return None
     return GameStats(
@@ -108,14 +108,14 @@ def build_game_stats(row: dict[str, Any] | None) -> GameStats | None:
     )
 
 
-# --- report 組裝（純函式） ---
+# report 組裝，使用純函式。
 
 
 def build_play_records(
     rows: list[dict[str, Any]],
     stats_by_uuid: dict[str, dict[str, Any]],
 ) -> list[PlayRecord]:
-    """合併場次索引與各遊戲細部統計。"""
+    """合併場次索引與各遊戲的明細統計。"""
     return [
         PlayRecord(
             **session_fields_from_row(row),
@@ -126,10 +126,10 @@ def build_play_records(
 
 
 def build_summary_by_game(records: list[PlayRecord]) -> list[GameSummary]:
-    """依 (遊戲種類, 模式) 彙總多場次統計。
+    """依遊戲種類與模式，彙總多場次統計。
 
-    單人版與雙人版難度不同，混在同一列會誤導 —— 故分組鍵是 (gameType, mode)，
-    同一遊戲最多拆成 single + double 兩列。排序先 gameType 再 mode（single 在前）。
+    單人與雙人模式的難度不同，因此使用 (gameType, mode) 分組。
+    同一遊戲最多有 single 與 double 兩列。先依 gameType 排序，再依 mode 排序，single 在前。
     """
     grouped: dict[tuple[str, str], list[PlayRecord]] = {}
     for record in records:
@@ -172,7 +172,7 @@ def build_summary_by_game(records: list[PlayRecord]) -> list[GameSummary]:
 
 TREND_METRICS = ("correctCount", "wrongCount", "accuracy")  # 固定順序
 
-# 顯示順序：single 一律排在 double 前（不是字母序 —— 字母序會把 double 排前面）。
+# 顯示時，single 固定排在 double 前，不使用字母排序。
 _MODE_ORDER = {"single": 0, "double": 1}
 
 
@@ -181,11 +181,11 @@ def _mode_sort_key(mode: str) -> int:
 
 
 def build_trends(records: list[PlayRecord]) -> list[GameTrend]:
-    """把 records 依 gameType × 指標 pivot 成時間序列。純函式。
+    """依 gameType 與指標，將 records 轉為時間序列。使用純函式。
 
-    stats 為 None 的場次沒有數值可畫，整筆略過。分組鍵為 (gameType, mode)，
-    依該 tuple 排序（gameType 字母序、single 在 double 前）。每條序列由舊到新
-    （startTime 為 YYYY-MM-DD HH:MM:SS，字典序即時間序）。
+    stats 為 None 時，略過該場次。使用 (gameType, mode) 分組。
+    gameType 依字母排序，同遊戲的 single 排在 double 前。
+    每個序列由舊至新排列。startTime 為 YYYY-MM-DD HH:MM:SS，字典序與時間序相同。
     """
     grouped: dict[tuple[str, str], list[PlayRecord]] = {}
     for record in records:
@@ -213,7 +213,7 @@ def build_trends(records: list[PlayRecord]) -> list[GameTrend]:
 
 
 def build_student_list_items(rows: list[dict[str, Any]]) -> list[StudentListItem]:
-    """把 fetch_students 的列組成回應項目。純函式。"""
+    """將 fetch_students 的資料列組成回應項目。使用純函式。"""
     return [
         StudentListItem(
             studentKey=f"{row['grade']}_{row['case_id']}",
@@ -227,7 +227,7 @@ def build_student_list_items(rows: list[dict[str, Any]]) -> list[StudentListItem
     ]
 
 
-# --- API 路由 ---
+# API 路由
 
 
 @router.get("/api/students", response_model=StudentListResponse)
@@ -237,10 +237,10 @@ def list_students(
     ),
     identity: Identity = Depends(require_teacher),
 ) -> StudentListResponse:
-    """老師專用。不管有沒有帶 school，一律只回登入老師自己場域的學生——
+    """老師專用端點，只回傳登入老師所屬場域的學生。
 
-    帶了別的場域字串一律 403，不是靜默改查自己場域，才不會讓呼叫端誤以為查到了
-    別人的資料卻其實悄悄被換掉。
+    未提供 school 時，使用老師的場域。提供其他場域時，回傳 403。
+    不自動改查自己的場域，避免呼叫端誤判結果的來源。
     """
     normalized_school = normalize_school(school) or identity.school
     if normalized_school != identity.school:

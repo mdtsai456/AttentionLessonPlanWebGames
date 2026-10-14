@@ -2,11 +2,11 @@ import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
-// 每關 60 秒、共 6 關。時間內答完就繼續出題；單題 10 秒沒答算錯並換下一題。
+// 每關 60 秒，共 6 關。關卡時間內持續出題。單題 10 秒未作答時，計為錯誤並換題。
 const STAGE_COUNT = 6;
 const MID_STAGE = 3;
 
-// DOM and game state
+// DOM 與遊戲狀態
 const $ = (id) => document.getElementById(id);
 let gameStartTime = 0;
 let savedStage = 0;
@@ -39,12 +39,12 @@ const player = createEftPlayer({
     },
 });
 
-// Randomization and asset helpers
+// 隨機選取與素材輔助函式
 function shuffle(items) { return player.shuffle(items); }
 function asset(style, direction, opposite) { return player.asset(style, direction, opposite); }
 function setEnabled(enabled) { player.setEnabled(enabled); }
 
-// Stage clock and progress UI
+// 關卡計時與進度介面
 function stageRemaining() { return player.stageRemaining(); }
 function updateProgress() { player.updateProgress(); }
 function startStageClock() { player.startStageClock(); }
@@ -52,7 +52,7 @@ function stopStageClock() { player.stopStageClock(); }
 function makeQuestion() { return player.makeQuestion(); }
 function renderQuestion() { player.renderQuestion(); }
 
-// Game and stage lifecycle
+// 遊戲與關卡的生命週期
 function beginStage(nextStage) { player.beginStage(nextStage); }
 function startGame() { player.startGame(); }
 function resetGame() { player.resetGame(); }
@@ -99,7 +99,7 @@ async function saveGameDataToBackend(data) {
     const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade');
     const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case');
     const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school');
-    // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
+    // 未取得登入學生資料時，不送出成績，避免將未登入的成績寫入正式資料庫。
     if (!grade || !caseId || !school) {
         console.warn('找不到登入學生資料，成績不送出');
         return;
@@ -112,7 +112,7 @@ async function saveGameDataToBackend(data) {
         10
     );
 
-    // 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。
+    // 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
     const payload = {
         lessonId: '1140908_EFT',
         data: {
@@ -143,7 +143,7 @@ function missQuestion(message) { player.missQuestion(message); }
 function endStage() { player.endStage(); }
 function answer(direction) { player.answer(direction); }
 
-// Event handlers and startup
+// 事件處理與啟動流程
 function handleKeydown(event) {
     if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
     const overlay = !$('results').hidden ? $('results') : (!$('mid-break-modal').hidden ? $('mid-break-modal') : null);
@@ -205,7 +205,7 @@ const legacyApi = {
     endStage, answer, leaveGame
 };
 
-// Keep classic-script function names callable while containing implementation in a module.
+// 實作封裝於模組中，並保留傳統 script 可呼叫的函式名稱。
 window.EFTSingle = Object.freeze({ ...legacyApi, resetGame });
 Object.assign(window, legacyApi);
 

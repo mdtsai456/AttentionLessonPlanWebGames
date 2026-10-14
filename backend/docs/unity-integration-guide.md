@@ -30,7 +30,7 @@ Content-Type: application/json
 - 一位學生玩完一場 → 送一個 POST。**雙人版是兩位學生 → 兩個各自獨立的 POST**（見 §3）。
 - 單人必須帶 `Authorization: Bearer <本人學生 token>`。
 - 雙人每筆另帶 `X-Partner-Authorization: Bearer <搭檔學生 token>`。兩個 token 都必須有效、未過期、未撤銷，且皆屬於學生。
-- `data.grade`／`caseId`／`school` 必須與 **Authorization 本人**完全一致。不得使用預設學生身分；可由 `GET /api/auth/me` 查詢身分及 `expiresAt`（回應 `Cache-Control: no-store`）。
+- `data.grade`／`caseId`／`school` 必須與 **Authorization 本人**完全一致。不得使用預設學生身分；可由 `GET /api/auth/me` 查詢身分、`expiresAt` 及剩餘秒數 `expiresIn`（回應 `Cache-Control: no-store`）。
 - 缺 token、假 token、過期或已撤銷回 `401`；老師 token 或成績身分不符回 `403`，均不寫入。
 - 不新增同校或不同帳號限制。Token 只放 headers，不寫入成績 payload 或待送佇列。
 
@@ -67,7 +67,7 @@ Content-Type: application/json
 | `data.school` | string | **場域識別字串**，見 §6。三方必須完全一致 |
 | `data.currentDay` | int | 第幾個施測日 |
 | `data.startTime` / `endTime` | int | Unix **毫秒**。`endTime` 不可早於 `startTime` |
-| `data.stats[]` | array | `{apiname, value}` 陣列。每款遊戲**必須**包含這 5 筆（`<遊戲>_` 前綴）：`_correct`、`_wrong`、`_accuracy`、`_duration`、`_stage`。缺任一筆 → `400` |
+| `data.stats[]` | array | `{apiname, value}` 陣列。每款遊戲**必須**包含這 5 筆（`<遊戲>_` 前綴）：`_correct`、`_wrong`、`_accuracy`、`_duration`、`_stage`。缺任一筆，或 `value` 不是有限數字（`null` 視為 0；`NaN`／`Infinity`／陣列／物件）→ `400` |
 
 > **注意（現況）**：中介平台目前**只儲存上面這 5 個核心數值**。你多送的遊戲專屬欄位
 > （如 `DAT_avgReactionTime`、`EFT_wrongDirectionCount`…）中介平台會**收下但不寫入
@@ -142,6 +142,20 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 如果 `mode: "double"` 但沒帶 `pairId`：中介平台**還是會收**（`201`），只是那筆少了
 「跟搭檔的連結」。所以就算 `pairId` 產生邏輯出包，成績也不會掉。但請盡量帶對。
 
+### 3.5 重送同一筆：submissionId（單人、雙人都適用，選填）
+
+送出逾時、但伺服器其實已經寫入時，前端重送會多出一列。要避免這種重複，每筆成績
+第一次送出前產一個 UUID 放在 `data.submissionId`，**重送同一筆時沿用同一個值**。
+
+- 後端用「學生身分（`grade`／`caseId`／`school`）＋ `submissionId`」推導出這一場的
+  `sessionId`（UUID v5），**回傳的 `sessionId` 不等於 `submissionId`**，請以回應為準。
+- 同一位學生再送一次同一個 `submissionId`（大小寫不拘），推導出同一個 `sessionId`：
+  回 `201` 和先前那一筆的 `sessionId`，不會多寫一列。
+- 不同學生就算剛好送了同一個 `submissionId`，也會得到不同的 `sessionId`，各自寫入，
+  不會互相覆蓋或被當成重送。
+- 不是 UUID 格式回 `400` `{"detail": "submissionId 格式錯誤"}`。
+- 不帶就跟以前一樣，由後端產生 `sessionId`。網頁版 DCCS（`js/net/client.js`）已經會帶。
+
 ---
 
 ## 4. 驗證規則與錯誤回應
@@ -156,10 +170,14 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
 | `pairId` 長度 > 36 | `400` | `{"detail": "pairId 格式錯誤"}` |
 | `data.school` 不在已登記的 8 個場域內（打錯字、送了表外的值） | `400` | `{"detail": "未知的場域（school 尚未登記）"}` —— 這筆成績**不會被儲存**，請修正 `school` 後重送 |
 | 缺 5 個核心 stat 之一 | `400` | `{"detail": "缺少必要統計：DAT_wrong"}` |
+| 核心 stat 不是有限數字（`NaN`、`Infinity`、陣列、物件、文字） | `400` | `{"detail": "DAT_correct 必須是數字"}` |
 | `endTime` 早於 `startTime` | `400` | `{"detail": "endTime 不可早於 startTime"}` |
 | `grade`／`caseId`／`school` 空白 | `422` | — |
 | `lessonId` 認不出遊戲 | `400` | `{"detail": "不支援的遊戲：XXX"}` |
-| 同一個 sessionId 重複送 | `409` | `{"detail": "場次已存在"}` |
+| 同一位學生重送同一個 `submissionId`（見 §3.5） | `201` | 回先前那一筆的 `sessionId`（由學生身分＋`submissionId` 推導，不等於 `submissionId`），不重複寫入 |
+| 不同學生送了同一個 `submissionId` | `201` | 各自寫入，`sessionId` 不同 |
+| `submissionId` 不是 UUID | `400` | `{"detail": "submissionId 格式錯誤"}` |
+| 同一個 sessionId 重複送（未帶 `submissionId`） | `409` | `{"detail": "場次已存在"}` |
 | 中介平台/資料庫出錯 | `500` | `{"detail": "資料庫寫入失敗"}`（可重送） |
 
 `mode: "single"` 時若誤帶了 `pairId`，會被忽略（存 NULL），不報錯。

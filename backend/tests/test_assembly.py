@@ -1,4 +1,4 @@
-"""rows → models 的組裝邏輯。純函式，不碰資料庫。"""
+"""rows 轉為 models 的組裝邏輯。使用純函式，不存取資料庫。"""
 
 from __future__ import annotations
 
@@ -109,10 +109,9 @@ def test_build_play_records_leaves_stats_none_when_uuid_missing():
 
 
 def test_build_summary_by_game_aggregates_and_rounds_average():
-    """0.1 與 0.2 是刻意挑的：它們的平均是 0.15000000000000002，不等於 0.15。
+    """使用 0.1 與 0.2，因為平均值是 0.15000000000000002，可驗證 round(..., 2) 的作用。
 
-    若改用 0.8 與 0.5，平均恰好是 0.65，這個測試就無法分辨 round(..., 2)
-    存不存在 —— 拿掉那行照樣通過。
+    0.8 與 0.5 的平均值為 0.65，即使移除捨入，測試仍會通過，因此不適用於此檢查。
     """
     records = build_play_records(
         [_assessment_row("u1"), _assessment_row("u2")],
@@ -154,7 +153,7 @@ def test_build_summary_by_game_sorts_by_game_type():
 
 
 def test_build_summary_by_game_splits_single_and_double_of_same_game():
-    """同一遊戲的 single 與 double 記錄 → 兩列，各自加總，single 在前。"""
+    """同一遊戲的 single 與 double 記錄分成兩列，各自加總，single 排在前方。"""
     records = build_play_records(
         [
             _assessment_row("u1", "DAT", mode="single"),
@@ -254,7 +253,7 @@ def test_build_trends_orders_points_old_to_new():
     row_old["start_time"] = datetime(2026, 7, 1, 9, 0, 0)
     row_new = _assessment_row("new")
     row_new["start_time"] = datetime(2026, 7, 8, 9, 0, 0)
-    # 刻意把新的排在輸入的前面，證明是 build_trends 在升冪排序
+    # 將較新的記錄放在輸入前方，驗證 build_trends 依時間升冪排序。
     records = build_play_records(
         [row_new, row_old],
         {"new": _stats_row("new"), "old": _stats_row("old")},
@@ -273,7 +272,7 @@ def test_build_trends_skips_records_without_stats():
 
     trends = build_trends(records)
 
-    # 兩筆都是 DCCS，只有 u1 有 stats：每條序列只剩 1 個點
+    # 兩筆資料皆為 DCCS，但只有 u1 包含 stats，因此每個序列只有一個點。
     assert len(trends[0].items[0].stats) == 1
 
 
@@ -302,7 +301,7 @@ def test_build_trends_of_records_all_without_stats_is_empty():
 
 
 def test_build_trends_splits_same_game_by_mode():
-    """同 gameType 的 single / double → 兩個趨勢群，各群只含該模式的點。"""
+    """相同 gameType 的 single／double 分成兩個趨勢群。各群只包含對應模式的資料點。"""
     records = build_play_records(
         [
             _assessment_row("s1", "DAT", mode="single"),

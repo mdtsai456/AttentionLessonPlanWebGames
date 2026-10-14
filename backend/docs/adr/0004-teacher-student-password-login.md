@@ -27,10 +27,10 @@ mockup 隱含的需求，所以改成另外發一組**全域唯一**的帳號。
    `hashlib.pbkdf2_hmac`（`auth.py`）雜湊，不存明碼、不用外部套件。
 2. **`teacher` / `student` 各加 `account` 欄位（全域唯一，`UNIQUE` 索引）**，
    跟原本的姓名／`studentKey` 脫鉤：
-   - `teacher.account` 格式 `T0001`，由 `teacher_id` 推導。
+   - `teacher.account` 格式 `T001`，由 `teacher_id` 推導。
    - `student` 另外加一個代理鍵 `student_id`（`AUTO_INCREMENT`、`UNIQUE`，
      不動原本 `(grade, case_id, school)` 複合主鍵，其他表的外鍵不受影響），
-     `student.account` 格式 `S0001`，由 `student_id` 推導。
+     `student.account` 格式 `S001`，由 `student_id` 推導。
    - 兩者都是 `DEFAULT NULL`（不是空字串）——同一時間多筆都還沒指派帳號時，
      `UNIQUE` 索引才不會因為「多個空字串重複」而炸掉（MySQL 對 `NULL` 不視為
      重複，對空字串會）。

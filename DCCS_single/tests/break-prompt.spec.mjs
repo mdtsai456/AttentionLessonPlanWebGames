@@ -1,8 +1,8 @@
-// 第 3 關後「繼續遊玩／返回遊戲大廳」中場休息的端對端測試（單人與雙人）。
+// 第 3 關後中場休息畫面的 E2E 測試，涵蓋單人與雙人模式。
 //
 // 執行：cd DCCS_single/tests && npm install && npx playwright test
-// 預設以 ?sessionSeconds=60 把每關縮成 10 秒；DCCS_FULL_LENGTH=1 時用正式長度（每關 60 秒）。
-// 成績 POST 一律由測試攔截，不會打到真的後端。
+// 預設使用 ?sessionSeconds=60，將每關縮短為 10 秒。DCCS_FULL_LENGTH=1 時，每關使用正式長度 60 秒。
+// 測試攔截所有成績 POST 請求，不連線至正式後端。
 
 import { test, expect } from '@playwright/test';
 import {
@@ -17,8 +17,7 @@ import {
   stat,
   unloadGuardActive,
 } from './helpers.mjs';
-
-// 觀察既有 Track 實例，不變更題目、計時或判定；作答仍透過真正的鍵盤事件。
+// 觀察既有的 Track 實例，保留題目、計時與判定。透過鍵盤事件作答。
 async function observeTracks(page, mode) {
   // 雙人頁載入的是 DCCS_double 自己那份引擎，要改那一份的 Track 才觀察得到。
   await page.evaluate(async (mode) => {
@@ -67,7 +66,7 @@ async function assertPlayable(page, mode) {
     [t._shapePressCount, t._objectPressCount]
   ))).toEqual(before.map((t) => [t.shape + count, t.object + count]));
 
-  // 輪盤會完成轉動，並且這題的鍵盤操作確實進入第 4 關的成績記錄。
+  // 輪盤完成轉動後，本題的鍵盤操作會記錄於第 4 關成績。
   await expect.poll(() => page.evaluate((trials) => window.getTestTracks().every((t, i) =>
     t.stats.rows().filter((row) => row.level === 4 && row.trialIndex === trials[i]
       && row.slotsRotated > 0 && Number.isFinite(row.firstInputMs)).length === 2
@@ -98,7 +97,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     expect(await unloadGuardActive(page)).toBe(true);
     await assertPlayable(page, 'double');
 
-    // 第 4 關確實在跑：時間到會出現「第 4 關結束」。
+    // 第 4 關正在進行時，時間結束後會顯示「第 4 關結束」。
     await drive(page, 'double', 'level4-clear', LEVEL_TIMEOUT);
     expect(posts).toHaveLength(0);
     expect(pageErrors).toEqual([]);
@@ -108,7 +107,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     const { pageErrors } = await setup(page, 'double');
     await reachBreak(page, 'double');
 
-    // 進入畫面時若空白鍵已按著，要放開再按；這裡是全新的一次按鍵。
+    // 進入畫面時，若空白鍵已按住，須先放開再按。此處使用一次新的按鍵事件。
     await page.keyboard.press('Space');
 
     await expect(page.locator('#shared-overlay')).toBeHidden({ timeout: 2000 });
@@ -123,7 +122,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     await page.locator('#shared-break-continue').click();
     await expect(page.locator('#shared-overlay')).toBeHidden({ timeout: 2000 });
 
-    // 若離開保護在結束時沒解除，導頁會跳出瀏覽器的離開詢問。
+    // 若遊戲結束時未解除離開保護，導頁會跳出瀏覽器的離開詢問。
     const dialogs = recordNativeDialogs(page);
 
     await drive(page, 'double', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
@@ -174,7 +173,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     for (const payload of posts) {
       expect(payload.data.mode).toBe('double');
       expect(stat(payload, 'stage')).toBe(3);
-      // 第 4 關的題目不應被記錄進來。
+      // 成績不應包含第 4 關的題目。
       expect(stat(payload, 'levelsPlayed')).toBe('1,2,3');
     }
     expect(pageErrors).toEqual([]);
