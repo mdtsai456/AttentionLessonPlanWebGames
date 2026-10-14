@@ -33,6 +33,12 @@
           id="player1-game"
           class="game-root"
         ></div>
+
+        <p
+          id="player1-case"
+          class="player-case"
+          hidden
+        ></p>
       </section>
 
       <section class="player-panel player-two">
@@ -42,9 +48,15 @@
           id="player2-game"
           class="game-root"
         ></div>
+
+        <p
+          id="player2-case"
+          class="player-case"
+          hidden
+        ></p>
       </section>
 
-      <!-- 左右遊戲共用一份提示，避免兩側重複顯示。 -->
+      <!-- 左右遊戲共用提示畫面，避免重複顯示。 -->
       <div
         id="shared-overlay"
         class="shared-overlay"
@@ -181,6 +193,6 @@
   <script type="application/x-webgame-script" data-src="../shared/session-timeout.js"></script>
   <script type="application/x-webgame-script" data-src="../shared/stage-clear.js"></script>
   <script type="application/x-webgame-script" data-src="../shared/leave-confirm.js"></script>
-  <script type="application/x-webgame-script" data-src="./js/double.js?v=4" data-type="module"></script>
+  <script type="application/x-webgame-script" data-src="./js/double.js?v=9" data-type="module"></script>
 </body>
 </html>

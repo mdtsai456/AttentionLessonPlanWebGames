@@ -1,7 +1,7 @@
-"""測試資料庫的連線、建表、清空與資料插入輔助。
+"""測試資料庫的連線、建表、清空與資料插入輔助函式。
 
-需要環境變數 TEST_DB_NAME，且其值必須以 `_test` 結尾。
-未設定時，需要資料庫的測試會被跳過，不碰資料庫的測試照常執行。
+需要設定 TEST_DB_NAME，且值須以 _test 結尾。
+未設定時，略過需要資料庫的測試。其餘測試照常執行。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ load_dotenv()
 
 SCHEMA_PATH = pathlib.Path(__file__).parent / "schema.sql"
 
-# 由子表往父表刪，避開外鍵限制。
+# 先刪除子表，再刪除父表，避免違反外鍵約束。
 TABLES_CHILD_FIRST = (
     "dat_result",
     "dccs_result",
@@ -27,25 +27,24 @@ TABLES_CHILD_FIRST = (
     "im_result",
     "tgame_result",
     "assessment_result",
-    "login_session",  # 外鍵同時指向 teacher 與 student，兩者都要在它之後刪
+    "login_session",  # 此外鍵同時指向 teacher 與 student，須先刪除此表，再刪除兩個父表。
     "student",
-    "teacher",  # 參照資料：teacher 掛在 school 底下，先刪 teacher
+    "teacher",  # teacher 的外鍵指向 school，須先刪除 teacher。
     "school",
 )
 
 
 def _assert_test_database(name: str) -> None:
-    """防止測試連上正式庫並清空資料。
+    """阻止測試連線至正式資料庫並清空資料。
 
-    這道檢查存在的理由很具體：若有人忘了設 TEST_DB_NAME，
-    測試會靜默連上 AttentionLessonPlan 並 DELETE 掉 student。
+    未設定 TEST_DB_NAME 時，可能連線至 AttentionLessonPlan 並刪除 student 資料，因此須檢查目標。
     """
     assert name.endswith("_test"), f"拒絕在非測試資料庫上執行：{name}"
 
 
 def _schema_statements() -> list[str]:
-    # 以裸分號切分。schema.sql 目前沒有任何字串常值或行內註解包含分號，
-    # 若日後有，這裡會切錯。
+    # 使用分號分隔 SQL。schema.sql 目前的字串常值與行內註解不包含分號，
+    # 若後續加入此類分號，須調整分隔方式。
     raw = SCHEMA_PATH.read_text(encoding="utf-8")
     lines = [line for line in raw.splitlines() if not line.strip().startswith("--")]
     return [stmt.strip() for stmt in "\n".join(lines).split(";") if stmt.strip()]
@@ -53,15 +52,13 @@ def _schema_statements() -> list[str]:
 
 @pytest.fixture(scope="session", autouse=True)
 def point_app_at_test_db() -> Any:
-    """把 DB_NAME 指向測試庫。
+    """將 DB_NAME 指向測試資料庫。
 
-    db.get_db_config() 每次呼叫都會讀 os.getenv，所以在這裡改環境變數即可，
-    不需要 patch 任何函式。
-
-    沒設 TEST_DB_NAME 時回傳 None，讓不碰資料庫的測試照常執行。
+    db.get_db_config() 每次呼叫皆讀取 os.getenv，修改環境變數即可，不需替換函式。
+    未設定 TEST_DB_NAME 時，回傳 None，讓不存取資料庫的測試照常執行。
     """
-    # App startup 現在要求 read/write credentials。沒有測試庫時提供不會真的
-    # 連線的 dummy 值；有測試庫時 writer 明確沿用該測試帳號。
+    # 應用程式啟動時需要讀取與寫入憑證。未設定測試資料庫時，使用不會建立連線的測試值。
+    # 已設定測試資料庫時，寫入操作沿用測試帳號。
     name = os.getenv("TEST_DB_NAME")
     test_user = (os.getenv("DB_USER") or "").strip() or "test_reader"
     configured_password = os.getenv("DB_PASSWORD") or ""
@@ -112,8 +109,8 @@ def db_available(point_app_at_test_db: Any) -> str:
     return point_app_at_test_db
 
 
-# schema.sql 的 CREATE TABLE IF NOT EXISTS 對「表已存在但缺某個約束」的情形無感。
-# 這些外鍵是後來才補的，既有的 _test 庫不會自己長出來 —— 在這裡冪等補齊。
+# schema.sql 的 CREATE TABLE IF NOT EXISTS 不會替既有資料表增加缺少的約束。
+# 在此以冪等操作補齊外鍵，更新既有的 _test 資料庫。
 _RETROFIT_CONSTRAINTS = (
     (
         "student",
@@ -123,8 +120,8 @@ _RETROFIT_CONSTRAINTS = (
     ),
 )
 
-# 同上，但補的是欄位不是約束（帳密登入是後補的，既有 _test 庫的 teacher/student
-# 表不會自己長出 password_hash）。
+# 同樣以冪等操作補齊欄位。帳號與密碼欄位是後續新增，
+# 既有 _test 資料庫的 teacher／student 表需另外加入 password_hash。
 _RETROFIT_COLUMNS = (
     ("teacher", "password_hash", "ALTER TABLE teacher ADD COLUMN password_hash "
      "varchar(255) NOT NULL DEFAULT ''"),
@@ -170,9 +167,9 @@ def _schema(db_available: str) -> None:
 def _truncate_all() -> None:
     from db import get_connection
 
-    # 這道檢查是最後一關。point_app_at_test_db 已經檢查過一次，但那守的是
-    # fixture 路徑，不是資料庫本身：任何繞過 fixture 直接連線的程式碼都會
-    # 走到這裡來刪資料。
+    # 刪除前，再次驗證資料庫名稱。point_app_at_test_db 已驗證 fixture 使用的路徑，
+    # 但此處還須驗證資料庫本身，因為略過 fixture 並直接連線的程式碼
+    # 也會在此刪除資料。
     _assert_test_database(os.environ["DB_NAME"])
 
     with get_connection() as connection:
@@ -183,7 +180,7 @@ def _truncate_all() -> None:
 
 
 class DbHelper:
-    """測試用的資料插入輔助。表格名稱由測試碼直接指定，不來自外部輸入。"""
+    """測試用的資料插入輔助函式。資料表名稱由測試程式指定，不接受外部輸入。"""
 
     def query(self, sql: str, params: list | None = None) -> list[dict]:
         from db import get_connection
@@ -202,9 +199,9 @@ class DbHelper:
             connection.commit()
 
     def ensure_school(self, school: str) -> None:
-        """冪等登記一個場域字串。student.school 有外鍵指向 school，
-        所以插學生／場次前該場域必須先存在。多數測試不在乎場域本身，
-        故插學生時自動補上；真正要驗場域行為的測試自己呼叫 insert_school。"""
+        """以冪等操作登記場域字串。student.school 的外鍵指向 school，因此插入學生或場次前，場域須存在。
+插入學生時，自動補齊場域。驗證場域行為的測試可直接呼叫 insert_school。
+"""
         self.execute(
             "INSERT INTO school (school, display_name, sort_order) VALUES (%s, %s, 0) "
             "ON DUPLICATE KEY UPDATE school = school",
@@ -329,10 +326,10 @@ def client(db: DbHelper) -> Any:
 
 @pytest.fixture
 def login_as_teacher(client: Any, db: DbHelper) -> Any:
-    """回傳一個工廠函式：建一位帳密已知的老師、登入，回傳 (teacher_id, headers)。
+    """回傳工廠函式，建立帳號與密碼已知的老師，再登入並回傳 (teacher_id, headers)。
 
-    account 帳號預設自動產生亂數字串——登入帳密改用全域唯一的 account 之後
-    （見 docs/adr/0004），不再靠 school+name 登入，這裡跟著換。
+    account 預設使用隨機字串。登入使用全域唯一的 account，不使用 school+name。
+    見 docs/adr/0004。
     """
 
     def _login(
@@ -357,7 +354,7 @@ def login_as_teacher(client: Any, db: DbHelper) -> Any:
 
 @pytest.fixture
 def login_as_student(client: Any, db: DbHelper) -> Any:
-    """回傳一個工廠函式：建一位帳密已知的學生、登入，回傳 (studentKey, headers)。"""
+    """回傳工廠函式，建立帳號與密碼已知的學生，再登入並回傳 (studentKey, headers)。"""
 
     def _login(
         grade: str = "G1",
@@ -381,10 +378,9 @@ def login_as_student(client: Any, db: DbHelper) -> Any:
 
 @pytest.fixture
 def break_query(monkeypatch: Any) -> Any:
-    """讓指定的 queries 函式拋出一個含敏感資訊的例外。
+    """讓指定的 queries 函式拋出包含敏感資訊的例外。
 
-    例外訊息刻意包含主機位址與使用者名稱，測試才能斷言它們沒有出現在
-    HTTP 回應裡。
+    例外包含主機位址與使用者名稱，以驗證 HTTP 回應未包含這些資訊。
     """
 
     def _break(function_name: str) -> None:

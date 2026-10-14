@@ -2,7 +2,7 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const decode = (image) => image.decode().then(() => true, () => false);
 
-  // 只有仍屬於同一道題的流程可以替換或揭露圖片。
+  // 只有仍對應目前題目的流程，才可替換或顯示圖片。
   async function prepareItems(images, timeoutMs, isCurrent, labelCard) {
     const decoded = new Set();
     const preparation = images.map(async (image) => {
@@ -60,7 +60,12 @@
       if (await onResume()) hide();
       else update();
     });
-    leave.addEventListener("click", () => { leave.disabled = true;onLeave(); });
+    // onLeave 會先跳出頁面內的離開確認（確認框疊在暫停畫面上），確定後才存檔導頁。
+    // 等待期間停用避免連點；按「繼續遊戲」取消時留在暫停畫面並恢復可按。
+    leave.addEventListener("click", async () => {
+      leave.disabled = true;
+      try { await onLeave(); } finally { leave.disabled = false; }
+    });
     window.addEventListener("resize", update);
     return { update, hide, isUsable };
   }

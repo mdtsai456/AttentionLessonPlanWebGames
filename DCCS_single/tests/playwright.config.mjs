@@ -1,5 +1,5 @@
-// DCCS 端對端測試。以靜態伺服器提供 repo 根目錄，跟 Zeabur 線上部署（output_dir: "."）一致。
-// DCCS_TEST_ROOT 可指向其他目錄（例如修正前的程式碼），用來確認測試能抓到 bug。
+// DCCS E2E 測試。靜態伺服器提供專案根目錄，與 Zeabur 部署設定 output_dir: "." 相同。
+// DCCS_TEST_ROOT 可指定其他目錄，例如修正前的程式碼，以確認測試能偵測錯誤。
 
 import { defineConfig, devices } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
@@ -15,14 +15,14 @@ export default defineConfig({
   testMatch: '*.spec.mjs',
   fullyParallel: true,
   workers: 3,
-  // 正式長度每關 60 秒，打到第 3 關要 3 分鐘，整場要 6 分鐘。
+  // 正式長度為每關 60 秒。完成第 3 關需 3 分鐘，整場需 6 分鐘。
   timeout: fullLength ? 15 * 60_000 : 6 * 60_000,
   reporter: [['list']],
   use: {
     ...devices['Desktop Chrome'],
     viewport: { width: 1280, height: 800 },
     baseURL: `http://localhost:${port}`,
-    // 正式長度的 trace 太大，寫檔會讓收尾逾時。
+    // 正式長度的 trace 檔案較大，寫入時可能使測試結束流程逾時。
     trace: fullLength ? 'off' : 'retain-on-failure',
   },
   webServer: {

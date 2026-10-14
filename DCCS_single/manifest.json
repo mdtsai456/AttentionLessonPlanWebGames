@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-16T05:51:24Z",
+  "generatedAt": "2026-10-10T18:21:18Z",
   "backgrounds": {
     "single": "assets/Single.png",
     "double": "assets/Double.png"
@@ -182,7 +182,7 @@
       "index": 5,
       "levelNo": 6,
       "shapeCount": 2,
-      "objectCount": 5,
+      "objectCount": 4,
       "objectRule": "category",
       "sourceCategories": [
         "2",

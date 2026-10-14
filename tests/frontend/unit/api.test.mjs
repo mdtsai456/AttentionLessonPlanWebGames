@@ -41,3 +41,34 @@ test('401 清除登入，403 保留登入供核對身分', async () => {
     assert.equal(run.invalidated(), status === 401);
   }
 });
+
+test('損壞的待送成績無法選到學生，也不會送出', async () => {
+  const { instance, calls } = api();
+  for (const payload of [null, {}, { data: null }, []]) {
+    assert.equal(instance.sessionPlayer(payload), -1);
+    await assert.rejects(instance.submitSession(payload), { status: 401 });
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('API 位址覆寫去除結尾斜線，避免送到 //sessions', () => {
+  const window = { location: {}, API_BASE_URL: 'https://override.test/api///' };
+  vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), { window });
+  assert.equal(window.WebGameApi.resolveApiBase(), 'https://override.test/api');
+});
+
+test('uuid() 產生 UUID v4；沒有 randomUUID（非 https 區網）時改用 getRandomValues，不用 Math.random', () => {
+  const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const withRandomUUID = { location: {} };
+  vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), { window: withRandomUUID, crypto: globalThis.crypto });
+  assert.match(withRandomUUID.WebGameApi.uuid(), V4);
+
+  const insecure = { location: {} };
+  const getRandomValues = (bytes) => globalThis.crypto.getRandomValues(bytes);
+  const math = Object.create(Math);
+  math.random = () => { throw new Error('不可使用 Math.random'); };
+  vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), { window: insecure, crypto: { getRandomValues }, Math: math });
+  const ids = new Set(Array.from({ length: 50 }, () => insecure.WebGameApi.uuid()));
+  assert.equal(ids.size, 50);
+  for (const id of ids) assert.match(id, V4);
+});

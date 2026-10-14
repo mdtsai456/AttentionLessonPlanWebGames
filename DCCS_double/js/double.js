@@ -1,8 +1,8 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=4';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=7';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
-import { submitResult } from './net/client.js?v=2';
-import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js';
+import { submitResult } from './net/client.js?v=4';
+import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js?v=2';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
 const form =
@@ -58,20 +58,6 @@ const sharedContinue =
 
 const sharedErrorMessage =
   document.getElementById('shared-error-message');
-
-function createPairId() {
-  if (
-    window.crypto &&
-    typeof window.crypto.randomUUID === 'function'
-  ) {
-    return window.crypto.randomUUID();
-  }
-
-  return (
-    `dccs-${Date.now()}-` +
-    Math.random().toString(16).slice(2)
-  ).slice(0, 36);
-}
 
 function showSharedScreen(target) {
   const screens = [
@@ -143,7 +129,7 @@ async function submitPlayerResult(payload, player) {
     await submitResult(payload, { player });
 
   if (!ok) {
-    // submitResult 已負責暫存；拋錯讓結算畫面標示送出失敗。
+    // submitResult 已負責暫存。拋出錯誤，讓結算畫面顯示送出失敗。
     throw new Error(detail);
   }
 
@@ -184,8 +170,8 @@ function submissionMessage(
       ? result.reason.message
       : String(result.reason);
 
-  // 伺服器有時會回傳完整 HTML 錯誤頁；結算卡只顯示第一行摘要，避免把外部
-  // HTML 插進頁面、撐壞左右卡片，也避免不可信內容被當成標記解析。
+  // 伺服器可能回傳完整的 HTML 錯誤頁。結算卡只顯示第一行摘要，
+  // 避免插入外部 HTML、影響卡片版面，或將不可信內容解析為標記。
   const reasonSummary =
     escapeHtml(
       (reason.split(/\r?\n/, 1)[0] || '未知錯誤')
@@ -202,7 +188,7 @@ function submissionMessage(
 
 let cameFromLobby = false;
 
-// 只顯示一份共用教學；兩個 mountDCCS 實例都停用自己的教學層。
+// 只顯示一份共用教學。兩個 mountDCCS 實例皆停用各自的教學層。
 async function showSharedTutorial() {
   ensureOverlayStyles();
 
@@ -270,8 +256,9 @@ async function startSession(player1, player2) {
         ? { sessionSeconds: sessionSecondsOverride }
         : {};
 
+    // UUID 由 shared/api.js 產生（遊戲頁都會先載入它）。
     const pairId =
-      createPairId();
+      window.WebGameApi.uuid();
 
     form.hidden = true;
     const setupShell = document.getElementById('setup-shell');
@@ -281,7 +268,7 @@ async function startSession(player1, player2) {
 
     showSharedScreen(sharedLoading);
 
-    // 操作說明改由 Tutorial/DCCS_tutorial.html 進入前顯示。
+    // 進入遊戲前，由 Tutorial/DCCS_tutorial.html 顯示操作說明。
 
     if (sharedPlayerInfo) {
       sharedPlayerInfo.textContent =
@@ -289,12 +276,24 @@ async function startSession(player1, player2) {
         `玩家 2：${player2.caseId}`;
     }
 
+    // 標題畫面在雙人版不會出現，所以兩側面板各自標出是哪位學生。
+    for (const [playerNumber, player] of [[1, player1], [2, player2]]) {
+      const label =
+        document.getElementById(`player${playerNumber}-case`);
+
+      if (label) {
+        label.textContent =
+          `玩家 ${playerNumber}：${player.caseId}`;
+        label.hidden = false;
+      }
+    }
+
     const playerPhases = {
       1: 'loading',
       2: 'loading',
     };
 
-    // 教學已取得開始意圖，兩側載入後直接進入第 1 關提示。
+    // 玩家已在教學頁選擇開始。兩側載入後，直接顯示第 1 關提示。
     let bothPlayersReady = true;
     let continueLocked = false;
     let lobbyChosen = false;
@@ -340,7 +339,7 @@ async function startSession(player1, player2) {
       sharedLevelMessage.textContent =
         `準備開始第 ${levelNumber} 關！`;
 
-      // 進入提示時若空白鍵仍按著，必須放開再按，避免直接跳過。
+      // 進入提示時，若空白鍵仍按住，須先放開再按，避免跳過提示。
       canContinueWithSpace =
         !spaceDown;
 
@@ -348,7 +347,7 @@ async function startSession(player1, player2) {
         sharedLevel
       );
 
-      // 不 focus 按鈕，否則空白鍵放開可能觸發 click 而跳過提示。
+      // 不將焦點設在按鈕上，避免空白鍵放開時觸發 click 而跳過提示。
       if (
         document.activeElement &&
         typeof document.activeElement.blur ===
@@ -387,7 +386,7 @@ async function startSession(player1, player2) {
 
       canContinueWithSpace = false;
 
-      // 返回大廳要等兩筆成績送出才導頁，先切到送出中畫面，避免看起來沒反應。
+      // 返回大廳前等待兩筆成績送出。等待期間顯示送出中的畫面。
       if (choice === 'lobby') {
         lobbyChosen = true;
         sharedLoading.querySelector('h1').textContent =
@@ -667,23 +666,78 @@ async function startSession(player1, player2) {
         ...sessionSecondsOption,
       });
 
-    document.getElementById('leave-btn').addEventListener('click', async () => {
-      const completed = Math.min(
-        player1Handle.completedLevel,
-        player2Handle.completedLevel
-      );
-      const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
-      if (stage) {
-        const payloads = [player1Handle, player2Handle]
-          .map((handle) => handle.buildLeavePayload(stage))
-          .filter(Boolean);
-        await Promise.all(payloads.map((payload, index) =>
-          submitPlayerResult(makeDoublePayload({ payload }, pairId), index + 1).catch((error) => {
-            console.error(error);
-          })
-        ));
+    // 離開與正常結束共用：每個關卡檢查點（stage）兩位玩家各只送一次。
+    // 離開要先確認；取消時什麼都不送，遊戲照常進行。
+    const stageSubmissions = new Map();
+    let leaving = false;
+    let finalSubmitting = false;
+
+    function submitStageOnce(stage, payloads) {
+      if (!stageSubmissions.has(stage)) {
+        stageSubmissions.set(
+          stage,
+          Promise.allSettled(
+            payloads.map((payload, index) =>
+              payload ? submitPlayerResult(payload, index + 1) : null
+            )
+          )
+        );
       }
-      window.askLeave('../Select/index.html');
+
+      return stageSubmissions.get(stage);
+    }
+
+    const leaveButton =
+      document.getElementById('leave-btn');
+
+    leaveButton.addEventListener('click', async () => {
+      // 連點，或最終成績已在送出（送完會自動回大廳），都不再送一次。
+      if (leaving || finalSubmitting) return;
+      leaving = true;
+      leaveButton.disabled = true;
+      let confirmed = false;
+
+      try {
+        // 先問再存檔：取消時什麼都不送，按鈕恢復可按。
+        if (!(await window.confirmLeave())) return;
+        // 確認期間場次已結束：交給結束流程送出並導頁。
+        if (finalSubmitting) return;
+        confirmed = true;
+        // 兩位玩家的引擎各有離開保護，確定離開後先拿掉，導頁才不會再跳瀏覽器詢問。
+        player1Handle.releaseUnloadGuard();
+        player2Handle.releaseUnloadGuard();
+
+        const completed = Math.min(
+          player1Handle.completedLevel,
+          player2Handle.completedLevel
+        );
+        const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+        // 確定離開後遊戲維持暫停到導頁；這段只等送出（逾時用原生計時器），不等遊戲計時器。
+        // 組不出成績也照樣導頁：學生已確定離開，不能停在暫停的畫面上。
+        if (stage) {
+          try {
+            const payloads = [player1Handle, player2Handle]
+              .map((handle) => handle.buildLeavePayload(stage))
+              .map((payload) => payload && makeDoublePayload({ payload }, pairId));
+            const results = await submitStageOnce(stage, payloads);
+            for (const result of results) {
+              if (result.status === 'rejected') console.error(result.reason);
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        // 送出期間場次已結束：交給結束流程導頁。
+        if (finalSubmitting) return;
+        window.leaveTo('../Select/index.html');
+      } finally {
+        // 已確定離開就維持停用，導頁前不能再按。
+        if (!confirmed) {
+          leaving = false;
+          if (!finalSubmitting) leaveButton.disabled = false;
+        }
+      }
     });
 
     const player2Handle =
@@ -730,6 +784,9 @@ async function startSession(player1, player2) {
 
       removeSharedEvents();
 
+      finalSubmitting = true;
+      leaveButton.disabled = true;
+
       const payload1 =
         makeDoublePayload(
           result1,
@@ -752,11 +809,17 @@ async function startSession(player1, player2) {
         payload2
       );
 
+      const finalStage = Math.max(
+        result1.summary.stage,
+        result2.summary.stage
+      );
+
+      // 同一檢查點若已由「離開」送過（例如取消離開後在中場選返回大廳），
+      // 不再重送；導頁前等所有送出完成，避免中斷還在送的請求。
       const submissions =
-        await Promise.allSettled([
-          submitPlayerResult(payload1, 1),
-          submitPlayerResult(payload2, 2),
-        ]);
+        await submitStageOnce(finalStage, [payload1, payload2]);
+
+      await Promise.all(stageSubmissions.values());
 
       const player1Accuracy =
         (
@@ -770,7 +833,7 @@ async function startSession(player1, player2) {
           100
         ).toFixed(1);
 
-      // 結算表先隱藏，成績送出後直接回 Home。需要時再把下面整段註解打開。
+      // 隱藏結算表。成績送出後，直接返回 Home。需要結算表時，可啟用下方的程式碼。
       /*
       doubleGame.hidden = true;
       hideSharedOverlay();
@@ -870,7 +933,7 @@ async function startSession(player1, player2) {
           }
         );
 
-      // 雙人版手動返回，讓兩位受試者先看完成績與送出狀態。
+      // 雙人模式手動返回，供兩位受試者查看成績與送出狀態。
       if (cameFromLobby) {
         document
           .getElementById('back-to-lobby')
@@ -880,6 +943,7 @@ async function startSession(player1, player2) {
           );
       }
       */
+      // 場次已結束、成績已送，直接導頁。
       window.location.href = '../Select/index.html';
     } catch (error) {
       removeSharedEvents();

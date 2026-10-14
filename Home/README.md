@@ -9,6 +9,8 @@
 3. 學生要填第幾天（1～24）。年級與場域用後端登入結果，畫面上不填。
 4. 呼叫 `shared/api.js` 的登入。成功後學生去 `Select/`，老師去 `Teacher_platform/`。
 
+送出後到換頁前，送出鈕與身份／模式按鈕都停用；存登入狀態用的是**按下送出那一刻**的身份與模式，等待回應時改選也不影響。登入失敗才重新打開。
+
 帳號或密碼錯誤留在這一頁。後端連不上時，本機提示先啟動 `http://127.0.0.1:5001`。登到一半失敗會把已經拿到的 token 登出，避免留在伺服器上。
 
 從別的頁被送回來時，網址可以帶 `?auth=retry`（驗證連不上）或 `?auth=expired`（登入失效）。
@@ -23,7 +25,7 @@
 | 學生 | `user_role=student`、`game_mode`（`single` 或 `double`）、`token` |
 | 每位學生 | `student1_*`、`student2_*`：token、studentKey、case、grade、school、day |
 
-學生 1 另外寫一份不帶編號的 `grade`、`caseId`、`school`、`current_day`、`currentDay`，給舊的讀法使用。登入到期時間由 `shared/session-timeout.js` 記錄。
+學生 1 另外寫一份不帶編號的 `grade`、`caseId`、`school`、`current_day`、`currentDay`，給舊的讀法使用。登入到期時間由 `shared/session-timeout.js` 記錄：用登入回應的 `expiresIn`（剩餘秒數）加上本機現在時間，裝置時鐘不準也不會提早或延後登出；舊後端沒有 `expiresIn` 時才用 `expiresAt`。
 
 ## 檔案
 

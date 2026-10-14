@@ -30,7 +30,7 @@ export const TEACHER = {
   teacher_school: "TEST",
 };
 
-/** 先開 Home，再把登入資料寫進 sessionStorage，模擬從 Home 登入後的狀態。 */
+/** 先開啟 Home，再將登入資料寫入 sessionStorage，模擬從 Home 登入後的狀態。 */
 export async function loginAs(page, session) {
   const unique = crypto.randomUUID();
   session = { ...session };
@@ -46,9 +46,9 @@ export async function loginAs(page, session) {
 }
 
 /**
- * 攔截所有非 GET 請求：/api/sessions 回假的 201，其他一律擋掉。
- * 回傳的陣列會記錄每一筆請求與 JSON body。
- * 注意：攔截請求會讓 Chrome 停用 bfcache，bfcache 測試不能用。
+ * 攔截所有非 GET 請求。/api/sessions 回傳模擬的 201，其他請求皆阻止。
+ * 回傳陣列記錄每筆請求與 JSON body。
+ * 攔截請求會讓 Chrome 停用 bfcache，因此 bfcache 測試不可使用此函式。
  */
 export async function recordWrites(page) {
   const writes = [];

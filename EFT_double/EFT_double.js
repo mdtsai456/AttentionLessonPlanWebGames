@@ -2,7 +2,7 @@ import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
-// 每關 60 秒、共 6 關。時間內答完就繼續出題；單題 10 秒沒答算錯並換下一題。
+// 每關 60 秒，共 6 關。關卡時間內持續出題。單題 10 秒未作答時，計為錯誤並換題。
 const STAGE_COUNT = 6;
 const MID_STAGE = 3;
 
@@ -41,55 +41,77 @@ function getPlayerIdentity(playerIndex) {
     };
 }
 
-function buildPlayerStats(player, state, stage) {
-    const total = Math.max(state.index, 1);
-    const avgReactionMs = state.reactionSamples.length
-        ? state.reactionSamples.reduce((sum, value) => sum + value, 0) / state.reactionSamples.length
-        : 0;
-    return buildEftStats({
-        score: state.score,
-        wrong: Math.max(total - state.score, 0),
-        accuracy: state.score / total,
-        duration: window.WebGameRuntime.now() - state.startTimeMs,
-        stage,
-        levelAccuracy: player.levelAccuracyText(stage),
-        avgReactionMs,
-        questionCount: state.index,
-    });
-}
+// 同一局兩人共用 pairId；再玩一次時兩人一起開新局並換新的 pairId。
+let pairId = '';
+// 兩人都打完六關才開放「再玩一次」，避免先打完的人把還在玩的搭檔一起重設。
+const finished = [false, false];
 
-// 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。
-async function savePlayerRun(player, playerIndex, stage) {
+// 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
+// 回傳伺服器回應。連線失敗時回傳 undefined。
+function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();
-    await window.WebGameApi.submitSession({
+    // 只算到該關結束為止，第 4、5 關中途離開送第 3 關時不含後面關卡；endTime 也是該關結束當下。
+    const checkpoint = player.checkpointStats(stage);
+    return window.WebGameApi.submitSession({
             lessonId: '1140908_EFT',
             data: {
                 ...identity,
-                startTime: state.startTimeMs,
-                endTime: Date.now(),
+                startTime: window.WebGameRuntime.toWallTime(state.startTimeMs),
+                endTime: checkpoint.endTime,
                 mode: 'double',
                 pairId,
-                stats: buildPlayerStats(player, state, stage),
+                stats: buildEftStats(checkpoint),
             },
         }, { player: playerIndex + 1 }).catch((error) => console.error(error));
 }
 
 function createPlayer(element, keyBindings, playerIndex) {
+    // 這一局每個檢查點的送出，key 是關卡。離開、中場返回與六關打完共用，
+    // 連點或離開→取消→再離開都只送一次；已送過更後面的檢查點就不再送前面的。
+    let submissions = new Map();
+    function saveRun(stage) {
+        const done = [...submissions.keys()].filter((saved) => saved >= stage);
+        if (done.length) return submissions.get(Math.max(...done));
+        const currentRun = submissions;
+        currentRun.set(stage, savePlayerRun(player, playerIndex, stage).then((response) => {
+            // 伺服器明確拒絕時允許下次離開再送；連線失敗或代理逾時可能已寫入，不重送避免重複。
+            if (response && !response.ok && response.status !== 408 && response.status < 502) {
+                currentRun.delete(stage);
+                console.error(`成績送出失敗 ${response.status}`);
+            }
+            return response;
+        }));
+        return currentRun.get(stage);
+    }
+    function startGame() {
+        submissions = new Map();
+        player.startGame();
+    }
     const player = createEftPlayer({
         root: element,
         getUi: (id) => element.querySelector(`[data-ui="${id}"]`),
         keyBindings,
         onStageEnd: (state) => handlePlayerStageEnd(playerIndex, state),
+        onFinished: () => handlePlayerFinished(playerIndex),
     });
-    element.querySelector('[data-ui="restart"]').addEventListener('click', player.startGame);
+    element.querySelector('[data-ui="restart"]').addEventListener('click', startSession);
     return {
-        startGame: player.startGame,
+        startGame,
         completedStages: player.completedStages,
         setArrowAssets: player.setArrowAssets,
-        saveRun: (stage) => savePlayerRun(player, playerIndex, stage),
+        saveRun,
     };
 }
+
+// 打完六關立刻送自己的成績；兩人都打完才開放「再玩一次」。
+function handlePlayerFinished(playerIndex) {
+    finished[playerIndex] = true;
+    void players[playerIndex].saveRun(STAGE_COUNT);
+    restartButtons.forEach((button) => { button.disabled = !finished.every(Boolean); });
+}
+
+const restartButtons = [...document.querySelectorAll('[data-ui="restart"]')];
 
 // 兩位玩家的題目、計時與分數各自獨立。
 export const players = [
@@ -130,17 +152,54 @@ document.getElementById('mid-continue').addEventListener('click', () => {
     document.getElementById('mid-break').hidden = true;
     resumes.forEach((resume) => resume && resume());
 });
-let pairId = `${window.WebGameRuntime.now()}`;
 
-document.getElementById('leave-btn').addEventListener('click', async () => {
+// 開新的一局：兩人一起重來、換新的 pairId，並清掉過關與中場的等待狀態。
+function startSession() {
+    pairId = window.WebGameApi.uuid();
+    finished.fill(false);
+    midWait.fill(false);
+    midResume.fill(null);
+    stageWait.fill(null);
+    stageResume.fill(null);
+    document.getElementById('mid-break').hidden = true;
+    players.forEach((player) => player.startGame());
+}
+
+function checkpointStage() {
     const completed = Math.min(...players.map((player) => player.completedStages()));
-    const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-    if (stage) await Promise.all(players.map((player) => player.saveRun(stage)));
-    window.askLeave('../Select/index.html');
+    return completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+}
+
+function saveBoth(stage) {
+    if (!stage) return Promise.resolve();
+    return Promise.all(players.map((player) => player.saveRun(stage)));
+}
+
+const leaveButton = document.getElementById('leave-btn');
+// 先在頁面內確認，確定後才送兩人的檢查點並回大廳；取消什麼都不送，遊戲照常繼續。
+leaveButton.addEventListener('click', async () => {
+    leaveButton.disabled = true;
+    if (!(await window.confirmLeave())) {
+        leaveButton.disabled = false;
+        return;
+    }
+    await saveBoth(checkpointStage());
+    window.leaveTo('../Select/index.html');
+    // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
+    leaveButton.disabled = false;
 });
 
-document.getElementById('mid-lobby').addEventListener('click', () => {
-    window.location.href = '../Select/index.html';
+// 中場返回也先送兩人第 3 關成績，和其他遊戲的中場返回一致。
+const midButtons = ['mid-continue', 'mid-lobby'].map((id) => document.getElementById(id));
+document.getElementById('mid-lobby').addEventListener('click', async () => {
+    midButtons.forEach((button) => { button.disabled = true; });
+    try {
+        await saveBoth(MID_STAGE);
+        window.location.href = '../Select/index.html';
+    } finally {
+        // 導頁沒有發生時（例如頁面被攔下）恢復按鈕；已送過的檢查點不會重送。
+        midButtons.forEach((button) => { button.disabled = false; });
+    }
 });
 
 // 預載素材後，同時開始兩位玩家的第一題。
@@ -150,8 +209,8 @@ Promise.all(players.map((player, playerIndex) => preloadEftAssets({
 }))).then((arrowAssetsByPlayer) => {
     players.forEach((player, playerIndex) => {
         player.setArrowAssets(arrowAssetsByPlayer[playerIndex]);
-        player.startGame();
     });
+    startSession();
 }).catch((error) => {
     console.error('EFT 雙人載入或啟動失敗：', error);
     document.querySelectorAll('[data-ui="feedback"]').forEach((feedback) => {

@@ -1,4 +1,4 @@
-// 所有功能頁共用守門；在 head 同步執行，功能腳本驗證成功後才依序載入。
+// 所有功能頁共用登入驗證。在 head 同步執行，驗證成功後才依序載入功能腳本。
 (function (global) {
   const entry = document.currentScript;
   const root = new URL('../', entry.src);
@@ -13,6 +13,10 @@
   let checking = false;
   let generation = 0;
   let expiryTimer;
+  // setTimeout 延遲上限約 24.8 天；超過會溢位成立刻觸發，所以分段等待。
+  const MAX_TIMEOUT = 2 ** 31 - 1;
+  // 每個 /auth/me 回應換算成本機時鐘的到期時間（不放進 body，避免影響身分比對）。
+  const localExpiry = new WeakMap();
 
   function hide() {
     document.documentElement.style.visibility = 'hidden';
@@ -29,7 +33,8 @@
   }
 
   function apiBase() {
-    if (global.API_BASE_URL) return global.API_BASE_URL;
+    // 與 shared/api.js 相同：覆寫網址去掉結尾斜線，避免 //auth/...
+    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, '');
     if (global.location.pathname.startsWith('/app/')) return global.location.origin + '/api';
     const { hostname, protocol } = global.location;
     if (hostname === 'localhost' || hostname === '127.0.0.1') return `${protocol}//${hostname}:5001/api`;
@@ -45,13 +50,32 @@
       error.invalid = res.status === 401 || res.status === 403;
       throw error;
     }
+    const receivedAt = realNow();
     const body = await res.json();
-    if (body.role !== expectedRole || !Number.isFinite(Date.parse(body.expiresAt)) || Date.parse(body.expiresAt) <= realNow()) {
+    const expires = expiryOf(body, receivedAt);
+    if (body.role !== expectedRole || !Number.isFinite(expires) || expires <= realNow()) {
       const error = new Error('登入身分不符或已過期');
       error.invalid = true;
       throw error;
     }
+    localExpiry.set(body, expires);
     return body;
+  }
+
+  // 優先用 expiresIn（伺服器算的剩餘秒數）加上本機收到回應的時間：expiresAt 是伺服器
+  // 時鐘，直接和裝置時鐘比較時，裝置時鐘快幾分鐘就少幾分鐘，快超過 1 小時會一登入就失效。
+  function expiryOf(body, receivedAt) {
+    if (typeof body.expiresIn === 'number' && Number.isFinite(body.expiresIn)) return receivedAt + body.expiresIn * 1000;
+    return Date.parse(body.expiresAt);
+  }
+
+  function armExpiry(expires) {
+    nativeClear(expiryTimer);
+    const remaining = expires - realNow();
+    expiryTimer = nativeTimeout(() => {
+      if (expires - realNow() > 0) armExpiry(expires);
+      else global.WebGameAuth.invalidate();
+    }, Math.min(MAX_TIMEOUT, Math.max(0, remaining)));
   }
 
   function checkStudent(body, slot, mode) {
@@ -91,12 +115,13 @@
     checking = true;
     const attempt = ++generation;
     const controller = new AbortController();
-    // Promise.race 也涵蓋讀取 body，超時後不允許遲來回應恢復頁面。
+    // Promise.race 涵蓋 body 的讀取。逾時後到達的回應不可恢復頁面。
     let timeout;
     try {
       const role = sessionStorage.getItem('user_role');
       const mode = expectedRole === 'teacher' ? 'teacher' : sessionStorage.getItem('game_mode');
-      if (role !== expectedRole || !['single', 'double', 'teacher'].includes(mode)) {
+      // 學生只能是單人或雙人；teacher 模式只屬於老師頁。
+      if (role !== expectedRole || (expectedRole === 'student' && !['single', 'double'].includes(mode))) {
         home(null, false); return;
       }
       const tokens = expectedRole === 'teacher'
@@ -112,7 +137,7 @@
       nativeClear(timeout);
       if (attempt !== generation) return;
       if (expectedRole === 'student') bodies.forEach((body, index) => checkStudent(body, index + 1, mode));
-      const signature = JSON.stringify({ mode, tokens, bodies: bodies.map(({ expiresAt, ...body }) => body) });
+      const signature = JSON.stringify({ mode, tokens, bodies: bodies.map(({ expiresAt, expiresIn, ...body }) => body) });
       if (authenticated && authenticated.signature !== signature) { home(null, false); return; }
       if (expectedRole === 'student' && pageMode !== 'select' && mode !== pageMode) {
         const target = entry.dataset.doubleRedirect && mode === 'double'
@@ -127,16 +152,15 @@
         invalidate() { authenticated = null; home('expired', true); },
         revalidate: validate,
       };
-      const expires = Math.min(...bodies.map((body) => Date.parse(body.expiresAt)));
+      const expires = Math.min(...bodies.map((body) => localExpiry.get(body)));
       sessionStorage.setItem('login_expires_at', String(expires));
-      nativeClear(expiryTimer);
-      expiryTimer = nativeTimeout(() => global.WebGameAuth.invalidate(), Math.max(0, expires - realNow()));
+      armExpiry(expires);
       if (expectedRole === 'teacher') {
         sessionStorage.setItem('teacher_id', String(bodies[0].teacherId));
         sessionStorage.setItem('teacher_name', bodies[0].teacherName);
         sessionStorage.setItem('teacher_school', bodies[0].school);
       }
-      // 載入期間只有初次啟動可使用已驗證的登入，bfcache 必須等驗證完成。
+      // 首次載入時，可使用已驗證的登入狀態。從 bfcache 返回時，須等待驗證完成。
       checking = false;
       document.documentElement.style.visibility = '';
       document.documentElement.inert = false;

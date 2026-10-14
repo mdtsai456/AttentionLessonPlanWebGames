@@ -1,8 +1,8 @@
 // =============================================================================
 // TGame_double / 勇闖迷宮（雙人）
-// 左右各一組獨立 T 型迷宮與角色。P1 用 A / D，P2 用左右鍵。
-// 每一關倒數 60 秒共用：任一人第一次按鍵時，兩邊同時開始計時；
-// 時間到，兩邊一起進入下一關。時間內兩人各自連續作答，互不等待。
+// 左右各有獨立的 T 型迷宮與角色。P1 使用 A／D，P2 使用左右鍵。
+// 每關共用 60 秒倒數。任一玩家首次按鍵時，兩側同時開始計時。
+// 時間結束後，兩側同時進入下一關。關卡時間內各自連續作答，無須互相等待。
 // =============================================================================
 
 const TIME_LIMIT_SEC = 60;
@@ -34,7 +34,12 @@ const ALL_ITEMS = [
 ];
 
 const DEFAULT_STAGE_RULES = [
-  { prompt: "請選擇符合「可以吃的食物」的方向", correct: ["apple", "banana", "carrot"] },
+  // 魚也能吃，不能當「可以吃的食物」的錯誤選項，所以這一關明列錯誤項目
+  {
+    prompt: "請選擇符合「可以吃的食物」的方向",
+    correct: ["apple", "banana", "carrot"],
+    wrong: ["boot", "book", "chair", "hammer", "hat", "key", "soccer", "umbrella"],
+  },
   { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
   { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
   { prompt: "請選擇符合「下雨時用的」的方向", correct: ["umbrella"] },
@@ -66,7 +71,9 @@ const session = {
   startedAt: 0,
   timerId: null,
   endReason: "",
-  // 用於追蹤計時器是否已開始
+  // 同一局兩位玩家共用 pairId，後端用來配對兩筆成績。每次開新局時更換。
+  pairId: "",
+  // 記錄計時器是否已開始。
   timerStarted: false,
 };
 
@@ -87,7 +94,7 @@ document.getElementById("mid-continue").addEventListener("click", () => {
   startLevel(session.level + 1);
 });
 document.getElementById("leave-btn").addEventListener("click", leaveGame);
-//設定重新載入題目按鈕事件
+// 設定重新載入題目的按鈕事件。
 
 let savedStage = 0;
 
@@ -100,14 +107,26 @@ function completedStage() {
   return Math.max(0, session.level - 1);
 }
 
+// 先確認再存檔：取消時什麼都不送，避免檢查點和之後打完的成績各留一筆。
+// 確定後遊戲維持暫停（計時凍結、按鍵不作答）直到導頁，存檔慢也不會打完下一關多送一筆。
+// 這段只等 fetch，不等遊戲的計時器；萬一出錯沒導頁就解除暫停，讓遊戲繼續。
 async function leaveGame() {
   const leaveBtn = document.getElementById("leave-btn");
   leaveBtn.disabled = true;
-  const completed = completedStage();
-  const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-  if (stage) await saveBoth(stage);
-  window.askLeave("../Select/index.html");
-  leaveBtn.disabled = false;
+  try {
+    if (!(await window.confirmLeave())) return;
+    try {
+      const completed = completedStage();
+      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      if (stage) await saveBoth(stage);
+      window.leaveTo("../Select/index.html");
+    } catch (err) {
+      console.error("離開失敗：", err);
+      window.cancelLeave();
+    }
+  } finally {
+    leaveBtn.disabled = false;
+  }
 }
 
 async function saveBoth(stage) {
@@ -158,6 +177,7 @@ async function savePlayer(player, index, stage) {
         startTime: window.WebGameRuntime.toWallTime(session.startedAt || window.WebGameRuntime.now()),
         endTime: Date.now(),
         mode: "double",
+        pairId: session.pairId,
         stats: [
           { apiname: "TGame_correct", value: player.score },
           { apiname: "TGame_wrong", value: wrong },
@@ -180,12 +200,19 @@ async function savePlayer(player, index, stage) {
 document.getElementById("mid-lobby").addEventListener("click", async () => {
   document.getElementById("mid-continue").disabled = true;
   document.getElementById("mid-lobby").disabled = true;
-  await saveBoth(MID_STAGE);
-  location.href = "../Select/index.html";
+  try {
+    await saveBoth(MID_STAGE);
+    location.href = "../Select/index.html";
+  } finally {
+    // 中場回大廳是明確選擇，不再確認。萬一導向沒有發生，恢復按鈕避免卡在中場畫面；已存過不會重送
+    document.getElementById("mid-continue").disabled = false;
+    document.getElementById("mid-lobby").disabled = false;
+  }
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.repeat || !session.playing || session.paused) return;
+  // 遊戲時鐘暫停時（例如確定離開、存檔中）不作答
+  if (event.repeat || !session.playing || session.paused || window.WebGameRuntime.paused) return;
 
   if (event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -207,9 +234,9 @@ async function init() {
     player.promptEl.textContent = "圖片載入中…";
   });
   const scenesReady = preloadSceneImages();
-  const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV，失敗就用預設題目
+  const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV。失敗時使用預設題目。
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 先排好六關，等場景、角色圖與第 1 關物品圖解碼完才開局；網路太慢時最多等 8 秒
+  // 先安排六關，再等待場景、角色與第 1 關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
   const rules = buildStageRules();
   stageRules = rules;
   await Promise.race([
@@ -290,6 +317,7 @@ function makePlayerAssets(base) {
 function startGame(rules = buildStageRules()) {
   clearInterval(session.timerId);
   savedStage = 0;
+  session.pairId = window.WebGameApi.uuid();
   session.startedAt = window.WebGameRuntime.now();
   session.endReason = "";
   stageRules = rules;
@@ -338,14 +366,19 @@ function startLevel(level) {
   });
 
   viewportGuard.update();
-  // 計時不在這裡開始：等任一人第一次按鍵才同時開始（見 startLevelTimer）
+  // 此處不開始計時。任一玩家首次按鍵時，才同時開始計時（見 startLevelTimer）。
 }
 
-// 用截止時間戳計算剩餘秒數，不靠每秒減 1，避免計時器延遲累積誤差
+// 以截止時間戳計算剩餘秒數，避免每秒遞減造成計時誤差。
 function startLevelTimer() {
   if (session.timerStarted) return;
   session.timerStarted = true;
-  session.levelDeadline = window.WebGameRuntime.now() + TIME_LIMIT_MS;
+  const now = window.WebGameRuntime.now();
+  session.levelDeadline = now + TIME_LIMIT_MS;
+  // 按鍵開始前的等待（說明、休息）不算反應時間：題目已顯示的玩家從開始計時這一刻起算
+  [players.p1, players.p2].forEach((player) => {
+    if (player.ready) player.questionShownAt = now;
+  });
   session.timerId = setInterval(tick, HUD_TICK_MS);
   renderAllHud();
 }
@@ -463,11 +496,13 @@ async function chooseDirection(player, choice) {
   const question = currentQuestion(player);
   if (!question) return;
 
+  // 開始計時的那一下同時是作答，但量不到反應時間，計分照算、不列入反應時間
+  const startsTimer = !session.timerStarted;
   startLevelTimer();
 
   const token = session.roundToken;
   player.busy = true;
-  player.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - player.questionShownAt));
+  if (!startsTimer) player.reactionSamples.push(Math.max(0, window.WebGameRuntime.now() - player.questionShownAt));
   const isCorrect = choice === question.correct;
   player.pendingCorrect = isCorrect;
   if (isCorrect) player.score += 1;
@@ -517,7 +552,7 @@ async function chooseDirection(player, choice) {
   const questionReady = renderQuestion(player);
   hideFeedback(player);
   resetSceneAndPlayer(player, true);
-  // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
+  // 新物品圖片解碼完成後才淡入，避免顯示舊圖片或延遲顯示。最多等待 300 ms。
   await Promise.all([
     wait(40),
     questionReady,
@@ -644,10 +679,10 @@ function setPlayerSprite(player, src) {
   player.playerImg.src = src;
 }
 
-// 預載過的 Image 物件留在這裡，避免被 GC 回收後又重新下載、解碼
+// 保留已預載的 Image 物件，避免 GC 回收後重新下載與解碼。
 const preloadedImages = new Map();
 
-// 回傳 Promise<boolean>：圖片可用為 true，載入失敗為 false（不會 reject）
+// 回傳 Promise<boolean>。圖片可用時為 true，載入失敗時為 false，不會 reject。
 function preloadImage(src) {
   if (preloadedImages.has(src)) return preloadedImages.get(src).ready;
   const image = new Image();
@@ -676,7 +711,7 @@ function levelItemIds(level) {
   return Array.from(new Set([...rule.correct, ...wrongItems]));
 }
 
-// 該關所有可能出現的物品圖先下載並解碼；找不到的直接記進 missingImages，之後改用文字卡
+// 預先下載並解碼本關所有可能使用的物品圖片。缺少的圖片記入 missingImages，之後改用文字卡。
 function preloadLevelItems(level) {
   return Promise.all(
     levelItemIds(level)
@@ -851,7 +886,7 @@ function buildThemesFromRows(rows) {
     themes.push(theme);
   });
 
-  // 沒有「錯誤」列的主題：借用其他主題的正確項目當干擾選項
+  // 主題沒有錯誤列時，使用其他主題的正確項目作為干擾選項。
   const usable = themes.filter((theme) => {
     if (theme.wrong.length) return true;
     const borrowed = new Set();
@@ -917,7 +952,7 @@ function shuffled(list) {
   return copy;
 }
 
-// 主題 ≤ 6：照檔案順序；主題 > 6：每次遊戲隨機抽 6 個；主題不足 6：循環補滿
+// 主題不超過 6 個時，使用檔案順序。超過 6 個時，隨機選取 6 個。不足 6 個時，循環補足。
 function buildStageRules() {
   if (!customThemes || !customThemes.length) return DEFAULT_STAGE_RULES;
   const picked =
@@ -1040,5 +1075,5 @@ const viewportGuard = window.TGameSupport.createViewportGuard({
   onBlock: pauseForViewport, onResume: resumeViewport, onLeave: leaveGame,
 });
 
-// 必須放在檔案最後：init() 會用到上面所有 const，太早呼叫會踩到暫時性死區
+// 須放在檔案最後。init() 使用上方所有 const，提早呼叫會觸發暫時性死區錯誤。
 init();
