@@ -75,6 +75,7 @@ async function playDouble(choice) {
     assert.deepEqual(payloads.map((payload) => payload.data.caseId).sort(), ['S03', 'S04']);
     for (const payload of payloads) {
       const stats = Object.fromEntries(payload.data.stats.map(({ apiname, value }) => [apiname, value]));
+      // 30 秒場次每關 5 秒、每題約 5.4 秒：第 6 關那題來不及判定就散場，所以最高到第 5 關。
       const expectedQuestions = choice === 'continue' ? 5 : 3;
       assert.equal(stats.DCCS_questionCount, expectedQuestions);
       assert.equal(stats.DCCS_correct + stats.DCCS_wrong, expectedQuestions);

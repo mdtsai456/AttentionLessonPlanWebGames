@@ -872,6 +872,8 @@ export function createOverlays(container) {
   }
 
   function showResult(summary, statusText) {
+    // 成績還在送出時先停用；這時按下去不會被等待，學生會以為按鈕壞了。
+    resultLobbyButton.disabled = true;
     const correct = summary && summary.correct_count != null ? summary.correct_count : 0;
     const accuracy = Math.round(((summary && summary.accuracy) || 0) * 100);
     const stage = summary && summary.stage != null ? summary.stage : 0;
@@ -883,6 +885,7 @@ export function createOverlays(container) {
   }
 
   function waitForResultLobby() {
+    resultLobbyButton.disabled = false;
     resultLobbyButton.focus();
     return new Promise((resolve) => {
       resolveResultLobby = resolve;
