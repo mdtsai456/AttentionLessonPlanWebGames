@@ -1,4 +1,4 @@
-"""CORS 設定的測試。不碰資料庫（只打 /health）。"""
+"""CORS 設定測試。只呼叫 /health，不存取資料庫。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import main
 
 
-# --- _cors_origins 純函式 ---
+# _cors_origins 純函式
 
 
 def test_cors_origins_default_is_localhost_dev_servers(monkeypatch):
@@ -34,7 +34,7 @@ def test_cors_origins_blank_falls_back_to_default(monkeypatch):
     assert main._cors_origins() == main._DEFAULT_DEV_ORIGINS
 
 
-# --- 實際的 CORS 回應 header（app 以預設 origin 清單建立） ---
+# 實際的 CORS 回應 header。應用程式使用預設的 origin 清單。
 
 
 def test_cors_echoes_allowed_origin_on_simple_request():

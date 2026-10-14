@@ -73,7 +73,7 @@ function clearMidBreak() {
   if (panel) panel.hidden = true;
 }
 
-// 任一玩家瞄準動物，兩位玩家同時開始出題
+// 任一玩家瞄準動物後，兩位玩家同時開始出題。
 function syncStart() {
   players.forEach((player) => player.forceStart());
 }
@@ -206,11 +206,11 @@ if (btnConfirmLeave) {
 }
 
 
-// 雙人版動態素材與彩蛋清單載入流程
+// 雙人模式的動態素材與動物升級清單載入流程
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 
-// 預設彩蛋備用圖清單（無素材時輪播用）
+// 預設的動物升級備用圖片清單。未取得素材時，依序切換此清單的圖片。
 const DEFAULT_ANIMAL_POOL = [
   'assets/animals/rabbit.png',
   'assets/animals/cat.png',
@@ -226,7 +226,7 @@ function assetStudentId(rawId) {
   return `${match[1].toUpperCase()}${String(Number(match[2])).padStart(3, '0')}`;
 }
 
-// 1. 抓取玩家 (P1/P2) 素材清單，自動補充不足部分以觸發彩蛋
+// 1. 取得 P1／P2 的素材清單。補足動物升級所需的素材。
 async function fetchStudentAssetList(playerIndex) {
   const isP1 = (playerIndex === 0);
   
@@ -241,14 +241,14 @@ async function fetchStudentAssetList(playerIndex) {
   return window.DatAssets.fetchAssetList(apiUrl, DEFAULT_ANIMAL_POOL);
 }
 
-// 3. 初始化雙人素材與啟動流程
+// 3. 初始化雙人素材與啟動流程。
 async function initDoubleGameWorkflow() {
   console.log('🎮 雙人遊戲開始，獨立載入 P1/P2 素材與彩蛋清單...');
 
   const p1Elem = document.querySelector('.player-1');
   const p2Elem = document.querySelector('.player-2');
 
-  // A. 載入前先隱藏 P1 與 P2 的動物與準心，避免畫面預設殘影
+  // A. 載入前隱藏 P1 與 P2 的動物及準心，避免顯示預設圖片。
   const togglePlayerVisibility = (pElem, visible) => {
     if (!pElem) return;
     const animal = pElem.querySelector('#animal, [data-ui="animal"]');
@@ -260,13 +260,13 @@ async function initDoubleGameWorkflow() {
   togglePlayerVisibility(p1Elem, false);
   togglePlayerVisibility(p2Elem, false);
 
-  // B. 並行抓取 P1 與 P2 的素材清單
+  // B. 並行取得 P1 與 P2 的素材清單。
   const [p1List, p2List] = await Promise.all([
     fetchStudentAssetList(0),
     fetchStudentAssetList(1)
   ]);
 
-  // C. 預載通用與玩家首張圖片
+  // C. 預載共用圖片與每位玩家的首張圖片。
   const [, , p1Initial, p2Initial] = await Promise.all([
     window.DatAssets.loadImage('assets/background.png', 'assets/background.png'),
     window.DatAssets.loadImage('assets/crosshair.png', 'assets/crosshair.png'),
@@ -276,21 +276,21 @@ async function initDoubleGameWorkflow() {
   p1List[0] = p1Initial;
   p2List[0] = p2Initial;
 
-  // D. 將素材清單傳送給兩位 Player 實體
+  // D. 將素材清單傳給兩個 Player 實例。
   await Promise.all([
     players[0].setAnimalAssets(p1List),
     players[1].setAnimalAssets(p2List),
   ]);
 
-  // E. 啟動遊戲 Session
+  // E. 啟動遊戲場次。
   beginSession();
 
-  // F. 載入完成並算好位置後，重新顯示兩位玩家的動物與準心
+  // F. 載入完成並計算位置後，顯示兩位玩家的動物與準心。
   togglePlayerVisibility(p1Elem, true);
   togglePlayerVisibility(p2Elem, true);
 }
 
-// 執行初始化並啟動動畫 Loop
+// 執行初始化，並啟動動畫迴圈。
 initDoubleGameWorkflow();
 
 players.forEach((player) => requestAnimationFrame(player.tick));

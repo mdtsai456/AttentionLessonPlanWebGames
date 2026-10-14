@@ -1,4 +1,4 @@
-"""確認測試資料庫的連線、建表與清空真的能運作。"""
+"""確認測試資料庫可連線、建表與清空資料。"""
 
 from __future__ import annotations
 
@@ -37,5 +37,5 @@ def test_can_insert_session_for_student(db):
 
 
 def test_each_test_starts_with_an_empty_database(db):
-    """前兩個測試插入的資料不該留下來。"""
+    """前兩個測試插入的資料須已清除。"""
     assert db.query("SELECT COUNT(*) AS n FROM student") == [{"n": 0}]

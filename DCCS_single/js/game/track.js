@@ -1,5 +1,5 @@
-// 單一玩家賽道（SPEC 4.12）。所有狀態由建構子注入，方便建立雙人模式的獨立實例。
-// 每關固定素材；切關會等待目前題目完整離場，題目屬性則在生成時凍結。
+// 單一玩家賽道（SPEC 4.12）。建構子接收所有狀態，以建立雙人模式的獨立實例。
+// 每關使用固定素材。換關前，等待目前題目離場。題目產生時固定其屬性。
 import { CONFIG } from '../config.js';
 import { Valve } from './valve.js';
 import { createTarget, stepTarget, hasReachedZ } from './target.js';
@@ -53,7 +53,7 @@ export class Track {
     this._showTick = false;
 
     this._target = null;
-    // 判定使用生成題目時凍結的屬性，不讀取可能已改變的目前關卡。
+    // 使用出題時固定的屬性判定答案，不讀取目前關卡的屬性。
     this._trialLevelNo = null;
     this._trialShapeCount = null;
     this._trialObjectCount = null;
@@ -74,7 +74,7 @@ export class Track {
 
     this._trialCounter = -1;
     this._currentTrialIndex = null;
-    // 一題兩道閥都對才算答對；判定逐閥記錄，得分與 ✓ 逐題結算。
+    // 每題的兩道閥皆答對才算答對。逐閥記錄判定，逐題計分並顯示 ✓。
     this._trialAllCorrect = true;
     this._trialFinalized = false;
 
@@ -152,7 +152,7 @@ export class Track {
     this._trialCounter += 1;
     this._currentTrialIndex = this._trialCounter;
 
-    // 題目飛行期間可能遇到切關門檻，因此判定屬性在此凍結。
+    // 目標移動期間可能達到換關時間，因此在此固定判定屬性。
     this._trialLevelNo = trial.levelNo;
     this._trialShapeCount = trial.shapeCount;
     this._trialObjectCount = trial.objectCount;
@@ -212,7 +212,7 @@ export class Track {
     if (!correct) this._trialAllCorrect = false;
   }
 
-  /** 這一題的閥都判定完後結算一次：全對才得分並顯示 ✓。 */
+  /** 每題的兩道閥皆判定完成後，結算一次。全對才得分並顯示 ✓。 */
   _finishTrialIfJudged(target) {
     if (this._trialFinalized) return;
     if (this._valveShape && !target.passedShape) return;
@@ -243,13 +243,13 @@ export class Track {
     if (!this._levelAdvancePending || this._levelIdx >= this.levels.length - 1) return false;
 
     this._levelIdx += 1;
-    // 保留等待目前題目離場所累積的超時。
+    // 保留等待目前題目離場時累積的超時時間。
     this._levelElapsed = Math.max(0, this._levelElapsed - this._levelSeconds);
     this._levelAdvancePending = false;
     this._warnedNoTrial = false;
     this._retryTimer = 0;
 
-    // 先生成新關第一題；dccs.js 隨即暫停並顯示提示。
+    // 先產生新關卡的第一題。dccs.js 隨後暫停遊戲並顯示提示。
     this._levelDeck = buildLevelDeck(this.manifest, this.levels[this._levelIdx]);
     this._spawnTrial();
     return true;
@@ -267,15 +267,15 @@ export class Track {
       }
     }
 
-    // 即使沒有目標也要消費輸入，避免按鍵遞延到下一題。
+    // 沒有目標時仍處理輸入，避免將按鍵套用到下一題。
     const shapePresses = this.input.takePresses('rotateShape');
     const objectPresses = this.input.takePresses('rotateObject');
 
     if (!this._target) {
-      // 沒有可完成的目前題目時，不必卡住等待；直接切到已到期的下一關。
+      // 目前沒有可完成的題目時，直接切換至已達開始時間的下一關。
       if (this._activateNextLevel()) return;
 
-      // 無可行題型時節流重試，避免每幀空轉。
+      // 無可用題型時，限制重試頻率，避免每幀重試。
       this._retryTimer -= dt;
       if (this._retryTimer <= 0) {
         this._retryTimer = RETRY_INTERVAL_SECONDS;
@@ -286,8 +286,8 @@ export class Track {
 
     const target = this._target;
 
-    // 先把已經在轉的動畫走完並判定，這一幀新按的鍵下一幀才開始轉，
-    // 避免目標剛好通過時，按鍵把還停在正中間的正確答案帶走。
+    // 先完成既有轉動動畫並判定答案。本幀的新按鍵在下一幀才開始轉動，
+    // 避免目標通過時，新的按鍵移動仍在中央的正確答案。
     if (this._valveShape) this._valveShape.update(dt);
     if (this._valveObject) this._valveObject.update(dt);
 

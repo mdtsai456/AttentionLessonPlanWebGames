@@ -5,15 +5,15 @@ import { resolveSubmitUrl } from './apiBase.js';
 const STATS_PREFIX = 'DCCS_';
 const SUBMIT_TIMEOUT_MS = 15_000;
 
-// 送出失敗的 payload 暫存在 localStorage，key 前綴固定，供下次開場時重送。
+// 送出失敗的 payload 暫存於 localStorage。使用固定的 key 前綴，供下次開始時重送。
 const PENDING_PREFIX = 'dccs_pending_';
 
-// 被伺服器「永久拒絕」的 payload 搬到這個前綴下：不再重送，但也不刪除。
-// 例如 school 沒登記在中介平台的場域名錄裡，會回 400——這種錯重試一萬次
-// 也不會變成功，留在待送佇列只會把後面正常的成績一起卡住。
+// 將伺服器永久拒絕的 payload 移至此 key 前綴。不再重送，並保留資料。
+// 例如，school 未登記於平台名錄時，伺服器回傳 400。重試無法解決此錯誤，
+// 若保留在待送佇列，會阻止後續有效成績送出。
 const REJECTED_PREFIX = 'dccs_rejected_';
 
-// 這些 4xx 是暫時性的，仍應重送；其餘 4xx 視為永久拒絕。
+// 這些 4xx 錯誤可重試。其餘 4xx 錯誤視為永久拒絕。
 const RETRYABLE_CLIENT_STATUSES = new Set([401, 403, 408, 429]);
 
 function isPermanentRejection(status) {
@@ -92,7 +92,7 @@ export function buildPayload({ lessonId, student, summary }) {
 }
 
 /**
- * 單純 POST，不做任何暫存。失敗一律 throw，由呼叫端決定怎麼處理。
+ * 只執行 POST，不暫存資料。失敗時拋出錯誤，由呼叫端處理。
  * @param {object} payload
  * @param {string} url
  * @returns {Promise<string>} 伺服器回應的原始內容
@@ -117,14 +117,14 @@ async function postPayload(payload, url, player) {
       const error = new Error(
         `server responded ${res.status}${text ? `: ${text}` : ''}`
       );
-      // 讓呼叫端能分辨「暫時送不出去」與「這筆永遠不會被接受」。
+      // 讓呼叫端區分暫時送出失敗與永久拒絕。
       error.status = res.status;
       throw error;
     }
 
     return text;
   } finally {
-    // 包含回應本文的讀取，避免只收到 headers 就永遠停在送出中。
+    // 逾時範圍包含回應本文的讀取，避免收到 headers 後持續等待。
     clearTimeout(timeout);
   }
 }
@@ -142,7 +142,7 @@ export async function submitResult(payload, { url = resolveSubmitUrl(), player }
   } catch (err) {
     const message = err && err.message ? err.message : String(err);
     try {
-      // 同一毫秒內送出兩筆（雙人模式）會撞 key，補一段亂數區隔。
+      // 雙人模式可能在同一毫秒送出兩筆資料。加入亂數，避免 key 重複。
       const key = `${PENDING_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       localStorage.setItem(key, JSON.stringify(payload));
     } catch (_storageErr) {
@@ -161,7 +161,7 @@ export function listPendingResults() {
 }
 
 /**
- * 掃出 localStorage 裡指定前綴的 payload，依 key 排序（即產生順序）。
+ * 列出 localStorage 中指定前綴的 payload，依 key 排序，即產生順序。
  * @param {string} prefix
  * @returns {Array<{key: string, payload: object}>}
  */
@@ -172,7 +172,7 @@ function collectByPrefix(prefix) {
     storage = window.localStorage;
     if (!storage) return found;
   } catch (_err) {
-    // 隱私模式等情況下讀 localStorage 會 throw。
+    // 隱私模式等情況下，讀取 localStorage 可能拋出錯誤。
     return found;
   }
 
@@ -188,11 +188,11 @@ function collectByPrefix(prefix) {
     try {
       payload = JSON.parse(storage.getItem(key));
     } catch (_err) {
-      // 內容已經壞掉，留著也沒用，直接清掉免得無限累積。
+      // 刪除已損壞的資料，避免持續累積。
       try {
         storage.removeItem(key);
       } catch (_removeErr) {
-        /* 清不掉就算了 */
+        /* 忽略刪除失敗。 */
       }
       continue;
     }
@@ -203,10 +203,10 @@ function collectByPrefix(prefix) {
 }
 
 /**
- * 重送所有暫存的成績。成功的才刪掉，失敗的原封不動留到下次。
+ * 重送所有暫存成績。成功後刪除資料，失敗時保留原資料供下次重送。
  *
- * 刻意不走 submitResult()——那支失敗時會再寫一筆新的暫存，重送一旦失敗就會
- * 讓暫存無限增生。
+ * 不呼叫 submitResult()，因為該函式在失敗時會新增暫存資料。
+ * 重送失敗若再新增資料，會使暫存持續增加。
  *
  * @param {{url?: string}} [opts]
  * @returns {Promise<{attempted: number, sent: number, failed: number,
@@ -228,13 +228,13 @@ async function flushPending({ url = resolveSubmitUrl() } = {}) {
       try {
         window.localStorage.removeItem(key);
       } catch (_removeErr) {
-        // 送出去了但刪不掉——下次會重送一次，由後端的唯一鍵擋掉重複。
+        // 送出成功但刪除失敗時，下次會重送。後端以唯一鍵防止重複寫入。
       }
       sent += 1;
     } catch (err) {
       if (isPermanentRejection(err && err.status)) {
-        // 搬到 rejected 區：不再重送，但資料留著可以人工撿回。
-        // 不搬走的話，這一筆會把後面每一場正常的成績永遠擋在佇列裡。
+        // 移至 rejected 區，停止重送，並保留資料供人工處理。
+        // 若未移出此資料，會阻止後續有效成績送出。
         console.error(
           '成績被伺服器拒絕，已移出待送佇列（需要人工處理）：',
           err.message,
@@ -248,14 +248,14 @@ async function flushPending({ url = resolveSubmitUrl() } = {}) {
           );
           window.localStorage.removeItem(key);
         } catch (_moveErr) {
-          // 搬不動就只能留著，至少資料還在。
+          // 移動失敗時，保留原資料。
         }
 
         rejected += 1;
         continue;
       }
 
-      // 暫時性失敗（斷線、5xx）：保持原樣，剩下的這次不用再試。
+      // 暫時失敗時，例如斷線或 5xx，保留原資料，並停止本次後續重試。
       failed += 1;
       break;
     }
@@ -265,14 +265,14 @@ async function flushPending({ url = resolveSubmitUrl() } = {}) {
 }
 
 /**
- * 列出被伺服器永久拒絕、已移出待送佇列的成績，供人工撿回。
+ * 列出伺服器永久拒絕且已移出待送佇列的成績，供人工處理。
  * @returns {Array<{key: string, payload: object}>}
  */
 export function listRejectedResults() {
   return collectByPrefix(REJECTED_PREFIX);
 }
 
-// 雙人同時掛載兩個遊戲實例時，共用一次重送，避免同一筆暫存重複寫入。
+// 雙人模式同時掛載兩個遊戲實例時，共用一次重送，避免重複寫入。
 let flushing = null;
 export function flushPendingResults(opts) {
   if (!flushing) flushing = flushPending(opts).finally(() => { flushing = null; });

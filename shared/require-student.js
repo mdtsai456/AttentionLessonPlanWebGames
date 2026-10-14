@@ -1,4 +1,4 @@
-// 所有功能頁共用守門；在 head 同步執行，功能腳本驗證成功後才依序載入。
+// 所有功能頁共用登入驗證。在 head 同步執行，驗證成功後才依序載入功能腳本。
 (function (global) {
   const entry = document.currentScript;
   const root = new URL('../', entry.src);
@@ -91,7 +91,7 @@
     checking = true;
     const attempt = ++generation;
     const controller = new AbortController();
-    // Promise.race 也涵蓋讀取 body，超時後不允許遲來回應恢復頁面。
+    // Promise.race 涵蓋 body 的讀取。逾時後到達的回應不可恢復頁面。
     let timeout;
     try {
       const role = sessionStorage.getItem('user_role');
@@ -136,7 +136,7 @@
         sessionStorage.setItem('teacher_name', bodies[0].teacherName);
         sessionStorage.setItem('teacher_school', bodies[0].school);
       }
-      // 載入期間只有初次啟動可使用已驗證的登入，bfcache 必須等驗證完成。
+      // 首次載入時，可使用已驗證的登入狀態。從 bfcache 返回時，須等待驗證完成。
       checking = false;
       document.documentElement.style.visibility = '';
       document.documentElement.inert = false;

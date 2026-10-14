@@ -1,6 +1,6 @@
-"""密碼雜湊與登入 token 工具。純函式，不碰資料庫、不依賴 FastAPI。
+"""密碼雜湊與登入 token 工具。使用純函式，不存取資料庫，也不依賴 FastAPI。
 
-只用 stdlib（hashlib／hmac／secrets），不新增依賴，跟這個 repo 現有的精簡依賴清單一致。
+只使用標準函式庫 hashlib／hmac／secrets，不新增依賴。
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ DUMMY_PASSWORD_HASH = f"{_ALGORITHM}${_ITERATIONS}${'00' * _SALT_BYTES}${'00' * 
 
 
 def hash_password(password: str) -> str:
-    """回傳可直接存進 password_hash 欄位的字串。
+    """回傳可儲存至 password_hash 的字串。
 
-    格式：pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>。iterations 存進字串裡，
-    之後要調高強度時舊密碼仍可驗證，不用一次性遷移全部使用者。
+    格式為 pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>。
+    字串包含 iterations，因此提高迭代次數後，仍可驗證舊密碼，無須一次遷移所有使用者。
     """
     salt = secrets.token_bytes(_SALT_BYTES)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _ITERATIONS)
@@ -36,7 +36,7 @@ def hash_password(password: str) -> str:
 
 
 def _parse_password_hash(stored: object) -> tuple[int, bytes, str] | None:
-    """拆出 (iterations, salt, digest_hex)；不是可用的 pbkdf2_sha256 雜湊就回 None。"""
+    """拆出 (iterations, salt, digest_hex)。不是可用的 pbkdf2_sha256 雜湊時，回傳 None。"""
     if not isinstance(stored, str):
         return None
     parts = stored.split("$")
@@ -91,5 +91,5 @@ def teacher_account(teacher_id: int) -> str:
 
 
 def generate_token() -> str:
-    """產生一組不可預測的登入 token（url-safe，適合放進 Authorization header）。"""
+    """產生不可預測的登入 token。使用 URL 安全字元，可放入 Authorization header。"""
     return secrets.token_urlsafe(32)

@@ -19,8 +19,9 @@ SCHOOL = "測試場域"
 
 @pytest.fixture(autouse=True)
 def _register_school(request):
-    """這些測試直接呼叫寫入路徑（writes.insert_session_with_stats），
-    student.school 的外鍵要求場域先登記。碰資料庫的測試都帶 db fixture。"""
+    """測試直接呼叫 writes.insert_session_with_stats。
+student.school 的外鍵要求先登記場域。存取資料庫的測試皆使用 db fixture。
+"""
     if "db" not in request.fixturenames:
         return
     request.getfixturevalue("db").insert_school(SCHOOL)
