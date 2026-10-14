@@ -2,11 +2,34 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 import main
+import queries
 from routers import sessions
+
+SCHOOL = "網頁版契約測試"
+
+
+@pytest.fixture(autouse=True)
+def student_logins(monkeypatch):
+    """POST /api/sessions 需要學生登入（成績身分必須是 Authorization 本人）；
+    以 token = caseId 對應到同場域的學生，不碰資料庫。"""
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    monkeypatch.setattr(queries, "fetch_login_session", lambda token: {
+        "subject_type": "student", "grade": "G1", "case_id": token,
+        "school": SCHOOL, "expires_at": expires_at,
+    } if token in {"S01", "S02", "S03"} else None)
+
+
+def bearer(case_id, partner=None):
+    headers = {"Authorization": f"Bearer {case_id}"}
+    if partner is not None:
+        headers["X-Partner-Authorization"] = f"Bearer {partner}"
+    return headers
 
 
 @pytest.fixture
@@ -25,7 +48,7 @@ def webgame_payload(case_id="S03", mode="single", pair_id=None):
     data = {
         "grade": "G1",
         "caseId": case_id,
-        "school": "網頁版契約測試",
+        "school": SCHOOL,
         "currentDay": 1,
         "startTime": 1782877200000,
         "endTime": 1782877560000,
@@ -66,7 +89,9 @@ def assert_six_stage_dat_write(call):
 
 def test_dat_single_webgame_is_accepted_as_dat(write_calls):
     with TestClient(main.app) as client:
-        response = client.post("/api/sessions", json=webgame_payload())
+        response = client.post(
+            "/api/sessions", json=webgame_payload(), headers=bearer("S03")
+        )
 
     assert response.status_code == 201, response.text
     assert len(write_calls) == 1
@@ -81,9 +106,11 @@ def test_dat_double_webgame_stores_each_player_with_shared_pair_id(write_calls):
     with TestClient(main.app) as client:
         responses = [
             client.post(
-                "/api/sessions", json=webgame_payload(case_id, "double", pair_id)
+                "/api/sessions",
+                json=webgame_payload(case_id, "double", pair_id),
+                headers=bearer(case_id, partner),
             )
-            for case_id in ("S01", "S02")
+            for case_id, partner in (("S01", "S02"), ("S02", "S01"))
         ]
 
     assert [response.status_code for response in responses] == [201, 201]

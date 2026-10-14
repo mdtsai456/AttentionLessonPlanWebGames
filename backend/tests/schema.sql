@@ -21,9 +21,8 @@ CREATE TABLE IF NOT EXISTS `student` (
   -- AUTO_INCREMENT 欄位，並保留既有複合主鍵與 assessment_result 等表的外鍵。
   `student_id` int NOT NULL AUTO_INCREMENT,
   -- account 是全域唯一的登入帳號。seed.py 或正式資料匯入流程
-  -- 指派 S0001 格式的帳號。預設值使用 NULL，讓尚未指派帳號的多筆資料
-  -- 可通過 UNIQUE 約束。若使用空字串，多筆資料會違反唯一性約束。
-  -- MySQL 的 UNIQUE 允許多個 NULL 值，但不允許重複的空字串。
+  -- 指派 S001 格式的帳號。預設值使用 NULL，讓尚未指派帳號的多筆資料
+  -- 可通過 UNIQUE 約束。MySQL 的 UNIQUE 允許多個 NULL 值，但不允許重複的空字串。
   `account` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`grade`,`case_id`,`school`),
   UNIQUE KEY `uq_student_id` (`student_id`),
@@ -202,7 +201,7 @@ CREATE TABLE IF NOT EXISTS `teacher` (
   `school` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL DEFAULT '',
   -- account 是全域唯一的登入帳號，見 student.account 說明。teacher.name 僅在同一場域內唯一，
-  -- 無法作為登入帳號。seed_directory.py 指派 T0001 格式的帳號。
+  -- 無法作為登入帳號。seed_directory.py 指派 T001 格式的帳號。
   `account` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`teacher_id`),
   UNIQUE KEY `uq_teacher_school_name` (`school`, `name`),

@@ -111,10 +111,10 @@ def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
     帳密清單只包含此次建立的帳號，來源為 account 原為 NULL 的老師。
     不覆寫既有帳號，因此重複執行不會使既有帳號或密碼失效。
 
-    帳號格式為 T0001，使用插入時才產生的 teacher_id（AUTO_INCREMENT）。
+    帳號格式為 T001，使用插入時才產生的 teacher_id（AUTO_INCREMENT）。
     先 upsert school/name，再為 account 為 NULL 的列補上 account 與密碼。
     """
-    from auth import hash_password
+    from auth import hash_password, teacher_account
 
     with connection.cursor() as cursor:
         cursor.execute(CREATE_SCHOOL)
@@ -145,7 +145,7 @@ def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
         teachers_needing_credentials = cursor.fetchall()
         new_credentials: list[tuple[str, str, str, str]] = []
         for row in teachers_needing_credentials:
-            account = f"T{row['teacher_id']:04d}"
+            account = teacher_account(row["teacher_id"])
             plaintext = _generate_readable_password()
             cursor.execute(
                 "UPDATE teacher SET account = %s, password_hash = %s WHERE teacher_id = %s",

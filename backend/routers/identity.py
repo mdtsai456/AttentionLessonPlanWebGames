@@ -17,8 +17,15 @@ from fastapi import Depends, Header, HTTPException
 import queries
 from errors import db_error
 
-_NOT_AUTHENTICATED = HTTPException(status_code=401, detail="請重新登入")
-_FORBIDDEN = HTTPException(status_code=403, detail="無權查看其他場域資料")
+
+# 每次 raise 都要建新的例外物件：重複 raise 同一個模組層級實例，Python 會把每次的
+# traceback 接在它的 __traceback__ 上，記憶體只增不減，frame 還會留住請求的區域變數。
+def _not_authenticated() -> HTTPException:
+    return HTTPException(status_code=401, detail="請重新登入")
+
+
+def _forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail="無權查看其他場域資料")
 
 
 @dataclass(frozen=True)
@@ -42,7 +49,7 @@ def extract_bearer_token(authorization: str | None) -> str | None:
 def get_current_identity(authorization: str | None = Header(default=None)) -> Identity:
     token = extract_bearer_token(authorization)
     if token is None:
-        raise _NOT_AUTHENTICATED
+        raise _not_authenticated()
 
     try:
         row = queries.fetch_login_session(token)
@@ -50,13 +57,13 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
         raise db_error(exc) from exc
 
     if row is None:
-        raise _NOT_AUTHENTICATED
+        raise _not_authenticated()
 
     expires_at = row["expires_at"]
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at <= datetime.now(timezone.utc):
-        raise _NOT_AUTHENTICATED
+        raise _not_authenticated()
 
     if row["subject_type"] == "teacher":
         try:
@@ -64,7 +71,7 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
         except Exception as exc:
             raise db_error(exc) from exc
         if teacher is None:
-            raise _NOT_AUTHENTICATED
+            raise _not_authenticated()
         return Identity(
             subject_type="teacher",
             teacher_id=teacher["teacher_id"],
@@ -74,7 +81,7 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
         )
 
     if row["subject_type"] != "student" or not all(row.get(key) for key in ("grade", "case_id", "school")):
-        raise _NOT_AUTHENTICATED
+        raise _not_authenticated()
     return Identity(
         subject_type="student", grade=row["grade"], case_id=row["case_id"],
         school=row["school"], expires_at=expires_at,
@@ -83,20 +90,20 @@ def get_current_identity(authorization: str | None = Header(default=None)) -> Id
 
 def require_teacher(identity: Identity = Depends(get_current_identity)) -> Identity:
     if identity.subject_type != "teacher":
-        raise _FORBIDDEN
+        raise _forbidden()
     return identity
 
 
 def require_student(identity: Identity = Depends(get_current_identity)) -> Identity:
     if identity.subject_type != "student":
-        raise _FORBIDDEN
+        raise _forbidden()
     return identity
 
 
 def require_same_school(identity: Identity, school: str) -> None:
     """老師只能查詢自己的場域。學生使用 require_own_student_or_same_school_teacher 驗證。"""
     if identity.school != school:
-        raise _FORBIDDEN
+        raise _forbidden()
 
 
 def require_own_student_or_same_school_teacher(
@@ -111,4 +118,4 @@ def require_own_student_or_same_school_teacher(
         require_same_school(identity, school)
         return
     if (identity.grade, identity.case_id, identity.school) != (grade, case_id, school):
-        raise _FORBIDDEN
+        raise _forbidden()

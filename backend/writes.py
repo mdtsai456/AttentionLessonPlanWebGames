@@ -21,6 +21,7 @@ def insert_session_with_stats(
     stats: dict[str, Any],
     mode: str = "single",
     pair_id: str | None = None,
+    session_id: str | None = None,
 ) -> str:
     """建立 Student、Session 與五個共用遊戲統計欄位，並回傳 UUID。
 
@@ -31,7 +32,9 @@ def insert_session_with_stats(
     if table_name is None:
         raise ValueError(f"不支援的遊戲類型：{game_type}")
 
-    session_id = str(uuid4())
+    # 前端帶了 submissionId 時，呼叫端會傳入由它推導的 UUID（routers/sessions.py
+    # submission_session_id），重送同一筆會撞主鍵而不是多一列。
+    session_id = session_id or str(uuid4())
     student_sql = (
         "INSERT IGNORE INTO student (grade, case_id, school) VALUES (%s, %s, %s)"
     )

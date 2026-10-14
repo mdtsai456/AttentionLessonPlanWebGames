@@ -78,7 +78,10 @@ TABLES_CHILD_FIRST = (
 ROUND_STARTS = [("A", date(2026, 1, 5)), ("B", date(2026, 3, 2))]  # 皆為週一
 WEEKDAY_OFFSETS = (0, 2, 4)  # 一、三、五
 WEEKS = 4
-DAILY_START = (12, 0)  # 每天 12:00 開始
+DAILY_START = (12, 0)  # 每天 12:00 開始（台灣時間）
+# 排程以台灣時間（UTC+8）安排；資料庫的時間欄一律存 UTC（與 POST /api/sessions 相同），
+# 寫入前要減掉這個時差，老師平台換回本地時間才會顯示 12:00。
+LOCAL_UTC_OFFSET = timedelta(hours=8)
 
 
 def build_play_days() -> list[dict]:
@@ -187,7 +190,8 @@ def generate() -> tuple[list, list, dict[str, list]]:
 
                     possible_sessions.append((
                         grade, case_id, school, game_uuid,
-                        start_dt, game, mode, pair_id, day["current_day"], end_dt,
+                        start_dt - LOCAL_UTC_OFFSET, game, mode, pair_id,
+                        day["current_day"], end_dt - LOCAL_UTC_OFFSET,
                     ))
                     # 只填入五個核心欄位，其餘遊戲專用欄位維持 NULL。
                     possible_details[game_uuid] = (GAME_TABLE[game], (
@@ -261,6 +265,7 @@ def main() -> None:
 
     # 讓 db.get_db_config() 連線至已解析的目標資料庫。
     os.environ["DB_NAME"] = target_db
+    from auth import student_account
     from db import get_connection
 
     student_rows, session_rows, detail_rows = generate()
@@ -290,14 +295,13 @@ def main() -> None:
                 student_rows,
             )
 
-            # 模擬學生的 account 需在 INSERT 後產生。
-            # 帳號格式為 S0001，使用 student_id。此 AUTO_INCREMENT 值在插入時才產生，
-            # 因此插入後再以 UPDATE 補上帳號。seed_directory.py
-            # 也使用此流程建立老師的 account。
+            # 模擬學生的 account 在 INSERT 後產生。
+            # 帳號格式為 S001，使用插入時才產生的 student_id（AUTO_INCREMENT）。
+            # 插入後以 UPDATE 補上帳號。seed_directory.py 也使用此流程建立老師的 account。
             cursor.execute("SELECT grade, case_id, school, student_id FROM student")
             sample_account = None
             for row in cursor.fetchall():
-                account = f"S{row['student_id']:04d}"
+                account = student_account(row["student_id"])
                 cursor.execute(
                     "UPDATE student SET account = %s "
                     "WHERE grade = %s AND case_id = %s AND school = %s",
@@ -331,7 +335,7 @@ def main() -> None:
     print(f"  assessment_result {len(session_rows):>5}")
     print(f"  各遊戲明細合計      {detail_total:>5}")
     print(f"所有假學生密碼統一是：{TEST_STUDENT_PASSWORD}（測試/本機 demo 用）")
-    print(f"帳號依 student_id 依序指派為 S0001、S0002……（帳號不會出現在任何 API 回應裡，")
+    print(f"帳號依 student_id 依序指派為 S001、S002……（帳號不會出現在任何 API 回應裡，")
     print(f"要看完整清單請直接查 DB 的 student.account 欄位）；隨便挑一個試登入，例如：{sample_account}")
 
 
