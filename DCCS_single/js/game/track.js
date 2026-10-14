@@ -15,7 +15,8 @@ export class Track {
   /**
    * @param {{manifest: object, images: Map<string, HTMLImageElement>, input: object,
    *          viewport: {x:number,y:number,w:number,h:number}, rng: () => number, stats: object,
-   *          backgroundKey?: string, sessionSeconds?: number}} opts
+   *          backgroundKey?: string, sessionSeconds?: number,
+   *          progressSide?: 'left'|'right'}} opts
    */
   constructor({
     manifest,
@@ -26,6 +27,7 @@ export class Track {
     stats,
     backgroundKey = 'single',
     sessionSeconds = CONFIG.SESSION_SECONDS,
+    progressSide = 'left',
   }) {
     this.manifest = manifest;
     this.images = images;
@@ -35,6 +37,7 @@ export class Track {
     this.stats = stats;
     this.backgroundKey = backgroundKey;
     this.sessionSeconds = sessionSeconds;
+    this.progressSide = progressSide;
 
     this.levels = Array.isArray(manifest.levels) ? manifest.levels.slice() : [];
     this.trialGen = createTrialGenerator(manifest, rng);
@@ -373,6 +376,7 @@ export class Track {
       level: this.currentLevelNo,
       remaining: Math.max(0, this._levelSeconds - this._levelElapsed),
       showTick: this._showTick,
+      progressSide: this.progressSide,
     });
   }
 }

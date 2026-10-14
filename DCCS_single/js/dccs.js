@@ -171,6 +171,10 @@ export function mountDCCS(options) {
       ? 16 / 9
       : opts.viewportAspect;
 
+  // 直立進度條放哪一側；雙人模式的玩家 2 傳 'right'。
+  const progressSide =
+    opts.progressSide === 'right' ? 'right' : 'left';
+
   const autoStart = !!opts.autoStart;
 
   const showTutorial =
@@ -705,6 +709,7 @@ export function mountDCCS(options) {
         stats: statsInstance,
         backgroundKey,
         sessionSeconds,
+        progressSide,
       });
 
       startedAtMs = Date.now();

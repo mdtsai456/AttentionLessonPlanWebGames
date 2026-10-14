@@ -766,6 +766,9 @@ async function startSession(player1, player2) {
           rotateObject: ['ArrowRight'],
         },
 
+        // 玩家 2 的進度條放右側，與玩家 1 左右對稱。
+        progressSide: 'right',
+
         submit: false,
         showResultScreen: false,
         showTutorial: false,

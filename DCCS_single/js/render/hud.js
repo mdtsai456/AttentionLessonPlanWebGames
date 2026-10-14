@@ -7,17 +7,20 @@ const FONT_STACK = '"MaokenAssortedSans", "Microsoft JhengHei", sans-serif';
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {{x:number,y:number,w:number,h:number}} viewport
- * @param {{score:number, elapsed:number, total:number, level:number, showTick:boolean}} state
+ * @param {{score:number, elapsed:number, total:number, level:number, showTick:boolean,
+ *          progressSide?: 'left'|'right'}} state
  */
 export function drawHud(ctx, viewport, state) {
   const { x: vx, y: vy, w, h } = viewport;
-  const { score = 0, elapsed = 0, total = 1, level = 0, showTick = false } = state || {};
+  const {
+    score = 0, elapsed = 0, total = 1, level = 0, showTick = false, progressSide = 'left',
+  } = state || {};
 
   ctx.save();
 
   drawScorePill(ctx, vx, vy, w, h, score, level);
   drawRemaining(ctx, vx, vy, w, h, state.remaining);
-  drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total);
+  drawVerticalTitleAndProgress(ctx, viewport, elapsed, total, progressSide);
   if (showTick) {
     drawTick(ctx, vx, vy, w, h);
   }
@@ -102,11 +105,25 @@ function drawRemaining(ctx, vx, vy, w, h, remaining) {
   ctx.restore();
 }
 
-function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
-  const barX = vx + 0.03 * w;
-  const barY = vy + 0.14 * h;
+/**
+ * 直立進度條與標題的位置。雙人模式的玩家 2 放右側，與左側玩家左右對稱。
+ * @param {{x:number,y:number,w:number,h:number}} viewport
+ * @param {'left'|'right'} side
+ */
+export function progressBarLayout(viewport, side = 'left') {
+  const { x: vx, y: vy, w, h } = viewport;
   const barW = 0.018 * w;
-  const barH = 0.72 * h;
+  const inset = 0.03 * w;
+  const gap = 0.012 * w;
+  const barX = side === 'right' ? vx + w - inset - barW : vx + inset;
+  // 標題排在進度條外側：左側時在左邊，右側時在右邊。
+  const titleX = side === 'right' ? barX + barW + gap : barX - gap;
+  return { barX, barY: vy + 0.14 * h, barW, barH: 0.72 * h, titleX };
+}
+
+function drawVerticalTitleAndProgress(ctx, viewport, elapsed, total, side) {
+  const { h } = viewport;
+  const { barX, barY, barW, barH, titleX } = progressBarLayout(viewport, side);
   const ratio = total > 0 ? Math.max(0, Math.min(1, elapsed / total)) : 0;
 
   ctx.save();
@@ -120,10 +137,9 @@ function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
   ctx.fill();
   ctx.restore();
 
-  // 直立標題：文字逐字向下排列於進度條左側。
+  // 直立標題：文字逐字向下排列於進度條外側。
   const title = '賽道攔截';
   const charSize = Math.round(0.028 * h);
-  const titleX = barX - 0.012 * w;
   let titleY = barY;
 
   ctx.save();
