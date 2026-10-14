@@ -402,8 +402,11 @@ function continueNextStage() {
 }
 
 function returnToLobby() {
-  location.href = "../Select/index.html";
+  window.leaveTo("../Select/index.html");
 }
+
+// 已開始、還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
+window.guardUnload(() => state.startedAt !== 0 && state.endReason === "");
 
 function finishGame(reason) {
   pausePlay();

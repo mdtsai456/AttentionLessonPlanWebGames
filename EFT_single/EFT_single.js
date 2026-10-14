@@ -58,7 +58,7 @@ function startGame() { player.startGame(); }
 function resetGame() { player.resetGame(); }
 
 function returnToLobby() {
-    window.location.href = '../Select/index.html';
+    window.leaveTo('../Select/index.html');
 }
 
 function showMidBreak() {
@@ -220,4 +220,6 @@ export {
 };
 
 bindEvents();
+// 還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
+window.guardUnload(() => !['intro', 'finished'].includes(player.getState().phase));
 preloadGameAssets();
