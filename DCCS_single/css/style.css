@@ -6,7 +6,7 @@
   size-adjust: 120%;
 }
 
-/* 單人頁外殼；遊戲畫面層樣式由 overlays.js 注入。 */
+/* 單人頁面容器。overlays.js 注入遊戲畫面層的樣式。 */
 
 * {
   box-sizing: border-box;

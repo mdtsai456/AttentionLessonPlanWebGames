@@ -157,7 +157,7 @@ button:focus-visible {
   box-shadow: none;
 }
 
-/* 題目卡：色名字色與算式並排 */
+/* 題目卡：並排顯示色名、字色與算式。 */
 .question-panel {
   position: absolute;
   top: 15%;
@@ -215,7 +215,7 @@ button:focus-visible {
   background: #df9b35;
 }
 
-/* 動物移動區：各幀位置由 JS 的 updateScene 設定。 */
+/* 動物移動區：JS 的 updateScene 設定每幀的位置。 */
 .animal-field {
   position: absolute;
   left: 9%;
@@ -370,7 +370,7 @@ button:disabled {
   }
 }
 
-/* 觸控方向鍵：按住持續移動，可同時按作答按鈕。 */
+/* 觸控方向鍵：按住時持續移動。可同時按作答按鈕。 */
 .movement {
   position: absolute;
   left: 7%;
@@ -404,7 +404,7 @@ button:disabled {
   gap: 1cqw;
 }
 
-/* 關卡結束：對齊 Home / DCCS 提示卡 */
+/* 關卡結束提示：使用與 Home／DCCS 相同的提示卡樣式。 */
 .modal-overlay {
   position: absolute;
   inset: 0;
@@ -519,7 +519,7 @@ button:disabled {
   box-shadow: none;
 }
 
-/* 存檔尚未完成時保留結果，讓重玩及離開的停用狀態可辨識。 */
+/* 存檔完成前保留結果。重玩與離開按鈕顯示停用狀態。 */
 .result-card button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

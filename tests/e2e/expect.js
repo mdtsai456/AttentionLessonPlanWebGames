@@ -5,10 +5,10 @@ import { hintFor } from './helpers.js';
 const STREAK_TO_EVOLVE = 5;
 
 /**
- * 成功作答後的回饋檢查
+ * 檢查成功作答後的回饋。
  * @param {object} r playQuestion 回傳的單一玩家結果
- * @param {number} streak 這題答完後的連擊數
- * @param {{ atMaxAfter: boolean, image: string }} expected 答完後是否已是最高級、應顯示的動物圖
+ * @param {number} streak 本題作答後的連擊數
+ * @param {{ atMaxAfter: boolean, image: string }} expected 是否達到最高等級，以及應顯示的動物圖片
  */
 export function expectSuccess(r, streak, { atMaxAfter, evolved = false, image }, label = '') {
   const where = `${label} 連擊 ${streak}：${r.message}`;
@@ -27,9 +27,7 @@ export function expectSuccess(r, streak, { atMaxAfter, evolved = false, image },
   }
 }
 
-/**
- * 失敗後的回饋檢查：動物不降級、紅光、有連擊時才提示「連擊歸零」
- */
+/** 檢查失敗後的回饋：動物不降級，顯示紅光。原有連擊時，才提示「連擊歸零」。 */
 export function expectFailure(r, { hadStreak, offTarget = false, image }, label = '') {
   const where = `${label}：${r.message}`;
   if (offTarget) assert.match(r.message, /^判斷正確，但準心未對到動物，不計分/, where);
@@ -45,9 +43,7 @@ export function expectNoErrors(session) {
   assert.deepEqual(session.errors, [], `頁面不應有錯誤：\n${session.errors.join('\n')}`);
 }
 
-/**
- * 新規則的參考模型：連續 5 題升級一次，失敗只歸零連擊、不降級
- */
+/** 參考模型：每連續答對 5 題升級一次。失敗時只重置連擊數，不降低動物等級。 */
 export class AnimalModel {
   constructor(images) {
     this.images = images;
@@ -87,8 +83,8 @@ export class AnimalModel {
 }
 
 /**
- * 雙人版：判定訊息要真的顯示在畫面上（作答中直接顯示，逾時後以「上一題：」顯示）。
- * 例外是關卡或練習結束時，畫面改顯示過關或練習結束訊息。
+ * 雙人模式的判定訊息須顯示於畫面。作答時直接顯示，逾時後使用「上一題：」前綴。
+ * 關卡或練習結束時，改顯示對應的結束訊息。
  */
 export function expectVisibleFeedback(r, label = '') {
   const v = r.visibleFeedback;
