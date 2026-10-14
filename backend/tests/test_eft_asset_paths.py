@@ -1,12 +1,13 @@
-"""漂浮泡泡（EFT_single / EFT_double）引用的本地素材必須以完全相同的檔名存在。不碰資料庫。
+"""EFT_single／EFT_double 引用的本地素材須有完全相同的檔名。不存取資料庫。
 
-正式站跑在 Linux，檔名大小寫有分；macOS 本機不分，所以 `箭頭00.png` 對上
-`箭頭00.PNG` 在本機看起來正常，上線卻是 404，遊戲預載失敗就無法開始。
+正式站使用 Linux，檔名區分大小寫。macOS 本機的檔案系統不區分大小寫。
+因此引用 `箭頭00.png`，而檔案為 `箭頭00.PNG` 時，本機可載入，正式站則回傳 404。
+素材預載失敗會阻止遊戲開始。
 
-比對的依據是 git 索引（`git ls-files`）而不是工作目錄：正式站的檔案是從 git 取出的，
-而 macOS 上只改大小寫的重命名 git 根本偵測不到（`core.ignorecase=true`，工作目錄已是
-`箭頭00.png`、索引仍是 `箭頭00.PNG`、`git status` 乾淨）。列工作目錄會看到新檔名而誤判
-通過，部署出去卻還是舊檔名。問 git 的結果在哪個平台跑都一樣。
+比對使用 git 索引，即 `git ls-files`，因為部署檔案來自 git。
+core.ignorecase=true 時，git 可能未偵測只有大小寫變更的重新命名。
+工作目錄可能顯示 `箭頭00.png`，但索引仍為 `箭頭00.PNG`，且 git status 沒有變更。
+只檢查工作目錄可能誤判通過。檢查 git 索引可在各平台使用相同的部署檔名。
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ import pytest
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 GAME_DIRS = ("EFT_single", "EFT_double")
 
-# 字串常值或 CSS url() 裡的相對路徑；含 ${} 的樣板字串不算。
+# 取得字串常值或 CSS url() 中的相對路徑。排除包含 ${} 的樣板字串。
 LOCAL_ASSET_LITERAL = re.compile(r"""['"`]((?:assets|fonts)/[^'"`$]+)['"`]""")
 
 
@@ -31,9 +32,9 @@ def _referenced_paths(source: pathlib.Path) -> list[str]:
 
 @functools.lru_cache(maxsize=None)
 def _tracked_names(repo: pathlib.Path, subdir: str) -> frozenset[str]:
-    """`repo` 的 git 索引裡 `subdir` 底下的檔名，相對 `subdir`。
+    """列出 `repo` 的 git 索引中，`subdir` 下的檔名。結果相對於 `subdir`。
 
-    `-z` 讓 git 直接吐原始位元組，省掉非 ASCII 檔名被加引號轉義的麻煩。
+    `-z` 輸出原始位元組，避免非 ASCII 檔名的引號與跳脫處理。
     """
     listing = subprocess.run(
         ["git", "-C", str(repo), "ls-files", "-z", "--", subdir],
@@ -62,7 +63,7 @@ def _own_file_cases() -> list[tuple[str, str]]:
 
 
 def test_shared_eft_assets_declares_the_expected_files():
-    """防止正則失效時下面的參數化測試變成零筆而默默通過。"""
+    """正則失效時，須阻止參數化測試因零筆資料而通過。"""
     paths = _referenced_paths(REPO_ROOT / "shared" / "eft-assets.js")
     assert "assets/arrow/反向提示.png" in paths
     assert {f"assets/arrow/箭頭0{i}.png" for i in range(4)} <= set(paths)
@@ -80,9 +81,9 @@ def test_game_page_asset_is_tracked_with_exact_name(game: str, path: str):
 
 
 def test_tracked_names_reports_the_index_name_not_the_worktree_name(tmp_path: pathlib.Path):
-    """重現本檔案要擋的那個情境：只改大小寫的重命名後，索引仍是舊檔名。
+    """重現只有檔名大小寫變更，但 git 索引仍保留舊檔名的情況。
 
-    在 macOS 上 git 連這次重命名都偵測不到，改讀工作目錄就會看到 `箭頭00.png` 而誤判通過。
+    macOS 上 git 可能未偵測重新命名。只讀取工作目錄會取得 `箭頭00.png`，造成誤判。
     """
     subprocess.run(["git", "init", "-q", str(tmp_path)], capture_output=True, check=True)
     assets = tmp_path / "EFT_x" / "assets"

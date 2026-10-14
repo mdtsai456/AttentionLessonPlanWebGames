@@ -1,6 +1,5 @@
 // js/main.js
-import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=10';
+import { createPlayer } from './game.js?v=12';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -23,22 +22,33 @@ async function withExitLock(action) {
   }
 }
 
-async function exitGame(confirmLeave = true) {
+// askFirst：「離開」與結算的「返回遊戲大廳」先在頁面內確認（#41），兩人都打完六關就不再問；
+// 第 3 關中場的「返回遊戲大廳」是明確選擇，不確認。確定後才存檢查點，取消就什麼都不送。
+async function exitGame(askFirst = true) {
+  if (exitPending) return;
+  const finished = Math.min(...players.map((player) => player.completedStages())) >= 6;
+  if (askFirst && !finished && !(await window.confirmLeave())) {
+    // 取消後焦點會回到「離開」；空白鍵／Enter 在離開鈕上不算作答，移開焦點讓按鍵回到遊戲。
+    document.activeElement?.blur?.();
+    return;
+  }
+  // 確認離開後遊戲維持暫停到導頁；存檔沒成功留在頁面時解除暫停，遊戲照常繼續。
+  const stay = () => window.cancelLeave?.();
   await withExitLock(async () => {
     const completed = Math.min(...players.map((player) => player.completedStages()));
     if (completed >= 6) {
       const saved = await Promise.all(players.map((player) => player.whenSaved()));
-      if (saved.some((result) => result === false)) return;
+      if (saved.some((result) => result === false)) { stay(); return; }
       safeNavigateTo('../Select/index.html');
       return;
     }
     const stage = completed >= 3 ? 3 : 0;
     if (playMode === 'game' && stage) {
+      // 已送過第 6 關的玩家：已儲存視為完成、結果不明或失敗則不改送第 3 關（dat-save）
       const results = await Promise.all(players.map((player) => player.saveRun(stage)));
-      if (!results.every(Boolean)) return;
+      if (!results.every(Boolean)) { stay(); return; }
     }
-    if (confirmLeave) window.askLeave('../Select/index.html');
-    else safeNavigateTo('../Select/index.html');
+    safeNavigateTo('../Select/index.html');
   });
 }
 
@@ -73,7 +83,7 @@ function clearMidBreak() {
   if (panel) panel.hidden = true;
 }
 
-// 任一玩家瞄準動物，兩位玩家同時開始出題
+// 任一玩家瞄準動物後，兩位玩家同時開始出題。
 function syncStart() {
   players.forEach((player) => player.forceStart());
 }
@@ -111,12 +121,12 @@ function refreshSaveControls() {
   const statuses = players.map((player) => player.saveStatus());
   const messages = players.map((player, index) => `玩家${index + 1}：${document.querySelector(`.player-${index + 1} [data-ui="save-status"]`).textContent}`);
   document.getElementById('checkpoint-save-status').textContent = messages.join('　');
-  document.getElementById('checkpoint-retry-save').hidden = !statuses.includes('failed');
+  document.getElementById('checkpoint-retry-save').hidden = !players.some((player) => player.canRetrySave());
   const resultsVisible = [...document.querySelectorAll('[data-ui="results"]')].every((panel) => !panel.hidden);
   document.getElementById('save-notice').hidden = resultsVisible || statuses.every((status) => status === 'idle' || status === 'saved');
 }
 document.getElementById('checkpoint-retry-save').addEventListener('click', () => {
-  players.filter((player) => player.saveStatus() === 'failed').forEach((player) => player.retrySave());
+  players.filter((player) => player.canRetrySave()).forEach((player) => player.retrySave());
 });
 
 function restartSession() {
@@ -131,7 +141,7 @@ function beginSession() {
   playerPracticeFinished = [false, false];
   document.getElementById('save-notice').hidden = true;
   clearMidBreak();
-  currentGamePairId = generateUUID();
+  currentGamePairId = window.WebGameApi.uuid();
   const formalButton = document.getElementById('enter-formal-btn');
   if (playMode === 'game') {
     if (formalButton) formalButton.hidden = true;
@@ -153,7 +163,7 @@ if (enterFormalButton) {
     document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
-    currentGamePairId = generateUUID();
+    currentGamePairId = window.WebGameApi.uuid();
     players.forEach((player) => player.startGame());
   });
 }
@@ -176,11 +186,11 @@ function preventLeaveHandler(event) {
 
 window.addEventListener('beforeunload', preventLeaveHandler);
 
+// 已決定離開：先拿掉自己的 beforeunload，才不會再跳出瀏覽器的離開詢問。
 export function safeNavigateTo(url) {
-  window.__askLeave = false;
   window.removeEventListener('beforeunload', preventLeaveHandler);
   window.onbeforeunload = null;
-  window.location.href = url;
+  window.leaveTo(url);
 }
 
 const midContinue = document.getElementById('mid-continue');
@@ -206,11 +216,11 @@ if (btnConfirmLeave) {
 }
 
 
-// 雙人版動態素材與彩蛋清單載入流程
+// 雙人模式的動態素材與動物升級清單載入流程
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 
-// 預設彩蛋備用圖清單（無素材時輪播用）
+// 預設的動物升級備用圖片清單。未取得素材時，依序切換此清單的圖片。
 const DEFAULT_ANIMAL_POOL = [
   'assets/animals/rabbit.png',
   'assets/animals/cat.png',
@@ -226,7 +236,7 @@ function assetStudentId(rawId) {
   return `${match[1].toUpperCase()}${String(Number(match[2])).padStart(3, '0')}`;
 }
 
-// 1. 抓取玩家 (P1/P2) 素材清單，自動補充不足部分以觸發彩蛋
+// 1. 取得 P1／P2 的素材清單。補足動物升級所需的素材。
 async function fetchStudentAssetList(playerIndex) {
   const isP1 = (playerIndex === 0);
   
@@ -241,14 +251,14 @@ async function fetchStudentAssetList(playerIndex) {
   return window.DatAssets.fetchAssetList(apiUrl, DEFAULT_ANIMAL_POOL);
 }
 
-// 3. 初始化雙人素材與啟動流程
+// 3. 初始化雙人素材與啟動流程。
 async function initDoubleGameWorkflow() {
   console.log('🎮 雙人遊戲開始，獨立載入 P1/P2 素材與彩蛋清單...');
 
   const p1Elem = document.querySelector('.player-1');
   const p2Elem = document.querySelector('.player-2');
 
-  // A. 載入前先隱藏 P1 與 P2 的動物與準心，避免畫面預設殘影
+  // A. 載入前隱藏 P1 與 P2 的動物及準心，避免顯示預設圖片。
   const togglePlayerVisibility = (pElem, visible) => {
     if (!pElem) return;
     const animal = pElem.querySelector('#animal, [data-ui="animal"]');
@@ -260,13 +270,13 @@ async function initDoubleGameWorkflow() {
   togglePlayerVisibility(p1Elem, false);
   togglePlayerVisibility(p2Elem, false);
 
-  // B. 並行抓取 P1 與 P2 的素材清單
+  // B. 並行取得 P1 與 P2 的素材清單。
   const [p1List, p2List] = await Promise.all([
     fetchStudentAssetList(0),
     fetchStudentAssetList(1)
   ]);
 
-  // C. 預載通用與玩家首張圖片
+  // C. 預載共用圖片與每位玩家的首張圖片。
   const [, , p1Initial, p2Initial] = await Promise.all([
     window.DatAssets.loadImage('assets/background.png', 'assets/background.png'),
     window.DatAssets.loadImage('assets/crosshair.png', 'assets/crosshair.png'),
@@ -276,21 +286,21 @@ async function initDoubleGameWorkflow() {
   p1List[0] = p1Initial;
   p2List[0] = p2Initial;
 
-  // D. 將素材清單傳送給兩位 Player 實體
+  // D. 將素材清單傳給兩個 Player 實例。
   await Promise.all([
     players[0].setAnimalAssets(p1List),
     players[1].setAnimalAssets(p2List),
   ]);
 
-  // E. 啟動遊戲 Session
+  // E. 啟動遊戲場次。
   beginSession();
 
-  // F. 載入完成並算好位置後，重新顯示兩位玩家的動物與準心
+  // F. 載入完成並計算位置後，顯示兩位玩家的動物與準心。
   togglePlayerVisibility(p1Elem, true);
   togglePlayerVisibility(p2Elem, true);
 }
 
-// 執行初始化並啟動動畫 Loop
+// 執行初始化，並啟動動畫迴圈。
 initDoubleGameWorkflow();
 
 players.forEach((player) => requestAnimationFrame(player.tick));

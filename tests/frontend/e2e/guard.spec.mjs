@@ -1,4 +1,4 @@
-// 010：學生單人頁的登入守門。
+// 010：學生單人頁面的登入驗證。
 import { test, expect } from "@playwright/test";
 import { GUARDED_PAGES, DCCS_PAGE } from "../site.mjs";
 import { HOME_URL, STUDENT, TEACHER, loginAs, recordWrites } from "./helpers.mjs";
@@ -24,7 +24,7 @@ for (const [label, session] of REJECTED_SESSIONS) {
 
       await page.goto(pagePath);
       await expect(page).toHaveURL(HOME_URL);
-      // 用 location.replace：被擋的頁面不留在瀏覽紀錄，按上一頁不會回去。
+      // 使用 location.replace，避免將未通過驗證的頁面加入瀏覽紀錄。
       expect(await page.evaluate(() => history.length)).toBe(historyBefore + 1);
 
       await page.waitForTimeout(500);

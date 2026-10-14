@@ -1,4 +1,4 @@
-// 本機打 127.0.0.1:5001；上線打 Zeabur。可在載入前以 API_BASE_URL 或 DCCS_SUBMIT_URL 覆寫。
+// 本機使用 127.0.0.1:5001，部署後使用 Zeabur。載入前可用 API_BASE_URL 或 DCCS_SUBMIT_URL 覆寫。
 
 const PROD_API_BASE_URL = 'https://attention-lesson-plan-data.zeabur.app/api';
 
@@ -19,7 +19,7 @@ export function resolveApiBase() {
 }
 
 /**
- * 成績要 POST 到哪裡。優先序：
+ * 成績 POST 位址的優先順序：
  * window.DCCS_SUBMIT_URL > window.API_BASE_URL + '/sessions' > 同源 /api/sessions。
  * @returns {string}
  */

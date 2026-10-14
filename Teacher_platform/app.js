@@ -1,10 +1,10 @@
 // =============================================================================
 // Back / 老師後台：查看學生進度
-// 流程：選學生 → 選第幾天 → 當天五個遊戲的成績與明細直接展開。
-// 名單與場次來自後端；DCCS 只打完前 3 關為 50%，打完後段或其它遊戲為 100%。
+// 選擇學生與施測日後，展開當日五款遊戲的成績與明細。
+// 名單與場次來自後端。DCCS 完成前 3 關為 50%，完成後段或其他遊戲為 100%。
 // =============================================================================
 
-/** 五個遊戲的固定清單；id 對應後端欄位，name 給畫面顯示。 */
+/** 五款遊戲的固定清單。id 對應後端欄位，name 用於畫面顯示。 */
 const GAMES = [
   { id: "DCCS", name: "賽道攔截" },
   { id: "DAT", name: "瓢蟲追擊令" },
@@ -13,7 +13,7 @@ const GAMES = [
   { id: "InstructionGame", name: "指令出擊" },
 ];
 
-/** 進度只允許這三個值；其他數字會被正規化到最接近的一檔。 */
+/** 進度只接受這三個值。其他數值轉換為最接近的值。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
 const studentSelect = document.getElementById("student-select");
@@ -27,19 +27,27 @@ const dayTitle = document.getElementById("day-title");
 const recordsBody = document.getElementById("records-tbody");
 const logoutBtn = document.getElementById("logout-btn");
 
+const DAY_PROMPT = "請選擇第幾天，查看當天成績。";
+const DAY_PROMPT_LOADING = "成績載入中…";
+const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重新整理頁面。";
+
+/** 每次換學生加一；回應回來時編號不同就是舊學生的，直接丟掉。 */
+let reportRequestId = 0;
+
 const state = {
   students: [], // [{ id, name, username }]
   days: [], // 固定第 1～24 天
-  sessions: [], // 目前學生的場次，選天時直接從這裡算進度
+  sessions: [], // 目前學生的場次資料。選擇施測日時，用於計算進度。
+  reportStatus: "idle", // "idle" | "loading" | "ready" | "error"。目前學生的場次讀取狀態。
   selectedStudentId: "",
-  selectedDay: null, // 尚未選天時為 null
+  selectedDay: null, // 未選擇施測日時為 null。
   progressByGame: {}, // { [gameId]: 0 | 50 | 100 }
   detailByGame: {}, // { [gameId]: { reached, accuracy, levelAccuracy, ...metrics } }
 };
 
 init();
 
-/** 進頁後先確認老師 token，再拉學生名單。 */
+/** 進入頁面後，先確認老師 token，再讀取學生名單。 */
 async function init() {
   const token = sessionStorage.getItem("token");
   if (!token || sessionStorage.getItem("user_role") !== "teacher") {
@@ -74,28 +82,44 @@ logoutBtn.addEventListener("click", async () => {
 
 dayRow.addEventListener("click", (event) => {
   const button = event.target.closest("[data-day]");
-  if (!button || button.disabled) return; // 還沒選學生時天數按鈕會 disabled
+  if (!button || button.disabled) return; // 未選擇學生時，停用施測日按鈕。
   selectDay(Number(button.dataset.day));
 });
 
 /**
- * 換成另一位學生時，清掉已選天數與進度，再重抓該學生的天數。
- * @param {string} studentId 下拉選單的 value；空字串代表回到「請選擇學生」
+ * 切換學生時，先清除上一位的場次、已選施測日與進度，再重新取得該學生的場次。
+ * 載入中與讀取失敗時，停用施測日按鈕。較晚返回的舊學生回應直接丟棄。
+ * @param {string} studentId 下拉選單的 value。空字串表示返回「請選擇學生」。
  */
 async function selectStudent(studentId) {
+  const requestId = ++reportRequestId;
   state.selectedStudentId = studentId;
   state.selectedDay = null;
   state.progressByGame = {};
   state.detailByGame = {};
-  state.sessions = studentId ? await fetchStudentReport(studentId) : [];
+  state.sessions = [];
+  state.reportStatus = studentId ? "loading" : "idle";
   state.days = TRAINING_DAYS;
+  renderDays();
+  renderProgress();
+  if (!studentId) return;
+
+  let sessions = null;
+  try {
+    sessions = await fetchStudentReport(studentId);
+  } catch (_err) {
+    sessions = null;
+  }
+  if (requestId !== reportRequestId) return; // 期間已換成別的學生
+  state.sessions = sessions || [];
+  state.reportStatus = sessions ? "ready" : "error";
   renderDays();
   renderProgress();
 }
 
-/** 選天立刻更新按下狀態與進度；場次已在選學生時抓好。 */
+/** 選擇施測日後，立即更新選取狀態與進度。選擇學生時，已取得場次資料。 */
 function selectDay(day) {
-  if (!state.selectedStudentId) return;
+  if (!state.selectedStudentId || state.reportStatus !== "ready") return;
   state.selectedDay = day;
   state.progressByGame = progressFromSessions(state.sessions, day);
   state.detailByGame = detailFromSessions(state.sessions, day);
@@ -109,7 +133,7 @@ function markSelectedDay(day) {
   });
 }
 
-/** 把學生名單填進下拉選單；第一個 option 是提示文字。 */
+/** 將學生名單加入下拉選單。第一個 option 顯示提示文字。 */
 function renderStudents() {
   const options = state.students
     .map(
@@ -128,11 +152,11 @@ function renderStudents() {
 const TRAINING_DAYS = Array.from({ length: 24 }, (_, index) => index + 1);
 
 /**
- * 畫第 1～24 天按鈕。
- * 還沒選學生時全部 disabled。
+ * 繪製第 1～24 天的按鈕。
+ * 未選擇學生、場次載入中或讀取失敗時，停用所有按鈕。
  */
 function renderDays() {
-  const hasStudent = Boolean(state.selectedStudentId);
+  const hasStudent = Boolean(state.selectedStudentId) && state.reportStatus === "ready";
   const days = TRAINING_DAYS;
 
   dayRow.innerHTML = days
@@ -154,8 +178,8 @@ function renderDays() {
 }
 
 /**
- * 學生與天數都選好才畫進度列表；
- * 否則顯示提示：「請先選擇學生與天數」或「請選擇第幾天」。
+ * 學生與施測日皆已選擇時，繪製進度清單。
+ * 否則顯示「請先選擇學生與天數」或「請選擇第幾天」。
  */
 function renderProgress() {
   const hasStudent = Boolean(state.selectedStudentId);
@@ -163,6 +187,10 @@ function renderProgress() {
   emptyHint.hidden = hasStudent;
   reportView.hidden = !hasStudent;
   dayPrompt.hidden = !hasStudent || hasDay;
+  dayPrompt.textContent =
+    state.reportStatus === "loading" ? DAY_PROMPT_LOADING
+      : state.reportStatus === "error" ? DAY_PROMPT_ERROR
+        : DAY_PROMPT;
   dayDetail.hidden = !hasDay;
   if (hasStudent) fillStudentMeta();
   if (!hasDay) {
@@ -198,10 +226,11 @@ function fillStudentMeta() {
   document.getElementById("view-school-name").textContent =
     `所屬場域：${student.school || teacherSchool()}`;
   document.getElementById("view-total-sessions").textContent = String(student.sessionCount || 0);
-  document.getElementById("view-last-played").textContent = student.lastPlayedAt || "尚無評測紀錄";
+  document.getElementById("view-last-played").textContent = formatUtcTimestamp(student.lastPlayedAt) || "尚無評測紀錄";
 }
 
 function renderRecords() {
+  // 後端時間都是 UTC 且固定寬度，直接比字串就是實際先後；顯示時才轉台灣時間。
   const rows = state.sessions
     .filter((session) => Number(session.currentDay) === Number(state.selectedDay))
     .slice()
@@ -223,7 +252,7 @@ function renderRecords() {
         <td>${stats.correctCount ?? "—"} / ${stats.wrongCount ?? "—"}</td>
         <td>${formatDuration(stats.duration)}</td>
         <td>${stats.stage ?? "—"}</td>
-        <td>${session.startTime || "—"}</td>
+        <td>${formatUtcTimestamp(session.startTime) || "—"}</td>
       </tr>
     `;
   }).join("");
@@ -299,6 +328,25 @@ function formatAccuracy(value) {
   return `${percent}%`;
 }
 
+/** 施測都在台灣，時間一律以台灣時間（UTC+8）顯示，不跟著裝置時區。 */
+const TAIPEI_TIME = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+
+/**
+ * 後端時間字串是 UTC（"YYYY-MM-DD HH:MM:SS"，不帶時區），
+ * 換成台灣時間後用同樣格式顯示。空值回空字串；看不懂的字串原樣顯示。
+ */
+function formatUtcTimestamp(value) {
+  if (typeof value !== "string" || !value) return "";
+  const date = new Date(`${value.trim().replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  const part = Object.fromEntries(TAIPEI_TIME.formatToParts(date).map(({ type, value: text }) => [type, text]));
+  return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}:${part.second}`;
+}
+
 function teacherToken() {
   return sessionStorage.getItem("token");
 }
@@ -322,12 +370,12 @@ async function fetchStudentReport(studentKey) {
     `/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(school)}`,
     token
   );
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error(`讀取成績失敗（HTTP ${res.status}）`);
   const body = await res.json();
   return Array.isArray(body.records) ? body.records : [];
 }
 
-/** 讀取這位老師所帶的學生名單。 */
+/** 讀取登入老師的學生名單。 */
 async function fetchTeacherStudents() {
   const token = teacherToken();
   if (!token) return [];
@@ -425,8 +473,8 @@ function emptyProgress() {
 }
 
 /**
- * 把任意數字收成 0、50 或 100（取最接近的一檔）。
- * 後端若回傳其他值，畫面仍能對應到三格進度條。
+ * 將數值轉換為最接近的 0、50 或 100。
+ * 後端回傳其他數值時，畫面仍可顯示三格進度條。
  */
 function normalizeProgress(value) {
   const number = Number(value) || 0;

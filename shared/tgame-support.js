@@ -2,7 +2,7 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const decode = (image) => image.decode().then(() => true, () => false);
 
-  // 只有仍屬於同一道題的流程可以替換或揭露圖片。
+  // 只有仍對應目前題目的流程，才可替換或顯示圖片。
   async function prepareItems(images, timeoutMs, isCurrent, labelCard) {
     const decoded = new Set();
     const preparation = images.map(async (image) => {

@@ -1,10 +1,10 @@
-// 1. 取得網址模式與設定
+// 1. 取得網址中的模式與設定。
 const urlParams = new URLSearchParams(window.location.search);
 const isPractice = urlParams.get('mode') === 'practice';
 
 // 全域時間與參數設定
-const ROUND_MS = 10000;       // 單題最多 10 秒，逾時算錯並換下一題
-const STAGE_MS = 60000;       // 正式遊戲每關 60 秒，時間內答完就繼續出題
+const ROUND_MS = 10000;       // 單題最多 10 秒。逾時後計為錯誤，並切換至下一題。
+const STAGE_MS = 60000;       // 正式遊戲每關 60 秒。關卡時間內答完題目後，繼續出題。
 const AIM_SPEED = 45;
 const ANIMAL_SPEED = 4;
 
@@ -25,11 +25,11 @@ let reactionSamples = [], activeMs = 0, focusMs = 0;
 let aim = { x: 25, y: 50 }, animal = { x: 55, y: 50, vx: 1, vy: .7 };
 let gameStartTime = 0; // 遊戲開始時間 (Unix 毫秒)
 
-// 彩蛋機制全域變數
-let animalAssetList = [];       // 儲存該學生所有可用的動物圖片 URL
+// 動物升級機制的全域變數
+let animalAssetList = [];       // 儲存該學生所有可用動物圖片的 URL。
 let currentAssetIndex = 0;     // 目前顯示的圖片索引
-let consecutiveCorrect = 0;    // 連續答對且瞄準成功計數器
-const STREAK_TO_EVOLVE = 5;    // 連續成功幾題升級一次動物
+let consecutiveCorrect = 0;    // 連續答對且瞄準成功的次數
+const STREAK_TO_EVOLVE = 5;    // 每次動物升級所需的連續答對題數
 
 const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
@@ -38,6 +38,7 @@ let stage = 1;
 let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
+let midStageStats = null; // 第 3 關結束時的統計，供第 4–5 關離開時的中場檢查點使用
 
 let saver;
 function showSaveStatus({ status, message, retryable }) {
@@ -64,10 +65,11 @@ function startGame() {
   stageDeadline = 0;
   stageQuestionNo = 0;
   levelOutcomes = [[]];
-  questions = isPractice ? generateRandomQuestions(QUESTIONS_PER_STAGE) : [];
+  midStageStats = null;
+  questions = isPractice ? generatePracticeQuestions(QUESTIONS_PER_STAGE) : [];
 
   index = score = wrong = offTarget = timedOut = elapsed = 0;
-  consecutiveCorrect = 0; // 重置彩蛋連擊計數器
+  consecutiveCorrect = 0; // 重置動物升級的連擊數。
   outcomes = [];
   reactionSamples = [];
   activeMs = 0;
@@ -168,13 +170,10 @@ function generateMathQuestion() {
   };
 }
 
-function generateRandomQuestions(count = 10) {
-  const list = [];
-  for (let i = 0; i < count; i++) {
-    const q = Math.random() < 0.5 ? generateColorQuestion() : generateMathQuestion();
-    list.push(q);
-  }
-  return list;
+// 練習固定顏色、數學輪流出題（2 題即各 1 題）；正式模式才每題隨機
+function generatePracticeQuestions(count) {
+  const generators = [generateColorQuestion, generateMathQuestion];
+  return Array.from({ length: count }, (_, i) => generators[i % generators.length]());
 }
 
 function enableAnswers(enabled) {
@@ -205,7 +204,7 @@ function updateProgress() {
 function answerLimitMs() {
   return ROUND_MS;
   /*
-  //修改會在最後一秒跑很多題目的 bug
+  // 修正最後一秒連續產生多題的問題。
   if (isPractice || !stageDeadline) return ROUND_MS;
   return Math.max(0, Math.min(ROUND_MS, stageDeadline - window.WebGameRuntime.now()));
   */
@@ -219,26 +218,7 @@ function renderPositions() {
 }
 
 function isOnAnimal() {
-  const field = $('field').getBoundingClientRect();
-  const aimX = field.left + aim.x / 100 * field.width;
-  const aimY = field.top + aim.y / 100 * field.height;
-  const animalRect = $('animal').getBoundingClientRect();
-  if (animalRect.width && animalRect.height) {
-    const radius = Math.min(animalRect.width, animalRect.height) * 0.36;
-    const centerX = animalRect.left + animalRect.width / 2;
-    const centerY = animalRect.top + animalRect.height / 2;
-    if (Math.hypot(aimX - centerX, aimY - centerY) <= radius) return true;
-  }
-  if (typeof RABBIT_HIT_MASK === 'undefined') return false;
-  const rect = $('animal-image').getBoundingClientRect();
-  const size = Math.min(rect.width, rect.height);
-  if (!size) return false;
-  const left = rect.left + (rect.width - size) / 2;
-  const top = rect.top + (rect.height - size) / 2;
-  const x = Math.floor((aimX - left) / size * 128);
-  const y = Math.floor((aimY - top) / size * 128);
-  if (x < 0 || y < 0 || x >= 128 || y >= 128) return false;
-  return RABBIT_HIT_MASK[y][x] === '1';
+  return window.DatAssets.isOnAnimal($('field'), $('animal'), $('animal-image'), aim);
 }
 
 function showQuestion(previousFeedback = '') {
@@ -270,18 +250,23 @@ function updateClock() {
   $('time-fill').style.width = `${Math.max(0, (1 - elapsed / limit) * 100)}%`;
 }
 
+// 遊戲時鐘暫停時（例如確認離開後正在存檢查點、視窗太小）不接受作答與移動，分數不能再變。
+function runtimePaused() {
+  return Boolean(window.WebGameRuntime?.paused);
+}
+
 function answer() {
-  if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= answerLimitMs()) return;
+  if (phase !== 'answer' || paused || runtimePaused() || document.hidden || submitted || elapsed >= answerLimitMs()) return;
   submitted = true;
   recordResult(true);
   enableAnswers(false);
 }
 
-// 彩蛋動物切換邏輯 (level up)
-// 🎨 統一切換圖片與動畫處理
+// 動物升級與圖片切換邏輯
+// 共用的圖片切換與動畫處理
 function updateAnimalImage(newIndex) {
   if (!animalAssetList || animalAssetList.length <= 1) return;
-  if (newIndex === currentAssetIndex) return; // 索引未改變則不更新
+  if (newIndex === currentAssetIndex) return; // 圖片索引相同時，不更新圖片。
 
   currentAssetIndex = newIndex;
   const targetAssetUrl = animalAssetList[currentAssetIndex];
@@ -293,10 +278,12 @@ function updateAnimalImage(newIndex) {
     const imageGeneration = ++animalImageGeneration;
     animalImgElem.style.transition = 'transform 0.2s ease-in-out, opacity 0.2s ease-in-out';
     animalImgElem.style.opacity = '0.2';
-    // 升級時先縮小再彈回原尺寸的視覺效果
+    // 升級時先縮小圖片，再恢復原尺寸。
     animalImgElem.style.transform = 'scale(0.6)';
 
-    window.DatAssets.setImage(animalImgElem, targetAssetUrl).then(() => {
+    // 升級素材失敗時保留目前可用圖片，避免已變身的貓退回預設兔子。
+    const currentImage = animalImgElem.getAttribute('src') || DEFAULT_ANIMAL_PATH;
+    window.DatAssets.setImage(animalImgElem, targetAssetUrl, currentImage).then(() => {
       if (imageGeneration !== animalImageGeneration) return;
       animalImgElem.style.opacity = '1';
       animalImgElem.style.transform = 'scale(1)';
@@ -304,7 +291,7 @@ function updateAnimalImage(newIndex) {
   }
 }
 
-// 🎉 連續答對 STREAK_TO_EVOLVE 題：升級 (最大封頂，不循環回 0)
+// 連續答對 STREAK_TO_EVOLVE 題後升級。達到上限後維持最高等級。
 function switchToNextAnimal() {
   if (currentAssetIndex < animalAssetList.length - 1) {
     updateAnimalImage(currentAssetIndex + 1);
@@ -313,21 +300,22 @@ function switchToNextAnimal() {
   }
 }
 
-// 紀錄答題結果
+// 記錄答題結果。
 function recordResult(pressed) {
   const correct = pressed === questions[index].answer;
   const onTarget = isOnAnimal();
   const isSuccess = correct && onTarget;
   const hadStreak = consecutiveCorrect > 0;
   let message;
-  reactionSamples.push(elapsed);
+  // 只有實際按鍵才有反應時間；「不要按」的等待與漏答不列入平均
+  if (pressed) reactionSamples.push(elapsed);
 
   if (isSuccess) {
     consecutiveCorrect++;
     score++;
     message = pressed ? '瞄準且答對！＋1 分' : '正確等待且保持瞄準！＋1 分';
 
-    // 連續答對 STREAK_TO_EVOLVE 題：觸發升級彩蛋
+    // 連續答對 STREAK_TO_EVOLVE 題後升級動物。
     if (consecutiveCorrect % STREAK_TO_EVOLVE === 0) {
       if (currentAssetIndex < animalAssetList.length - 1) {
         message += ` 🎉 連續答對 ${consecutiveCorrect} 題！變身新動物！`;
@@ -339,7 +327,7 @@ function recordResult(pressed) {
       message += `（再連續答對 ${STREAK_TO_EVOLVE - consecutiveCorrect % STREAK_TO_EVOLVE} 題變身）`;
     }
   } else {
-    // 失敗只歸零連擊，已變身的動物保留
+    // 作答失敗時只重置連擊數，保留目前動物。
     consecutiveCorrect = 0;
 
     if (!pressed && !correct) {
@@ -430,8 +418,9 @@ function endQuestion() {
     return;
   }
 
-  // 修改會在最後一秒跑很多題目的 bug
+  // 修正最後一秒連續產生多題的問題。
   if (stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20) {
+    if (stage === MID_STAGE) midStageStats = statsSnapshot();
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;
@@ -444,7 +433,17 @@ function answeredCount() {
 }
 
 
-function sessionMetrics() {
+// 目前累計的統計；at 為取樣時的遊戲時間
+function statsSnapshot() {
+  return {
+    score, wrong, offTarget, timedOut, activeMs, focusMs,
+    reactionSamples: [...reactionSamples],
+    at: window.WebGameRuntime.now(),
+  };
+}
+
+function sessionMetrics(stats) {
+  const { score, wrong, offTarget, reactionSamples, activeMs, focusMs } = stats;
   const questionCount = score + wrong + offTarget;
   const avgReactionMs = reactionSamples.length
     ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
@@ -459,14 +458,17 @@ function sessionMetrics() {
 }
 
 function saveCurrentRun(stage) {
-  const metrics = sessionMetrics();
+  // 第 4–5 關離開時存的是第 3 關檢查點，統計停在第 3 關結束，不含之後的作答
+  const stats = stage === MID_STAGE && midStageStats ? midStageStats : statsSnapshot();
+  const metrics = sessionMetrics(stats);
   return saveGameDataToBackend({
-    score: score,
-    wrong: wrong,
-    offTarget: offTarget,
-    timedOut: timedOut,
+    score: stats.score,
+    wrong: stats.wrong,
+    offTarget: stats.offTarget,
+    timedOut: stats.timedOut,
     accuracy: metrics.accuracy,
-    duration: window.WebGameRuntime.now() - gameStartTime,
+    duration: stats.at - gameStartTime,
+    endTime: stats.at,
     stage: stage,
     levelAccuracy: levelAccuracyText(stage),
     avgReactionMs: metrics.avgReactionMs,
@@ -500,13 +502,18 @@ function checkpointStage() {
   return 0;
 }
 
+// 已決定離開（確認過、或按了中場／結算的「返回遊戲大廳」）：存檢查點後回選遊戲頁。
+// 先拿掉自己的 beforeunload，才不會再跳出瀏覽器的離開詢問。
+// 確認離開後遊戲維持暫停到導頁；存檔沒成功留在頁面時解除暫停，遊戲照常繼續。
 async function returnToLobby() {
   await withExitLock(async () => {
     const checkpoint = checkpointStage();
-    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
+    if (checkpoint && !(await saveCurrentRun(checkpoint))) {
+      window.cancelLeave?.();
+      return;
+    }
     window.removeEventListener('beforeunload', blockUnload);
-    window.__askLeave = false;
-    window.location.href = '../Select/index.html';
+    window.leaveTo('../Select/index.html');
   });
 }
 
@@ -551,7 +558,7 @@ async function saveGameDataToBackend(data) {
   const grade = sessionStorage.getItem('grade') || sessionStorage.getItem('student1_grade');
   const caseId = sessionStorage.getItem('caseId') || sessionStorage.getItem('student1_case');
   const school = sessionStorage.getItem('school') || sessionStorage.getItem('student1_school');
-  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
+  // 未取得登入學生資料時，不送出成績，避免將未登入的成績寫入正式資料庫。
   if (!grade || !caseId || !school) {
     console.warn('找不到登入學生資料，成績不送出');
     return;
@@ -564,7 +571,7 @@ async function saveGameDataToBackend(data) {
     10
   );
 
-  // 瓢蟲追擊令成績送 DAT；素材 API 也讀 DAT。
+  // 瓢蟲追擊令的成績使用 DAT 寫入。素材 API 也使用 DAT 查詢。
   const payload = {
     lessonId: "1140908_DAT",
     data: {
@@ -573,7 +580,8 @@ async function saveGameDataToBackend(data) {
       school: school,
       currentDay: currentDay,
       startTime: window.WebGameRuntime.toWallTime(gameStartTime),
-      endTime: Date.now(),
+      // 檢查點帶的是該關結束的時間；沒帶時（直接呼叫）用現在，不能送出 null。
+      endTime: data.endTime == null ? Date.now() : window.WebGameRuntime.toWallTime(data.endTime),
       mode: "single",
       stats: [
         { apiname: "DAT_correct",  value: data.score },
@@ -625,7 +633,7 @@ function tick(time) {
       elapsed = Math.min(answerLimitMs(), elapsed + delta);
       updateClock();
 
-      //修改會在最後一秒跑很多題目的 bug
+      // 修正最後一秒連續產生多題的問題。
       const isStageTimeout = !isPractice && stageDeadline && window.WebGameRuntime.now() >= stageDeadline;
       if (elapsed >= answerLimitMs() || isStageTimeout) {
         endQuestion();
@@ -639,17 +647,16 @@ function tick(time) {
 $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', () => { if (phase === 'finished') startGame(); });$('leave-btn').addEventListener('click', leaveGame);
 
+// 遊戲中按「離開」：先在頁面內確認，確定後才存檢查點並離開；取消就什麼都不送（#41）。
+// 打完（含練習結束）直接回大廳，不再確認。
+// 取消後焦點會回到「離開」；空白鍵在離開鈕上不算作答，會再按到離開，所以移開焦點讓按鍵回到遊戲。
 async function leaveGame() {
-  if (phase === 'finished') {
-    await returnToLobby();
+  if (exitPending) return;
+  if (phase !== 'finished' && !(await window.confirmLeave())) {
+    $('leave-btn').blur();
     return;
   }
-  await withExitLock(async () => {
-    const checkpoint = checkpointStage();
-    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
-    window.removeEventListener('beforeunload', blockUnload);
-    window.askLeave('../Select/index.html');
-  });
+  await returnToLobby();
 }
 $('retry-save').addEventListener('click', () => saver.retry());
 $('checkpoint-retry-save').addEventListener('click', () => saver.retry());
@@ -670,7 +677,7 @@ document.addEventListener('keydown', (event) => {
     buttons[next].focus();
     return;
   }
-  if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
+  if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused && !runtimePaused()) {
     event.preventDefault(); keys.add(event.code);
   }
   if (event.code === 'Space' && phase === 'answer' && !paused && event.target?.id !== 'leave-btn') {
@@ -681,7 +688,7 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('keyup', (event) => keys.delete(event.code));
 document.querySelectorAll('[data-move]').forEach((button) => {
   button.addEventListener('pointerdown', (event) => {
-    if (paused || !['aiming', 'answer'].includes(phase)) return;
+    if (paused || runtimePaused() || !['aiming', 'answer'].includes(phase)) return;
     event.preventDefault();
     button.setPointerCapture(event.pointerId);
     pointerDirections.set(event.pointerId, button.dataset.move);
@@ -691,7 +698,7 @@ document.querySelectorAll('[data-move]').forEach((button) => {
   }
 });
 
-// 動態載入學生素材與彩蛋清單
+// 動態載入學生素材與動物升級清單。
 const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 let animalImageGeneration = 0;
@@ -727,7 +734,7 @@ async function fetchStudentAssets() {
 async function initGameWorkflow() {
   console.log('🎮 遊戲開始，執行素材載入流程...');
 
-  // 1. 載入前先隱藏動物與準心，避免畫面出現預設預載殘影
+  // 1. 載入前隱藏動物與準心，避免顯示預設圖片。
   const animalElem = $('animal');
   const crosshairElem = $('crosshair');
   if (animalElem) animalElem.style.visibility = 'hidden';
@@ -735,7 +742,7 @@ async function initGameWorkflow() {
 
   const animalAssetUrl = await fetchStudentAssets();
 
-  // 2. 並行預載背景圖、準心圖與動物圖
+  // 2. 並行預載背景、準心與動物圖片。
   const [, , finalAnimalSrc] = await Promise.all([
     window.DatAssets.loadImage('assets/background.png', 'assets/background.png'),
     window.DatAssets.loadImage('assets/crosshair.png', 'assets/crosshair.png'),
@@ -749,10 +756,10 @@ async function initGameWorkflow() {
     console.log(`[DOM 更新] 套用初始動物素材: ${finalAnimalSrc}`);
   }
 
-  // 3. 啟動遊戲並計算初始化位置
+  // 3. 啟動遊戲，並計算初始位置。
   startGame();
 
-  // 4. 全部圖片下載並渲染完成後，再顯示動物與準心
+  // 4. 所有圖片下載並繪製完成後，顯示動物與準心。
   if (animalElem) animalElem.style.visibility = 'visible';
   if (crosshairElem) crosshairElem.style.visibility = 'visible';
 }

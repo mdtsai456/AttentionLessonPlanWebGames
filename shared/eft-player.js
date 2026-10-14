@@ -37,6 +37,8 @@ export function createEftPlayer({
     let outcomes = [], reactionSamples = [], answerStartedAt = 0;
     let startTimeMs = 0;
     let stage = 1, stageQuestion = 0, stageStartedAt = 0, stageOutcomes = [], levelAccuracies = [];
+    // 每關結束時的成績快照；中途離開送檢查點時用，避免混入後面關卡的資料。
+    let stageSnapshots = [];
     let arrowAssets = [...DEFAULT_ARROW_STYLE];
     let arrowStyleIndex = 0, consecutiveCorrect = 0;
     let clockId = 0;
@@ -150,11 +152,13 @@ export function createEftPlayer({
         getUi('feedback').textContent = '回答剛才位置的泡泡';
         setEnabled(true);
         const remaining = stageRemaining();
+        // 本關剩不到 10 秒時，作答時間被關卡切斷；沒作答就直接結束本關，這題不記錄。
+        const cutByStage = remaining < ANSWER_LIMIT_MS;
         const wait = Math.min(ANSWER_LIMIT_MS, Math.max(0, remaining));
-        const timeoutMessage = remaining <= ANSWER_LIMIT_MS
-            ? '本關時間到，這題算錯'
-            : '10 秒未作答，這題算錯';
-        timer = setTimeout(() => missQuestion(timeoutMessage), wait);
+        timer = setTimeout(() => {
+            if (cutByStage) endStage();
+            else missQuestion('10 秒未作答，這題算錯');
+        }, wait);
     }
 
     function renderQuestion() {
@@ -175,10 +179,12 @@ export function createEftPlayer({
         field.replaceChildren();
         renderMemoryBubbles(field, positions);
         const memoryMs = Math.min(TARGET_MS, Math.max(0, stageRemaining()));
+        // 剩不到記憶時間時，還沒進入作答本關就結束了；這題不記錄。
+        const cutByStage = memoryMs < TARGET_MS;
         timer = setTimeout(() => {
             if (phase !== 'memory') return;
-            if (stageRemaining() <= 0) {
-                missQuestion('本關時間到，這題算錯');
+            if (cutByStage || stageRemaining() <= 0) {
+                endStage();
                 return;
             }
             field.replaceChildren();
@@ -212,6 +218,7 @@ export function createEftPlayer({
         stageStartedAt = 0;
         stageOutcomes = [];
         levelAccuracies = [];
+        stageSnapshots = [];
         arrowStyleIndex = 0;
         consecutiveCorrect = 0;
         setEnabled(false);
@@ -286,6 +293,7 @@ export function createEftPlayer({
         setEnabled(false);
         const hits = stageOutcomes.filter(Boolean).length;
         levelAccuracies[stage - 1] = stageOutcomes.length ? hits / stageOutcomes.length : 0;
+        stageSnapshots[stage] = takeSnapshot();
         const finished = stage;
         if (onStageEnd) {
             onStageEnd({
@@ -300,8 +308,13 @@ export function createEftPlayer({
         finishGame();
     }
 
+    // 遊戲暫停時（例如確定離開、成績還在送）不收作答，免得存檔期間分數還在變。
+    function inputPaused() {
+        return Boolean(window.WebGameRuntime && window.WebGameRuntime.paused);
+    }
+
     function answer(direction) {
-        if (phase !== 'answer') return;
+        if (phase !== 'answer' || inputPaused()) return;
         phase = 'feedback';
         setEnabled(false);
         clearTimeout(timer);
@@ -319,7 +332,7 @@ export function createEftPlayer({
     buttons.forEach((button) => button.addEventListener('click', () => answer(button.dataset.direction)));
     document.addEventListener('keydown', (event) => {
         if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
-        if (phase === 'answer' && keyBindings[event.code]) {
+        if (phase === 'answer' && keyBindings[event.code] && !inputPaused()) {
             event.preventDefault();
             if (!event.repeat) answer(keyBindings[event.code]);
         }
@@ -344,6 +357,39 @@ export function createEftPlayer({
         };
     }
 
+    function takeSnapshot() {
+        return {
+            index,
+            score,
+            reactionSamples: [...reactionSamples],
+            levelAccuracies: [...levelAccuracies],
+            endedAt: window.WebGameRuntime.now(),
+        };
+    }
+
+    // 送成績用的欄位（buildEftStats 的輸入）。有該關結束快照就用快照，
+    // 例如第 4、5 關中途離開送第 3 關檢查點時，只算到第 3 關結束為止。
+    // endTime 是牆上時間：有快照時是該關結束當下（endTime − startTime 才會等於 duration），
+    // 沒有快照（該關還沒結束）時是現在。
+    function checkpointStats(stageCount) {
+        const stageSnapshot = stageSnapshots[stageCount];
+        const snapshot = stageSnapshot || takeSnapshot();
+        const total = Math.max(snapshot.index, 1);
+        const samples = snapshot.reactionSamples;
+        return {
+            score: snapshot.score,
+            // 一題都沒作答時錯題是 0，不能用 total（最少為 1）去減。
+            wrong: Math.max(snapshot.index - snapshot.score, 0),
+            accuracy: snapshot.score / total,
+            duration: snapshot.endedAt - startTimeMs,
+            stage: stageCount,
+            levelAccuracy: levelAccuracyText(snapshot.levelAccuracies, stageCount),
+            avgReactionMs: samples.length ? samples.reduce((sum, value) => sum + value, 0) / samples.length : 0,
+            questionCount: snapshot.index,
+            endTime: stageSnapshot ? window.WebGameRuntime.toWallTime(stageSnapshot.endedAt) : Date.now(),
+        };
+    }
+
     function completedStages() {
         if (phase === 'finished' || phase === 'break' || phase === 'stage_clear') return stage;
         return Math.max(0, stage - 1);
@@ -353,6 +399,7 @@ export function createEftPlayer({
         answer,
         asset,
         beginStage,
+        checkpointStats,
         completedStages,
         continueAfterFeedback,
         endStage,

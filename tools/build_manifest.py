@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """依各遊戲資料夾的 levels.json 與 assets/ 產生 manifest.json。
 
-DCCS_single 與 DCCS_double 各寫各的。只使用標準函式庫。設定錯誤會終止；素材不足則將關卡標為不可玩。
+DCCS_single 與 DCCS_double 分別產生各自的檔案。只使用標準函式庫。
+設定錯誤時，終止執行。素材不足時，將關卡標為不可玩。
 
 用法：python3 tools/build_manifest.py
 """
@@ -15,8 +16,8 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 GAME_DIRS = (ROOT / "DCCS_single", ROOT / "DCCS_double")
-# 素材與遊戲同在該資料夾底下，manifest 的 src 便能以 ASSET_DIR_NAME 為
-# 前綴、相對於 assetBase（該遊戲資料夾）解析。
+# 素材與遊戲位於同一資料夾。manifest 的 src 使用 ASSET_DIR_NAME 作為前綴，
+# 並相對於 assetBase，也就是遊戲資料夾，解析路徑。
 ASSET_DIR_NAME = "assets"
 GAME_DIR = GAME_DIRS[0]
 MATERIAL_DIR = GAME_DIR / ASSET_DIR_NAME
@@ -25,14 +26,14 @@ MANIFEST_PATH = GAME_DIR / "manifest.json"
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
-# shape/ 是唯一保留字：形狀閥的素材夾，不算語意類別。
+# shape/ 是唯一的保留名稱，用作形狀閥素材資料夾，不列入語意類別。
 SHAPE_DIR_NAME = "shape"
 
 VALID_OBJECT_RULES = {"model", "category"}
 
 
 def url_quote_path(rel_parts: list[str]) -> str:
-    """逐段 URL-encode，保留可由 assetBase 解析的相對路徑。"""
+    """逐段進行 URL 編碼，保留可由 assetBase 解析的相對路徑。"""
     return "/".join(quote(part) for part in rel_parts)
 
 
@@ -49,7 +50,7 @@ def list_images(dir_path: Path) -> list[Path]:
 
 
 def discover_category_dirs() -> list[Path]:
-    """列出 assets/ 下除了 shape/ 與隱藏項目以外的語意類別。"""
+    """列出 assets/ 下的語意類別，排除 shape/ 與隱藏項目。"""
     dirs = []
     for p in MATERIAL_DIR.iterdir():
         if not p.is_dir():
@@ -110,11 +111,12 @@ def use_game_dir(game_dir: Path) -> None:
 
 
 def load_levels_config() -> list[dict] | None:
-    """讀該遊戲資料夾的 levels.json，驗證格式。任何錯誤回傳 None（呼叫端印錯誤並以非 0 結束）。
+    """讀取遊戲資料夾的 levels.json，並驗證格式。
+    錯誤時回傳 None，由呼叫端輸出錯誤並以非 0 結束。
 
-    SPEC 5.1：這裡驗證的是「設定本身合不合法」（缺欄位、型別錯、長度對不
-    上），跟「素材有沒有補齊」是兩回事——後者是 compute_feasibility() 的
-    工作，走 playable=false + WARN 這條路，不會讓程式在這裡就報錯離開。
+    依 SPEC 5.1，檢查缺少欄位、型別錯誤與長度不符。
+    素材完整性由 compute_feasibility() 檢查。素材不足時，設定 playable=false 並產生 WARN，
+    不在格式驗證階段終止執行。
     """
     if not LEVELS_CONFIG_PATH.is_file():
         print(f"錯誤：找不到關卡設計表 {LEVELS_CONFIG_PATH}", file=sys.stderr)
@@ -202,13 +204,11 @@ def load_levels_config() -> list[dict] | None:
 
 
 def compute_feasibility(levels_config: list[dict], categories: list[dict], num_shapes: int):
-    """回傳 (levels, warnings, table_rows)。詳見 SPEC 1.6、5。
+    """回傳 (levels, warnings, table_rows)，見 SPEC 1.6、5。
 
-    levels：完全照 levels_config 的順序，每項補上 index/levelNo/playable/
-    reason，並原封不動帶上該關的 sourceCategory（model 關）或
-    sourceCategories（category 關）。
-    warnings：不可行關卡的 WARN 訊息（不可行的那一半不得降級或略過，
-    整關直接標 unplayable）。
+    levels 使用 levels_config 的順序，補上 index／levelNo／playable／reason。
+    保留各關的 sourceCategory（model 關）或 sourceCategories（category 關）。
+    warnings 包含不可行關卡的 WARN 訊息。任一部分不可行時，整關標為 unplayable，不降低難度或略過該部分。
     """
     category_by_id = {c["id"]: c for c in categories}
 
