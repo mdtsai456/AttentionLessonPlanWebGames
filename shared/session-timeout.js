@@ -1,7 +1,10 @@
 // 學生或老師登入滿 1 小時後，清除本機登入狀態，並返回 Home。
-// 到期時間使用登入回應的 expiresAt。舊分頁缺少此值時，從首次開啟頁面起算 1 小時。
+// 到期時間使用登入回應的 expiresIn（剩餘秒數）加上本機現在時間，不受裝置時鐘快慢影響。
+// 舊後端只有 expiresAt 時沿用它。舊分頁兩者都沒有時，從首次開啟頁面起算 1 小時。
 (function (global) {
   const TTL_MS = 60 * 60 * 1000;
+  // setTimeout 延遲上限約 24.8 天，超過會溢位成立刻觸發；到點後 expireSession 會再檢查並重新排程。
+  const MAX_TIMEOUT = 2 ** 31 - 1;
   const EXPIRES_KEY = "login_expires_at";
   const scriptSrc = document.currentScript && document.currentScript.src;
   const loginPageHref = new URL(
@@ -25,7 +28,14 @@
     return /\/Home\/(?:index\.html)?$/i.test(path);
   }
 
+  // value 可以是登入回應物件（{ expiresAt, expiresIn }）、ISO 字串或毫秒時間戳。
   function parseExpiry(value) {
+    if (value && typeof value === "object") {
+      if (typeof value.expiresIn === "number" && Number.isFinite(value.expiresIn)) {
+        return Date.now() + value.expiresIn * 1000;
+      }
+      return parseExpiry(value.expiresAt);
+    }
     if (typeof value === "number" && Number.isFinite(value)) return value;
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : NaN;
@@ -45,11 +55,11 @@
     }
     timerId = global.setTimeout(function () {
       expireSession(false);
-    }, remaining);
+    }, Math.min(remaining, MAX_TIMEOUT));
   }
 
-  function stampLoginExpiry(expiresAt) {
-    const values = Array.isArray(expiresAt) ? expiresAt : [expiresAt];
+  function stampLoginExpiry(login) {
+    const values = Array.isArray(login) ? login : [login];
     const parsed = values.map(parseExpiry).filter(function (value) {
       return Number.isFinite(value) && value > 0;
     });
@@ -70,7 +80,8 @@
   }
 
   function apiBase() {
-    if (global.API_BASE_URL) return global.API_BASE_URL;
+    // 與 shared/api.js 相同：覆寫網址去掉結尾斜線，避免 //auth/...
+    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, "");
     if (global.WebGameApi && global.WebGameApi.resolveApiBase) {
       return global.WebGameApi.resolveApiBase();
     }

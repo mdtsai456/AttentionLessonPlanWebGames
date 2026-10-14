@@ -11,6 +11,7 @@ const loginForm = document.getElementById("login-form");
 const enterBtn = loginForm.querySelector('[type="submit"]');
 const credentialSlots = document.getElementById("credential-slots");
 const errorMsg = document.getElementById("error-msg");
+const choiceButtons = document.querySelectorAll("[data-role], [data-mode]");
 
 const state = {
   role: null, // "student" | "teacher"
@@ -38,9 +39,17 @@ loginForm.addEventListener("submit", (event) => {
 // 登入成功後維持按鈕停用。按上一頁並從 bfcache 還原時，重新啟用按鈕。
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;
-  enterBtn.disabled = false;
+  setLoginBusy(false);
   errorMsg.textContent = "";
 });
+
+/** 登入中停用送出與身份／模式按鈕，避免等待回應時換了身份或模式。 */
+function setLoginBusy(busy) {
+  enterBtn.disabled = busy;
+  choiceButtons.forEach((button) => {
+    button.disabled = busy;
+  });
+}
 
 /**
  * 選擇身分。
@@ -198,7 +207,8 @@ function storeTeacherSession(result) {
   sessionStorage.setItem("teacher_id", String(result.teacherId));
   sessionStorage.setItem("teacher_name", result.teacherName);
   sessionStorage.setItem("teacher_school", result.school);
-  window.WebGameSession?.stampLoginExpiry(result.expiresAt);
+  // 傳整個登入回應：有 expiresIn 時以本機時間計算到期，避開裝置時鐘誤差。
+  window.WebGameSession?.stampLoginExpiry(result);
 }
 
 function storeStudentSlot(slot, result, day) {
@@ -224,7 +234,7 @@ function storeStudentSession(mode, results, days) {
   sessionStorage.setItem("school", results[0].school);
   sessionStorage.setItem("current_day", String(days[0]));
   sessionStorage.setItem("currentDay", String(days[0]));
-  window.WebGameSession?.stampLoginExpiry(results.map((item) => item.expiresAt));
+  window.WebGameSession?.stampLoginExpiry(results);
 }
 
 async function submitLogin() {
@@ -233,14 +243,17 @@ async function submitLogin() {
   errorMsg.textContent = message;
   if (message) return;
 
-  enterBtn.disabled = true;
+  setLoginBusy(true);
   errorMsg.textContent = "登入中…";
 
   // 已取得的登入結果。登入流程未完成時，在 finally 登出，避免伺服器保留 token。
   const results = [];
   let loggedIn = false;
+  // 送出當下就記住身份與模式：下面有 await，等待期間 state 可能被改掉，
+  // 存登入狀態時讀 state.mode 會存錯模式（例如雙人卻沒有第二位學生的 token）。
   const teacher = state.role === "teacher";
-  const dual = state.mode === "dual";
+  const mode = state.mode;
+  const dual = mode === "dual";
   // 雙人模式中目前登入的學生序號，用於錯誤訊息前綴。0 表示未進行登入。
   let loginSlot = 0;
 
@@ -280,7 +293,7 @@ async function submitLogin() {
         storeTeacherSession(results[0]);
       } else {
         const days = accounts.map((item) => item.currentDay);
-        storeStudentSession(state.mode, results, days);
+        storeStudentSession(mode, results, days);
       }
     } catch (_err) {
       // 寫入登入狀態失敗時，清除已登出 token 的狀態，並避免將錯誤顯示為後端錯誤。
@@ -296,7 +309,7 @@ async function submitLogin() {
     // 登入成功並導向頁面時，維持按鈕停用，避免重複送出並取得額外 token。
     if (!loggedIn) {
       results.forEach((result) => WebGameApi.logout(result.token));
-      enterBtn.disabled = false;
+      setLoginBusy(false);
     }
   }
 }

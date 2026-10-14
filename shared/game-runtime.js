@@ -10,6 +10,9 @@
   const offsets = [];
   let serial = 0;
   let paused = false;
+  // 暫停原因：每個暫停者各自掛一個，全部解除才真正恢復。
+  // 例如離開確認框開著時，登入驗證完成的 resume() 不能讓遊戲繼續跑。
+  const holds = new Set();
   let pausedAt = 0;
   let pausedPerf = 0;
   let wallOffset = 0;
@@ -50,6 +53,9 @@
   global.requestAnimationFrame = (fn) => schedule(fn, 0, false, [], true);
   global.cancelAnimationFrame = remove;
   global.WebGameRuntime = {
+    // 不受暫停影響的原生計時器：給網路請求的逾時用（例如確認離開後遊戲暫停、成績照常送出）。
+    nativeSetTimeout: (fn, delay, ...args) => timeout(fn, delay, ...args),
+    nativeClearTimeout: (id) => clear(id),
     now: () => (paused ? pausedAt : wallNow()) - wallOffset,
     toWallTime(value) {
       const offset = offsets.findLast((point) => value >= point.clock);
@@ -57,7 +63,8 @@
     },
     performanceNow: () => (paused ? pausedPerf : perfNow()) - perfOffset,
     get paused() { return paused; },
-    pause() {
+    pause(reason = "default") {
+      holds.add(reason);
       if (paused) return;
       paused = true; pausedAt = wallNow(); pausedPerf = perfNow();
       global.dispatchEvent(new Event("webgame:pause"));
@@ -66,8 +73,9 @@
         else { clear(task.native); task.remaining = Math.max(0, task.due - pausedAt); }
       }
     },
-    resume() {
-      if (!paused) return;
+    resume(reason = "default") {
+      holds.delete(reason);
+      if (!paused || holds.size) return;
       const clock = pausedAt - wallOffset;
       wallOffset += wallNow() - pausedAt;
       offsets.push({ clock, offset: wallOffset });
