@@ -8,9 +8,9 @@ dependencies = [
     "uvicorn[standard]>=0.27.0",
     "pymysql>=1.1.0",
     "python-dotenv>=1.0.0",
-    # anyio 4.10+ 對 anyio.abc.BlockingPortal 發 DeprecationWarning，而
-    # starlette.testclient 仍走舊路徑；pytest.ini 的 filterwarnings=error
-    # 會讓測試連收集都失敗。鎖在 4.10 以下直到 starlette 端修正。
+    # anyio 4.10 以上版本針對 anyio.abc.BlockingPortal 發出 DeprecationWarning。
+    # starlette.testclient 仍使用舊路徑。pytest.ini 的 filterwarnings=error
+    # 會使測試收集失敗。starlette 修正前，將 anyio 限制在 4.10 以下。
     "anyio<4.10",
 ]
 

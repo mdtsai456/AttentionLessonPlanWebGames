@@ -1,4 +1,4 @@
-// 完整生命週期與存檔契約；openGame 攔截全部外部流量。
+// 完整生命週期與存檔契約測試。openGame 攔截所有外部流量。
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameDriver, RESULT_RE, startStaticServer, launchBrowser, openGame, leaveDialog } from './helpers.js';
@@ -136,7 +136,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         await waitStatus(session, game, SAVED);
         assertPayloads(session.sessionPosts, game);
 
-        // 六關成績已儲存，離開直接回選遊戲頁（不再詢問）。導覽回 204 讓頁面留在原地，接著測同步重玩。
+        // 六關成績已儲存後，離開直接返回選單，不再詢問。導覽回傳 204，讓頁面留在原地，接著測試重玩。
         let lobbyNavigations = 0;
         await session.page.route('**/Select/index.html', (route) => { lobbyNavigations++; return route.fulfill({ status: 204 }); });
         await session.page.locator('#leave-btn').click();
@@ -233,7 +233,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
             if (!isSessionPost(request, url)) return false;
             if (serverBack) await fulfillSession(route);
             else if (failure === 'abort') await route.abort('failed');
-            // timeout 故意不完成路由，讓真正 fetch 的逾時保護處理未知寫入結果。
+            // timeout 情況不完成路由回應，讓 fetch 的逾時處理應對未知的寫入結果。
             return true;
           },
         });

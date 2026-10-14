@@ -1,7 +1,6 @@
-// 單局的成績送出與畫面狀態。網路中斷可能已完成寫入，不會自己重送。
-// 每筆成績在第一次送出時產生 submissionId（data.submissionId），之後重送沿用同一個 body；
-// 後端用「學生身分 + submissionId」決定場次編號，重複收到同一筆會回同一個 sessionId，
-// 所以結果不明（逾時、斷線）的成績可以由玩家重試或離開時再送一次，不會多一列。
+// 單一場次的成績送出與畫面狀態。斷線時，後端可能已完成寫入，因此不可自動重送。
+// 每筆成績第一次送出時產生 submissionId。之後重送沿用同一個 body。
+// 後端依學生身分與 submissionId 決定場次編號。重複收到同一筆時，回傳同一個 sessionId。
 (function () {
   const messages = {
     idle: '',

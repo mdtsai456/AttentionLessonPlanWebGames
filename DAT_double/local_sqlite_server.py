@@ -21,7 +21,7 @@ from pydantic import BaseModel, field_validator
 
 app = FastAPI(title="DAT_double 本地獨立 SQLite 後端", version="1.0.0")
 
-# 設定 CORS 跨網域放行
+# 設定 CORS，允許跨網域請求。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,19 +30,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 自動定位當前檔案所在的 DAT_double 目錄，並在該目錄生成 local_test.db
+# 取得本檔案所在的 DAT_double 目錄，並在該目錄建立 local_test.db。
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.environ.get("DAT_LOCAL_DB") or os.path.join(CURRENT_DIR, "local_test.db")
 REPO_ROOT = Path(CURRENT_DIR).parent.resolve()
 PORT = int(os.environ.get("DAT_LOCAL_PORT", "5002"))
 UPSTREAM = os.environ.get("DAT_LOCAL_UPSTREAM", "http://127.0.0.1:5001").rstrip("/")
 
-# 1. 初始化建立 SQLite 本地資料庫表格
+# 1. 初始化本地 SQLite 資料表。
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    # 建立場次紀錄主表
+    # 建立場次記錄主表。
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS assessment_result (
         session_id TEXT PRIMARY KEY,
@@ -75,7 +75,7 @@ def init_db():
 
 init_db()
 
-# 2. Pydantic 數據模型驗證
+# 2. Pydantic 資料模型驗證。
 class StatItem(BaseModel):
     apiname: str
     # DAT_levelAccuracy 是逗號分隔字串（例如 "1,0.5,0.75"），其餘為數值
@@ -107,10 +107,10 @@ class SessionPayload(BaseModel):
     data: SessionData
 
 # ----------------------------------------------------
-# 3. API 路由接口
+# 3. API 路由介面。
 # ----------------------------------------------------
 
-# 首頁路由：恢復原本 API 狀態 JSON 訊息（不會強行開啟 DAT_double.html）
+# 首頁路由回傳 API 狀態的 JSON 訊息，不開啟 DAT_double.html。
 @app.get("/")
 def root() -> dict[str, str]:
     return {
@@ -125,8 +125,8 @@ def root() -> dict[str, str]:
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
-# 與正式後端（backend/routers/sessions.py）相同的推導方式：學生身分 + submissionId → 場次 UUID。
-# 同一位學生重送同一筆得到同一個 UUID，不會多寫一列；不同學生不會撞在一起。
+# 與 backend/routers/sessions.py 相同。依學生身分與 submissionId 推導場次 UUID。
+# 同一位學生重送同一筆時得到同一個 UUID，不會多寫一列。不同學生不會使用同一個 UUID。
 SUBMISSION_SESSION_NAMESPACE = uuid.UUID("6f1c2a4e-8b3d-4e5f-9a7b-1c2d3e4f5a6b")
 
 
@@ -137,7 +137,7 @@ def submission_session_id(d: "SessionData") -> Optional[str]:
     return str(uuid.uuid5(SUBMISSION_SESSION_NAMESPACE, name))
 
 
-# POST /api/sessions: 接收遊戲數據寫入本地 local_test.db
+# POST /api/sessions：接收遊戲資料，並寫入本地 local_test.db。
 @app.post("/api/sessions", status_code=status.HTTP_201_CREATED)
 def create_session(payload: SessionPayload):
     d = payload.data
@@ -175,7 +175,7 @@ def create_session(payload: SessionPayload):
         print(f"❌ [SQLite] 寫入失敗: {e}")
         raise HTTPException(status_code=500, detail="本地資料庫寫入失敗")
 
-# GET /api/sessions: 開籤查詢 DAT_double 下的歷史場次紀錄
+# GET /api/sessions：查詢 DAT_double 的歷史場次記錄。
 @app.get("/api/sessions")
 def get_sessions():
     conn = sqlite3.connect(DB_FILE)
@@ -196,8 +196,8 @@ def get_sessions():
     conn.close()
     return {"total": len(results), "records": results}
 
-# 其他 /api 路徑（登入、/api/auth/me、學生報表）轉送到開發後端，
-# 讓登入守門照常運作；成績寫入仍由上方 /api/sessions 存進本地 SQLite。
+# 其他 /api 路徑轉送到開發後端，包含登入、/api/auth/me 與學生報表。
+# 成績寫入仍由上方 /api/sessions 存進本地 SQLite。
 FORWARD_HEADERS = {"authorization", "content-type", "x-partner-authorization"}
 
 

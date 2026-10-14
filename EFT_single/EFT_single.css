@@ -159,7 +159,7 @@ button:focus-visible {
   border-radius: 2em;
 }
 
-/* 泡泡區域：left / top 調位置，width / height 調範圍 */
+/* 泡泡區域：left／top 設定位置，width／height 設定範圍。 */
 .bubble-field {
   position: absolute;
   left: 10%;
@@ -168,7 +168,7 @@ button:focus-visible {
   height: 42%;
 }
 
-/* 泡泡大小：width 為泡泡區域寬度的百分比；各顆位置由 JS 的 positions 設定 */
+/* width 以泡泡區域寬度的百分比設定泡泡大小。JS 的 positions 設定每顆泡泡的位置。 */
 .bubble {
   position: absolute;
   width: 15%;
@@ -224,7 +224,7 @@ button:focus-visible {
   margin: .5em 0;
 }
 
-/* 左右作答按鈕：width 調大小，bottom 調垂直位置 */
+/* 左右作答按鈕：width 設定大小，bottom 設定垂直位置。 */
 .direction {
   position: absolute;
   bottom: 5%;
