@@ -256,8 +256,16 @@ test("#10 第 5 關按離開並確定，stage 3 存檔只算前 3 關的成績",
 });
 
 /** 開遊戲（可裝假時鐘），第 1–3 關都直接過關，停在中場畫面。 */
-async function playToMidway(page, { clock = false } = {}) {
+// holdSaves：成績送出一律卡住，直到呼叫 writes.release()（中場先送的第 3 關也會卡著）。
+async function playToMidway(page, { clock = false, holdSaves = false } = {}) {
   const writes = await recordWrites(page);
+  if (holdSaves) {
+    const released = new Promise((resolve) => { writes.release = resolve; });
+    await page.route("**/api/sessions", async (route) => {
+      await released;
+      await route.fallback();
+    });
+  }
   await loginAs(page, STUDENT);
   if (clock) await page.clock.install();
   await page.goto(GAME);
@@ -321,16 +329,19 @@ test("R9 第 6 關結束：時長算到第 6 關結束，不含結束後的等�
   const expectedDuration = await page.evaluate(() => state.stageResults[5].elapsedMs);
   await page.clock.runFor(5_000);
   await expect(page.locator("#result")).toBeVisible();
-  await expect.poll(() => sessionPosts(writes).length).toBe(1);
-  const save = sessionPosts(writes)[0];
+  // 中場先送第 3 關，打完再用同一個 submissionId 送第 6 關（後端更新同一列）。
+  await expect.poll(() => sessionPosts(writes).length).toBe(2);
+  const [midway, save] = sessionPosts(writes);
+  expect(stat(midway, "IM_stage")).toBe(3);
+  expect(save.body.data.submissionId).toBe(midway.body.data.submissionId);
   expect(stat(save, "IM_stage")).toBe(6);
   expect(stat(save, "IM_duration")).toBe(expectedDuration);
   expect(durationMatchesTimes(save)).toBeLessThan(1000);
 });
 
-test("R3 第 6 關剩 1 秒時確定離開、存檔要 2 秒：只送第 3 關，存檔期間不會打完第 6 關多送一筆", async ({ page }) => {
-  const writes = await playToMidway(page);
+test("R3 第 6 關剩 1 秒時確定離開、中場的第 3 關還沒送完：等它送完才導頁，期間不會打完第 6 關多送一筆", async ({ page }) => {
   const issued = watchSessionPosts(page);
+  const writes = await playToMidway(page, { holdSaves: true });
   const stageOf = (body) => body.data.stats.find((item) => item.apiname === "IM_stage")?.value;
   await page.locator("#continue-btn").click();
   for (let stage = 4; stage <= 6; stage++) {
@@ -341,10 +352,6 @@ test("R3 第 6 關剩 1 秒時確定離開、存檔要 2 秒：只送第 3 關�
       await page.locator(".shared-stage-clear-btn").click();
     }
   }
-  await page.route("**/api/sessions", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    await route.fallback();
-  });
   await page.evaluate(() => { state.remaining = 1; });
   await page.locator("#leave-btn").click();
   await leaveDialog(page).getByRole("button", { name: "離開", exact: true }).click();
@@ -353,13 +360,15 @@ test("R3 第 6 關剩 1 秒時確定離開、存檔要 2 秒：只送第 3 關�
   expect(await page.evaluate(() => window.WebGameRuntime.paused)).toBe(true);
   await expect(page.locator("#result")).toBeHidden();
   expect(issued.map(stageOf)).toEqual([3]);
+  writes.release();
   await page.waitForURL("**/Select/index.html");
   expect(issued.map(stageOf)).toEqual([3]);
   expect(sessionPosts(writes)).toHaveLength(1);
 });
 
 test("R3 確定離開後存檔還在路上：空白鍵、方向鍵、點門／放置點都不動遊戲狀態", async ({ page }) => {
-  const writes = await playToMidway(page);
+  // 中場先送的第 3 關一直卡著，離開時要等它送完。
+  const writes = await playToMidway(page, { holdSaves: true });
   await page.locator("#continue-btn").click();
   await expect(page.locator("#problem-title")).toHaveText("第 4 關");
   await beginStage(page);
@@ -373,12 +382,7 @@ test("R3 確定離開後存檔還在路上：空白鍵、方向鍵、點門／�
     state.playerX = Number(room.zones[0].x ?? 36);
     renderRoom();
   });
-  let release;
-  const released = new Promise((resolve) => { release = resolve; });
-  await page.route("**/api/sessions", async (route) => {
-    await released;
-    await route.fallback();
-  });
+  const release = writes.release;
   const before = await page.evaluate(() => JSON.stringify({
     bag: state.bag, x: state.playerX, row: state.row, col: state.col,
     results: state.stageResults.length, walk: state.walkTarget,

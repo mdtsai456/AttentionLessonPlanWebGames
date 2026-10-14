@@ -420,7 +420,11 @@ function endQuestion() {
 
   // 修正最後一秒連續產生多題的問題。
   if (stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20) {
-    if (stage === MID_STAGE) midStageStats = statsSnapshot();
+    if (stage === MID_STAGE) {
+      midStageStats = statsSnapshot();
+      // 到中場就先送第 3 關，之後直接關掉頁面也保得住前三關。
+      void saveCurrentRun(MID_STAGE);
+    }
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;

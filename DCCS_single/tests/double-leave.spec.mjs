@@ -42,7 +42,7 @@ async function doubleClick(page, locator) {
 }
 
 test.describe('雙人版 離開：先確認，確定後才存檔', () => {
-  test('取消離開什麼都不送、遊戲照常；之後打完全場只送全場成績', async ({ page }) => {
+  test('取消離開不多送、遊戲照常；之後打完全場只多送全場成績', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'double', { delayMs: 1000 });
     await reachBreak(page, 'double');
     await continueAfterBreak(page);
@@ -53,9 +53,9 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
     await expect(leaveDialog(page)).toHaveCount(1);
     await answerLeave(page, 'stay');
 
-    // 取消：沒有送出、還在遊戲頁、離開保護還在、按鈕可再按。
+    // 取消：只有中場先送的兩筆第 3 關、還在遊戲頁、離開保護還在、按鈕可再按。
     await page.waitForTimeout(1500);
-    expect(posts).toHaveLength(0);
+    expect(posts).toHaveLength(2);
     expect(new URL(page.url()).pathname).toBe('/DCCS_double/index.html');
     expect(await unloadGuardActive(page)).toBe(true);
     await expect(leave).toBeEnabled();
@@ -63,14 +63,14 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
     await leave.click();
     await answerLeave(page, 'stay');
     await page.waitForTimeout(1500);
-    expect(posts).toHaveLength(0);
+    expect(posts).toHaveLength(2);
 
     await drive(page, 'double', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
     await page.waitForURL(/\/Select\/index\.html/);
 
     expect(stagesByCase(posts)).toEqual({
-      T01: [FULL_SESSION_STAGE],
-      T02: [FULL_SESSION_STAGE],
+      T01: [3, FULL_SESSION_STAGE],
+      T02: [3, FULL_SESSION_STAGE],
     });
     expect(new Set(posts.map((payload) => payload.data.pairId)).size).toBe(1);
     expect(dialogs).toEqual([]);
@@ -131,7 +131,10 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
 
     // 最終成績一開始送就按離開（按鈕已停用，點擊不會有作用，也不會問要不要離開）。
     const clickLeaveWhileSending = (async () => {
-      await expect.poll(() => posts.length, { timeout: 3 * LEVEL_TIMEOUT }).toBeGreaterThan(0);
+      await expect.poll(
+        () => posts.some((payload) => stat(payload, 'stage') === FULL_SESSION_STAGE),
+        { timeout: 3 * LEVEL_TIMEOUT }
+      ).toBe(true);
       await page.locator('#leave-btn').click({ force: true });
       await page.locator('#leave-btn').click({ force: true });
       expect(await leaveDialog(page).count()).toBe(0);
@@ -142,8 +145,8 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
     await page.waitForURL(/\/Select\/index\.html/);
 
     expect(stagesByCase(posts)).toEqual({
-      T01: [FULL_SESSION_STAGE],
-      T02: [FULL_SESSION_STAGE],
+      T01: [3, FULL_SESSION_STAGE],
+      T02: [3, FULL_SESSION_STAGE],
     });
     expect(dialogs).toEqual([]);
     expect(pageErrors).toEqual([]);

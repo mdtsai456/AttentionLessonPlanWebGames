@@ -9,16 +9,24 @@ const MID_STAGE = 3;
 // DOM 與遊戲狀態
 const $ = (id) => document.getElementById(id);
 let gameStartTime = 0;
+// 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。
+let playId = '';
+// 已送出（或正在送）的最高關卡與那次送出；同一關或更低的關卡不再另送。
 let savedStage = 0;
+let savePromise = Promise.resolve();
 
 const player = createEftPlayer({
     root: document,
     getUi: (id) => $(id),
     keyBindings: { ArrowLeft: 'left', ArrowRight: 'right' },
     focusRestart: true,
-    onGameStart: (startedAt) => { gameStartTime = startedAt; },
+    onGameStart: (startedAt) => {
+        gameStartTime = startedAt;
+        playId = window.WebGameApi.uuid();
+    },
     onReset: () => {
         savedStage = 0;
+        savePromise = Promise.resolve();
         $('mid-break-modal').hidden = true;
         $('btn-continue').disabled = false;
         $('btn-lobby').disabled = false;
@@ -28,6 +36,8 @@ const player = createEftPlayer({
         if (finished === MID_STAGE) {
             setPhase('break');
             showMidBreak();
+            // 到中場就先送第 3 關，之後直接關掉頁面也保得住前三關。
+            void saveCurrentRun(MID_STAGE);
             return;
         }
         if (finished < STAGE_COUNT) {
@@ -74,9 +84,16 @@ function finishGame() {
 }
 
 // 成績只算到該關結束為止（第 4、5 關中途離開送第 3 關時不含後面關卡）。
+// 同一關或更低的關卡已送過（或正在送）就沿用那次；送失敗時清掉紀錄，下次離開會再送。
 function saveCurrentRun(stage) {
+    if (stage <= savedStage) return savePromise;
     savedStage = stage;
-    return saveGameDataToBackend(player.checkpointStats(stage));
+    const attempt = saveGameDataToBackend(player.checkpointStats(stage)).then((ok) => {
+        if (!ok && savedStage === stage) savedStage = 0;
+        return ok;
+    });
+    savePromise = attempt;
+    return attempt;
 }
 
 function levelAccuracyText(stageCount) { return player.levelAccuracyText(stageCount); }
@@ -89,7 +106,7 @@ async function saveGameDataToBackend(data) {
     // 未取得登入學生資料時，不送出成績，避免將未登入的成績寫入正式資料庫。
     if (!grade || !caseId || !school) {
         console.warn('找不到登入學生資料，成績不送出');
-        return;
+        return true;
     }
     const currentDay = parseInt(
         sessionStorage.getItem('currentDay')
@@ -111,6 +128,7 @@ async function saveGameDataToBackend(data) {
             // 該關結束當下的時間（中場或第 4、5 關才離開也不會多算）。
             endTime: data.endTime ?? Date.now(),
             mode: 'single',
+            submissionId: playId,
             stats: buildEftStats(data),
         },
     };
@@ -120,9 +138,12 @@ async function saveGameDataToBackend(data) {
         if (res.status !== 201) {
             const errData = await res.json().catch(() => ({}));
             console.error(`成績送出失敗 ${res.status}:`, errData.detail || '寫入失敗');
+            return false;
         }
+        return true;
     } catch (err) {
         console.error('成績送出失敗：', err);
+        return false;
     }
 }
 function recordOutcome(correct, reactionMs) { player.recordOutcome(correct, reactionMs); }
@@ -160,7 +181,7 @@ async function leaveGame() {
         ? state.stage
         : state.stage - 1;
     const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-    if (checkpoint && checkpoint !== savedStage) await saveCurrentRun(checkpoint);
+    if (checkpoint) await saveCurrentRun(checkpoint);
     window.leaveTo('../Select/index.html');
     // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
     $('leave-btn').disabled = false;

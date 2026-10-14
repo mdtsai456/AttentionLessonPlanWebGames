@@ -293,7 +293,7 @@ test('逾時的未知結果也能重送（同一個 submissionId）（#42）', a
   assert.equal(bodies[1], bodies[0]);
 });
 
-test('不同關卡是不同紀錄，submissionId 不同；新的一局（新 saver）也是新的 submissionId（#42）', async () => {
+test('同一局的第 3 關與第 6 關共用 submissionId（後端以較高關卡更新同一列）；新的一局（新 saver）是新的 submissionId（#42）', async () => {
   const bodies = [];
   const api = await setup((url, options) => { bodies.push(JSON.parse(options.body)); return ok(); }, { uuid: realUuid });
   const first = api.create({ url: '/sessions' });
@@ -304,7 +304,8 @@ test('不同關卡是不同紀錄，submissionId 不同；新的一局（新 sav
   const ids = bodies.map((body) => body.data.submissionId);
   assert.equal(ids.length, 3);
   for (const id of ids) assert.match(id, V4);
-  assert.equal(new Set(ids).size, 3);
+  assert.equal(ids[1], ids[0], '同一局的中場與最終成績是同一場');
+  assert.notEqual(ids[2], ids[0], '新的一局不能蓋掉上一局');
 });
 
 test('較高關卡結果不明時，存較低關卡改成重送較高那筆（同一個 submissionId），成功就算完成（R2、#42）', async () => {

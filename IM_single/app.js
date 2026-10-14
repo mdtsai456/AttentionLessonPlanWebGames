@@ -195,8 +195,11 @@ const backBtn = document.getElementById("back-btn");
 const keys = { left: false, right: false };
 window.addEventListener("webgame:pause", () => { keys.left = keys.right = false; });
 
-/** 這一局已送出到第幾關（3 中場 / 6 全破），避免同一關存兩次。 */
+/** 這一局已送出（或正在送）到第幾關（3 中場 / 6 全破），與那次送出；同一關或更低的不再另送。 */
 let savedStage = 0;
+let savePromise = Promise.resolve();
+/** 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。 */
+let playId = "";
 
 const state = {
   questions: [], // 目前題目的題庫，來源為後端或本地。
@@ -330,6 +333,8 @@ function startGame() {
   state.taskCursor = 0;
   state.endingStage = false;
   savedStage = 0; // 新的一局，上一局存過哪關不算數
+  savePromise = Promise.resolve();
+  playId = window.WebGameApi.uuid();
   resultEl.classList.add("is-hidden");
   midwayPanel.classList.add("is-hidden");
   continueBtn.disabled = false;
@@ -994,6 +999,8 @@ async function endStage(holdMs = 0) {
     return;
   }
   if (state.stage === MIDWAY_STAGE) {
+    // 到中場就先送第 3 關，之後直接關掉頁面也保得住前三關。
+    void saveCurrentRun(MIDWAY_STAGE);
     showMidway();
     return;
   }
@@ -1025,8 +1032,8 @@ function finishGame(reason) {
   resultHint.textContent = "六關都結束了";
   resultEl.classList.remove("is-hidden");
 
-  // 第 6 關結束等待的空檔裡按過「離開」就已經存過了，不再重送。
-  if (savedStage !== 6) void saveCurrentRun(6);
+  // 第 6 關結束等待的空檔裡按過「離開」就已經存過了，saveCurrentRun 不會重送。
+  void saveCurrentRun(6);
 }
 
 /**
@@ -1043,7 +1050,7 @@ async function leaveGame() {
   }
   const completed = state.finishedStages;
   const stage = completed >= 6 ? 6 : completed >= MIDWAY_STAGE ? MIDWAY_STAGE : 0;
-  if (stage && stage !== savedStage) await saveCurrentRun(stage);
+  if (stage) await saveCurrentRun(stage);
   window.leaveTo("../Select/index.html");
   // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
   leaveBtn.disabled = false;
@@ -1054,7 +1061,17 @@ async function leaveGame() {
  * 第 4–6 關中途離開存的是 stage 3，答對數、用時等都不能把第 4 關之後算進去。
  */
 function saveCurrentRun(stage) {
+  if (stage <= savedStage) return savePromise;
   savedStage = stage;
+  savePromise = sendStageResult(stage).then((ok) => {
+    // 送失敗時清掉紀錄，下次離開會再送；同一個 submissionId 重送不會多一列。
+    if (!ok && savedStage === stage) savedStage = 0;
+    return ok;
+  });
+  return savePromise;
+}
+
+function sendStageResult(stage) {
   const records = state.stageResults.slice(0, stage);
   const passed = records.filter((item) => item.passed).length;
   const answered = Math.max(records.length, 1);
@@ -1287,7 +1304,7 @@ async function submitResult(data) {
   // 未取得登入學生資料時，不送出成績，避免將未登入的成績寫入正式資料庫。
   if (!grade || !caseId || !school) {
     console.warn("找不到登入學生資料，成績不送出");
-    return;
+    return true;
   }
   const currentDay = parseInt(
     sessionStorage.getItem("currentDay")
@@ -1308,6 +1325,7 @@ async function submitResult(data) {
       // 第 stage 關結束當下，endTime − startTime 才會等於 IM_duration。
       endTime: data.endTime ?? Date.now(),
       mode: "single",
+      submissionId: playId,
       stats: [
         { apiname: "IM_correct", value: data.score },
         { apiname: "IM_wrong", value: data.wrong },
@@ -1325,8 +1343,11 @@ async function submitResult(data) {
     if (res.status !== 201) {
       const errData = await res.json().catch(() => ({}));
       console.error(`成績送出失敗 ${res.status}:`, errData.detail || "寫入失敗");
+      return false;
     }
+    return true;
   } catch (err) {
     console.error("成績送出失敗：", err);
+    return false;
   }
 }

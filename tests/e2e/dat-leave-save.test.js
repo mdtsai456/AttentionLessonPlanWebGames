@@ -8,11 +8,20 @@ import { startStaticServer, launchBrowser, openGame, leaveDialog } from './helpe
 const stageOf = (post) => post.data.stats.find((stat) => stat.apiname === 'DAT_stage').value;
 const isSessionPost = (request) => /\/api\/sessions$/.test(new URL(request.url()).pathname) && request.method() === 'POST';
 
-// 成績 API：slow 延遲 1.5 秒（真實時間）才回 201；hang 永不回應；fail 回 500
+// 到中場時遊戲會自動先送第 3 關。這裡讓那一筆先回 500，確定離開時才要重送檢查點，
+// 測的是離開當下的那次送出。
+const MIDWAY_FAILS = 500;
+
+// 成績 API：中場那筆回 500；之後 slow 延遲 1.5 秒（真實時間）才回 201；hang 永不回應；fail 回 500
 function sessionRoute(kind) {
-  return async ({ route, request }) => {
+  return async ({ route, request, sessionPosts }) => {
     if (!isSessionPost(request)) return false;
     const headers = { 'Access-Control-Allow-Origin': '*' };
+    const caseId = request.postDataJSON().data.caseId;
+    if (sessionPosts.filter((post) => post.data.caseId === caseId).length === 1) {
+      await route.fulfill({ status: MIDWAY_FAILS, contentType: 'application/json', headers, body: '{}' });
+      return true;
+    }
     if (kind === 'hang') return true;
     if (kind === 'fail') {
       await route.fulfill({ status: 500, contentType: 'application/json', headers, body: '{}' });
@@ -77,7 +86,7 @@ describe('確定離開後的存檔與暫停', () => {
         await session.page.clock.runFor(9000);
         assert.deepEqual(await progress(session.page), before, '存檔期間遊戲不能往下打');
         await session.page.waitForURL('**/Select/index.html');
-        assert.equal(session.sessionPosts.length, players, '每位玩家只送一筆第 3 關檢查點');
+        assert.equal(session.sessionPosts.length, players * 2, '每位玩家只在中場與離開各送一次第 3 關檢查點');
         for (const post of session.sessionPosts) assert.equal(stageOf(post), 3);
         assert.deepEqual(session.dialogs, []);
         assert.deepEqual(session.pageErrors, []);
@@ -99,7 +108,7 @@ describe('確定離開後的存檔與暫停', () => {
         assert.ok(session.page.url().includes(`DAT_${game}.html`), '結果不明時留在遊戲頁');
         assert.equal(await session.page.evaluate(() => window.WebGameRuntime.paused), false, '留在頁面時遊戲恢復');
         await session.driver.playQuestion('correct', 'correct');
-        assert.equal(session.sessionPosts.length, players, '不重送檢查點');
+        assert.equal(session.sessionPosts.length, players * 2, '不自動重送檢查點');
         assert.deepEqual(session.dialogs, []);
         assert.deepEqual(session.pageErrors, []);
       } finally { await session.context.close(); }
@@ -130,12 +139,12 @@ describe('確定離開後的存檔與暫停', () => {
         await session.page.clock.runFor(3000);
         for (const key of ['KeyD', 'ArrowRight']) await session.page.keyboard.up(key);
         assert.deepEqual(await state(), before, '存檔中（遊戲暫停）作答與移動準心都無效');
-        assert.equal(session.sessionPosts.length, players);
+        assert.equal(session.sessionPosts.length, players * 2);
       } finally { await session.context.close(); }
     });
 
     test(`${game}：檢查點逾時後再按離開，用同一個 submissionId 重送；重送失敗留在頁面，再按一次成功才回選遊戲頁（#42）`, async () => {
-      const session = await openGame(browser, server.origin, { game, routeOverride: sequenceRoute(['hang', 500, 201]) });
+      const session = await openGame(browser, server.origin, { game, routeOverride: sequenceRoute([MIDWAY_FAILS, 'hang', 500, 201]) });
       session.page.setDefaultTimeout(8000);
       const dialog = leaveDialog(session.page);
       const leave = async () => {
@@ -149,13 +158,13 @@ describe('確定離開後的存檔與暫停', () => {
         await session.page.clock.runFor(11000);
         await session.page.locator('#checkpoint-save-status').filter({ hasText: '存檔結果未確認' }).waitFor();
         await session.page.locator('#checkpoint-retry-save').waitFor({ state: 'visible' });
-        assert.equal(session.sessionPosts.length, players);
+        assert.equal(session.sessionPosts.length, players * 2);
         assert.equal(await session.page.evaluate(() => window.WebGameRuntime.paused), false);
 
         // 第二次：按離開→確定，自動重送同一筆，伺服器回 500 → 留在頁面、遊戲恢復
         await leave();
         await session.page.locator('#checkpoint-save-status').filter({ hasText: '成績儲存失敗' }).waitFor();
-        assert.equal(session.sessionPosts.length, players * 2);
+        assert.equal(session.sessionPosts.length, players * 3);
         assert.ok(session.page.url().includes(`DAT_${game}.html`), '重送失敗留在遊戲頁');
         assert.equal(await session.page.evaluate(() => window.WebGameRuntime.paused), false, '重送失敗後遊戲恢復');
         await session.driver.playQuestion('correct', 'correct');
@@ -163,10 +172,11 @@ describe('確定離開後的存檔與暫停', () => {
         // 第三次：再按離開→確定，重送成功才回選遊戲頁
         await leave();
         await session.page.waitForURL('**/Select/index.html');
-        assert.equal(session.sessionPosts.length, players * 3);
+        assert.equal(session.sessionPosts.length, players * 4);
         for (const caseId of new Set(session.sessionPosts.map((post) => post.data.caseId))) {
           const posts = session.sessionPosts.filter((post) => post.data.caseId === caseId);
-          assert.equal(posts.length, 3);
+          // 中場那一筆加上離開時的三次重送，都是同一筆。
+          assert.equal(posts.length, 4);
           assert.match(posts[0].data.submissionId, V4);
           for (const post of posts) {
             assert.equal(stageOf(post), 3, '只送第 3 關檢查點');
@@ -192,7 +202,7 @@ describe('確定離開後的存檔與暫停', () => {
         assert.equal(await session.page.evaluate(() => window.WebGameRuntime.paused), false, '存檔失敗後遊戲恢復');
         assert.equal(await session.page.locator('#leave-btn').isEnabled(), true);
         await session.driver.playQuestion('correct', 'correct');
-        assert.equal(session.sessionPosts.length, players);
+        assert.equal(session.sessionPosts.length, players * 2);
         assert.deepEqual(session.dialogs, []);
         assert.deepEqual(session.pageErrors, []);
       } finally { await session.context.close(); }

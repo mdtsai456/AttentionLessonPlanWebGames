@@ -73,6 +73,8 @@ const session = {
   endReason: "",
   // 同一局兩位玩家共用 pairId，後端用來配對兩筆成績。每次開新局時更換。
   pairId: "",
+  // 這一局的 submissionId，每次開新局時更換。
+  playId: "",
   // 記錄計時器是否已開始。
   timerStarted: false,
 };
@@ -96,7 +98,9 @@ document.getElementById("mid-continue").addEventListener("click", () => {
 document.getElementById("leave-btn").addEventListener("click", leaveGame);
 // 設定重新載入題目的按鈕事件。
 
+// 已送出（或正在送）的最高關卡與那次送出；同一關或更低的關卡不再另送。
 let savedStage = 0;
+let savePromise = Promise.resolve();
 
 function completedStage() {
   const midOpen = !midBreakEl.classList.contains("is-hidden");
@@ -129,10 +133,17 @@ async function leaveGame() {
   }
 }
 
-async function saveBoth(stage) {
-  if (!stage || stage === savedStage) return;
+function saveBoth(stage) {
+  if (!stage || stage <= savedStage) return savePromise;
   savedStage = stage;
-  await Promise.all([players.p1, players.p2].map((player, index) => savePlayer(player, index, stage)));
+  savePromise = Promise.all([players.p1, players.p2].map((player, index) => savePlayer(player, index, stage)))
+    .then((results) => {
+      // 有人送失敗時清掉紀錄，下次離開會再送兩人；同一個 submissionId 重送不會多一列。
+      const ok = results.every(Boolean);
+      if (!ok && savedStage === stage) savedStage = 0;
+      return ok;
+    });
+  return savePromise;
 }
 
 function levelAccuracyText(player, stageCount) {
@@ -157,7 +168,7 @@ async function savePlayer(player, index, stage) {
     (studentKey.includes("_") ? studentKey.slice(studentKey.indexOf("_") + 1) : studentKey);
   if (!grade || !caseId || !school) {
     console.warn("找不到登入學生資料，成績不送出");
-    return;
+    return true;
   }
   const currentDay = parseInt(
     sessionStorage.getItem(isP1 ? "student1_day" : "student2_day")
@@ -167,7 +178,7 @@ async function savePlayer(player, index, stage) {
   );
   const answered = Math.max(player.answers.length, 1);
   const wrong = Math.max(player.answers.length - player.score, 0);
-  await window.WebGameApi.submitSession({
+  return window.WebGameApi.submitSession({
       lessonId: "1140908_TGame",
       data: {
         grade,
@@ -178,6 +189,9 @@ async function savePlayer(player, index, stage) {
         endTime: Date.now(),
         mode: "double",
         pairId: session.pairId,
+        // 中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。
+        // 後端以「學生身分 + submissionId」區分，兩位玩家共用同一個值也不會撞在一起。
+        submissionId: session.playId,
         stats: [
           { apiname: "TGame_correct", value: player.score },
           { apiname: "TGame_wrong", value: wrong },
@@ -194,7 +208,10 @@ async function savePlayer(player, index, stage) {
           { apiname: "TGame_questionCount", value: player.answers.length },
         ],
       },
-  }, { player: index + 1 }).catch((error) => console.error(error));
+  }, { player: index + 1 }).then((response) => response.status === 201).catch((error) => {
+    console.error(error);
+    return false;
+  });
 }
 
 document.getElementById("mid-lobby").addEventListener("click", async () => {
@@ -317,7 +334,9 @@ function makePlayerAssets(base) {
 function startGame(rules = buildStageRules()) {
   clearInterval(session.timerId);
   savedStage = 0;
+  savePromise = Promise.resolve();
   session.pairId = window.WebGameApi.uuid();
+  session.playId = window.WebGameApi.uuid();
   session.startedAt = window.WebGameRuntime.now();
   session.endReason = "";
   stageRules = rules;
@@ -400,6 +419,8 @@ function endLevel() {
   settlePlayers();
 
   if (finishedLevel === MID_STAGE) {
+    // 到中場就先送兩人的第 3 關，之後直接關掉頁面也保得住前三關。
+    void saveBoth(MID_STAGE);
     document.getElementById("mid-continue").disabled = false;
     document.getElementById("mid-lobby").disabled = false;
     midBreakEl.classList.remove("is-hidden");

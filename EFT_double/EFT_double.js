@@ -10,6 +10,8 @@ function handlePlayerStageEnd(playerIndex, { stage, setPhase, setFeedback, resum
     if (stage === MID_STAGE) {
         setPhase('break');
         setFeedback('第 3 關已結束，等待另一位玩家');
+        // 到中場就先送自己的第 3 關，之後直接關掉頁面也保得住前三關。
+        void players[playerIndex].saveRun(MID_STAGE);
         waitForMidBreak(playerIndex, resume);
         return;
     }
@@ -43,6 +45,9 @@ function getPlayerIdentity(playerIndex) {
 
 // 同一局兩人共用 pairId；再玩一次時兩人一起開新局並換新的 pairId。
 let pairId = '';
+// 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。
+// 後端以「學生身分 + submissionId」區分，兩位玩家共用同一個值也不會撞在一起。
+let playId = '';
 // 兩人都打完六關才開放「再玩一次」，避免先打完的人把還在玩的搭檔一起重設。
 const finished = [false, false];
 
@@ -61,6 +66,7 @@ function savePlayerRun(player, playerIndex, stage) {
                 endTime: checkpoint.endTime,
                 mode: 'double',
                 pairId,
+                submissionId: playId,
                 stats: buildEftStats(checkpoint),
             },
         }, { player: playerIndex + 1 }).catch((error) => console.error(error));
@@ -75,8 +81,8 @@ function createPlayer(element, keyBindings, playerIndex) {
         if (done.length) return submissions.get(Math.max(...done));
         const currentRun = submissions;
         currentRun.set(stage, savePlayerRun(player, playerIndex, stage).then((response) => {
-            // 伺服器明確拒絕時允許下次離開再送；連線失敗或代理逾時可能已寫入，不重送避免重複。
-            if (response && !response.ok && response.status !== 408 && response.status < 502) {
+            // 送失敗時允許下次離開再送。有 submissionId，就算上次其實已寫入，重送也不會多一列。
+            if (!response || !response.ok) {
                 currentRun.delete(stage);
                 console.error(`成績送出失敗 ${response.status}`);
             }
@@ -156,6 +162,7 @@ document.getElementById('mid-continue').addEventListener('click', () => {
 // 開新的一局：兩人一起重來、換新的 pairId，並清掉過關與中場的等待狀態。
 function startSession() {
     pairId = window.WebGameApi.uuid();
+    playId = window.WebGameApi.uuid();
     finished.fill(false);
     midWait.fill(false);
     midResume.fill(null);

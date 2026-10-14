@@ -415,7 +415,11 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
 
     commitStageAccuracy();
-    if (!isPractice && currentStage === 3) midStageStats = statsSnapshot();
+    if (!isPractice && currentStage === 3) {
+      midStageStats = statsSnapshot();
+      // 到中場就先送自己的第 3 關，之後直接關掉頁面也保得住前三關。
+      void saveRun(3);
+    }
     if (isPractice) {
       finishPractice();
     } else if (currentStage < stageCount) {

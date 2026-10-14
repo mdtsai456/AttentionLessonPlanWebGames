@@ -151,10 +151,14 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
   `sessionId`（UUID v5），**回傳的 `sessionId` 不等於 `submissionId`**，請以回應為準。
 - 同一位學生再送一次同一個 `submissionId`（大小寫不拘），推導出同一個 `sessionId`：
   回 `201` 和先前那一筆的 `sessionId`，不會多寫一列。
+- 同一局的中場檢查點與完整成績用**同一個** `submissionId`：遊戲到第 3 關中場先送
+  `stage` 3，打完再送 `stage` 6。後端收到同一場、`stage` 比已存的高的成績時，
+  更新那一列的統計欄位與 `endTime`（`startTime` 不變），報表裡一局只有一列；
+  `stage` 沒有比較高（重送同一筆、晚到的第 3 關）就不動。
 - 不同學生就算剛好送了同一個 `submissionId`，也會得到不同的 `sessionId`，各自寫入，
   不會互相覆蓋或被當成重送。
 - 不是 UUID 格式回 `400` `{"detail": "submissionId 格式錯誤"}`。
-- 不帶就跟以前一樣，由後端產生 `sessionId`。網頁版 DCCS（`js/net/client.js`）已經會帶。
+- 不帶就跟以前一樣，由後端產生 `sessionId`。網頁版五個遊戲都會帶，同一局共用一個。
 
 ---
 

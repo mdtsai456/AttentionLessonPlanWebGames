@@ -626,6 +626,8 @@ def test_post_session_replayed_submission_id_is_accepted_without_new_row(monkeyp
         raise pymysql.IntegrityError(1062, "duplicate")
 
     monkeypatch.setattr(sessions.writes, "insert_session_with_stats", duplicate_write)
+    # 同一筆重送：關卡沒有比較高，寫入層不會更新（中場檢查點的更新見 test_session_checkpoint_upgrade.py）。
+    monkeypatch.setattr(sessions.writes, "upgrade_session_stats", lambda **kwargs: False)
     payload = dccs_payload()
     payload["data"]["submissionId"] = SUBMISSION_ID
 

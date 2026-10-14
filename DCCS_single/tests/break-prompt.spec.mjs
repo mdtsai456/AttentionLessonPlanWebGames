@@ -99,7 +99,8 @@ test.describe('雙人版 第 3 關後中場休息', () => {
 
     // 第 4 關正在進行時，時間結束後會顯示「第 4 關結束」。
     await drive(page, 'double', 'level4-clear', LEVEL_TIMEOUT);
-    expect(posts).toHaveLength(0);
+    // 只有到中場時兩位玩家各先送的一筆第 3 關。
+    expect(posts.map((p) => stat(p, 'stage'))).toEqual([3, 3]);
     expect(pageErrors).toEqual([]);
   });
 
@@ -129,14 +130,19 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     await page.waitForURL(/\/Select\/index\.html/);
 
     expect(dialogs).toEqual([]);
-    expect(posts).toHaveLength(2);
-    expect(posts.map((p) => p.data.caseId).sort()).toEqual(['T01', 'T02']);
-    for (const payload of posts) {
+    // 中場各先送一筆第 3 關，打完再各送一筆全場成績（同一個 submissionId，後端更新同一列）。
+    expect(posts).toHaveLength(4);
+    const midway = posts.filter((p) => stat(p, 'stage') === 3);
+    const finals = posts.filter((p) => stat(p, 'stage') === FULL_SESSION_STAGE);
+    expect(midway).toHaveLength(2);
+    expect(finals.map((p) => p.data.caseId).sort()).toEqual(['T01', 'T02']);
+    for (const payload of finals) {
       expect(payload.data.mode).toBe('double');
-      expect(stat(payload, 'stage')).toBe(FULL_SESSION_STAGE);
       expect(stat(payload, 'levelsPlayed')).toBe(FULL_SESSION_LEVELS);
+      const own = midway.find((p) => p.data.caseId === payload.data.caseId);
+      expect(payload.data.submissionId).toBe(own.data.submissionId);
     }
-    expect(posts[0].data.pairId).toBe(posts[1].data.pairId);
+    expect(finals[0].data.pairId).toBe(finals[1].data.pairId);
     expect(pageErrors).toEqual([]);
   });
 
@@ -222,7 +228,8 @@ test.describe('單人版 第 3 關後中場休息（回歸）', () => {
     expect(await unloadGuardActive(page)).toBe(true);
     await assertPlayable(page, 'single');
     await drive(page, 'single', 'level4-clear', LEVEL_TIMEOUT);
-    expect(posts).toHaveLength(0);
+    // 只有到中場時先送的一筆第 3 關。
+    expect(posts.map((p) => stat(p, 'stage'))).toEqual([3]);
     expect(pageErrors).toEqual([]);
   });
 
@@ -249,10 +256,11 @@ test.describe('單人版 第 3 關後中場休息（回歸）', () => {
     await page.waitForURL(/\/Select\/index\.html/);
 
     expect(dialogs).toEqual([]);
-    expect(posts).toHaveLength(1);
-    expect(posts[0].data.mode).toBe('single');
-    expect(stat(posts[0], 'stage')).toBe(FULL_SESSION_STAGE);
-    expect(stat(posts[0], 'levelsPlayed')).toBe(FULL_SESSION_LEVELS);
+    // 中場先送第 3 關，打完再用同一個 submissionId 送全場成績。
+    expect(posts.map((p) => stat(p, 'stage'))).toEqual([3, FULL_SESSION_STAGE]);
+    expect(posts[1].data.submissionId).toBe(posts[0].data.submissionId);
+    expect(posts[1].data.mode).toBe('single');
+    expect(stat(posts[1], 'levelsPlayed')).toBe(FULL_SESSION_LEVELS);
     expect(pageErrors).toEqual([]);
   });
 

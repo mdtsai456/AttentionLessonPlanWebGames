@@ -1,5 +1,6 @@
 // 單一場次的成績送出與畫面狀態。斷線時，後端可能已完成寫入，因此不可自動重送。
-// 每筆成績第一次送出時產生 submissionId。之後重送沿用同一個 body。
+// 同一局（一個 saver）的每筆成績共用一個 submissionId：中場的第 3 關與打完的第 6 關是同一場，
+// 後端收到同一場、關卡較高的成績時更新那一列，報表裡一局只有一列。重送沿用同一個 body。
 // 後端依學生身分與 submissionId 決定場次編號。重複收到同一筆時，回傳同一個 sessionId。
 (function () {
   const messages = {
@@ -13,8 +14,7 @@
   };
 
   // 有 submissionId 才能安全重送結果不明的成績；沒有 WebGameApi.uuid 時維持舊行為（不重送）。
-  function withSubmissionId(payload) {
-    const submissionId = window.WebGameApi?.uuid?.();
+  function withSubmissionId(payload, submissionId) {
     if (!submissionId || !payload?.data || typeof payload.data !== 'object') return { body: payload, submissionId: null };
     return { body: { ...payload, data: { ...payload.data, submissionId } }, submissionId };
   }
@@ -66,6 +66,8 @@
 
   function create({ url, onChange = () => {}, timeoutMs = 10000 }) {
     const records = new Map();
+    // 這一局的 submissionId，saver 每局重建一次。
+    const playId = window.WebGameApi?.uuid?.() || null;
     let latestStage = 0;
     let savedStage = 0;
     let status = 'idle';
@@ -116,10 +118,10 @@
           publish(target.status);
           return Promise.resolve(false);
         }
-        // 不同關卡是另一筆紀錄（新的 submissionId）：先前的中場紀錄結果不明時，
-        // 最終成績仍照常送出，畫面改顯示最新這筆的狀態。
+        // 不同關卡是另一筆紀錄（同一局的 submissionId，後端以較高關卡更新同一列）：
+        // 先前的中場紀錄結果不明時，最終成績仍照常送出，畫面改顯示最新這筆的狀態。
         latestStage = stage;
-        const { body, submissionId } = withSubmissionId(payload);
+        const { body, submissionId } = withSubmissionId(payload, playId);
         const record = { body: JSON.stringify(body), submissionId, player, status: 'idle', pending: null };
         records.set(stage, record);
         return send(stage, record);

@@ -89,6 +89,63 @@ def insert_session_with_stats(
     return session_id
 
 
+def upgrade_session_stats(
+    session_id: str,
+    grade: str,
+    case_id: str,
+    school: str,
+    game_type: str,
+    end_time: datetime | None,
+    stats: dict[str, Any],
+) -> bool:
+    """同一場（同一個 submissionId）已寫入時，用關卡較高的成績更新那一列。
+
+    遊戲到中場先送第 3 關成績，打完再用同一個 submissionId 送第 6 關，
+    同一場在報表裡只會有一列。新成績的 stage 沒有比已存的高時不動
+    （逾時重送同一筆、晚到的第 3 關），回傳是否有更新。
+    """
+    table_name = GAME_RESULT_TABLES.get(game_type)
+    if table_name is None:
+        raise ValueError(f"不支援的遊戲類型：{game_type}")
+    new_stage = stats.get("stage")
+    if new_stage is None:
+        return False
+
+    stat_assignments = ", ".join(f"r.{column} = %s" for column in CORE_STAT_COLUMNS)
+    sql = f"""
+        UPDATE {table_name} AS r
+        JOIN assessment_result AS a
+          ON a.grade = r.grade AND a.case_id = r.case_id
+         AND a.school = r.school AND a.uuid = r.uuid
+        SET {stat_assignments}, a.end_time = %s
+        WHERE r.grade = %s AND r.case_id = %s AND r.school = %s AND r.uuid = %s
+          AND (r.stage IS NULL OR r.stage < %s)
+    """
+    params = [
+        *[stats.get(column) for column in CORE_STAT_COLUMNS],
+        end_time,
+        grade,
+        case_id,
+        school,
+        session_id,
+        new_stage,
+    ]
+
+    with get_write_connection() as connection:
+        try:
+            with connection.cursor() as cursor:
+                updated = cursor.execute(sql, params)
+            connection.commit()
+        except Exception:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+            raise
+
+    return bool(updated)
+
+
 # 帳號與密碼登入，見 docs/adr/0004-teacher-student-password-login.md。
 
 

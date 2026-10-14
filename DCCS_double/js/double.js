@@ -453,6 +453,8 @@ async function startSession(player1, player2) {
         playerPhases[1] === 'continue-or-lobby' &&
         playerPhases[2] === 'continue-or-lobby'
       ) {
+        // 到中場就先送兩位玩家的第 3 關，之後直接關掉頁面也保得住前三關。
+        saveMidwayCheckpoint();
         window.setTimeout(showSharedBreak, 0);
         return;
       }
@@ -685,6 +687,14 @@ async function startSession(player1, player2) {
       }
 
       return stageSubmissions.get(stage);
+    }
+
+    // 中場的第 3 關與離開、中場返回共用同一個檢查點，送過就不再送。
+    function saveMidwayCheckpoint() {
+      const payloads = [player1Handle, player2Handle]
+        .map((handle) => handle.buildLeavePayload(3))
+        .map((payload) => payload && makeDoublePayload({ payload }, pairId));
+      void submitStageOnce(3, payloads);
     }
 
     const leaveButton =
