@@ -1,13 +1,14 @@
 // 完整生命週期與存檔契約測試。openGame 攔截所有外部流量。
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { GameDriver, RESULT_RE, startStaticServer, launchBrowser, openGame } from './helpers.js';
+import { GameDriver, RESULT_RE, startStaticServer, launchBrowser, openGame, leaveDialog } from './helpers.js';
 import { expectNoErrors } from './expect.js';
 
 const SAVED = '成績已儲存';
 const FAILED = '成績儲存失敗，請重試';
 const SAVING = '儲存中…';
-const UNKNOWN = '存檔結果未確認，請先確認紀錄，避免重複送出';
+const UNKNOWN = '存檔結果未確認，請按重試（不會重複記錄）';
+const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const selector = (game, id, p = 0) => game === 'single' ? `#${id}` : `.player-${p + 1} [data-ui="${id}"]`;
 const isSessionPost = (request, url) => request.method() === 'POST' && new URL(url).pathname.endsWith('/api/sessions');
 
@@ -66,7 +67,9 @@ function assertPayloads(posts, game) {
     assert.equal(stats.DAT_correct, 36);
     assert.equal(stats.DAT_wrong, 0);
     assert.ok(post.data.stats.every(({ apiname }) => apiname.startsWith('DAT_')));
+    assert.match(post.data.submissionId, V4, '每筆成績帶 UUID v4 的 submissionId（#42）');
   }
+  assert.equal(new Set(posts.map((post) => post.data.submissionId)).size, posts.length, '每位玩家各自一個 submissionId');
   if (game === 'double') {
     assert.ok(posts[0].data.pairId);
     assert.equal(posts[0].data.pairId, posts[1].data.pairId);
@@ -133,15 +136,15 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         await waitStatus(session, game, SAVED);
         assertPayloads(session.sessionPosts, game);
 
-        // 完成後離開直接回選單、不經確認；取消導航讓頁面留下，接著測重玩
-        const leaveTargets = [];
-        const lobbyRoute = (route) => { leaveTargets.push(new URL(route.request().url()).pathname); return route.abort('aborted'); };
-        await session.page.route('**/Select/index.html', lobbyRoute);
-        await session.page.evaluate(() => { window.__askLeaveCalls = 0; window.askLeave = () => { window.__askLeaveCalls += 1; }; document.querySelector('#leave-btn').click(); });
-        for (let i = 0; i < 50 && leaveTargets.length === 0; i += 1) await session.page.clock.runFor(100);
-        await session.page.unroute('**/Select/index.html', lobbyRoute);
-        assert.deepEqual(leaveTargets, ['/Select/index.html'], '完成後離開直接回選單');
-        assert.equal(await session.page.evaluate(() => window.__askLeaveCalls), 0, '完成後離開不再確認');
+        // 六關成績已儲存後，離開直接返回選單，不再詢問。導覽回傳 204，讓頁面留在原地，接著測試重玩。
+        let lobbyNavigations = 0;
+        await session.page.route('**/Select/index.html', (route) => { lobbyNavigations++; return route.fulfill({ status: 204 }); });
+        await session.page.locator('#leave-btn').click();
+        for (let i = 0; i < 50 && lobbyNavigations === 0; i++) await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.equal(lobbyNavigations, 1, '離開要導向選遊戲頁');
+        assert.deepEqual(session.dialogs, [], '六關已打完離開：不跳出瀏覽器的離開詢問');
+        assert.equal(await leaveDialog(session.page).count(), 0, '六關已打完離開：不再確認');
+        await session.page.unroute('**/Select/index.html');
         assert.equal(session.sessionPosts.length, game === 'double' ? 2 : 1, '已完成成績離開時不可重複寫入');
         const firstPair = session.sessionPosts[0].data.pairId;
         await resetDriver(session, game);
@@ -158,6 +161,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           await waitStatus(session, game, SAVED);
           assertPayloads(session.sessionPosts.slice(2), game);
           assert.notEqual(session.sessionPosts[2].data.pairId, firstPair, '第二局建立新 pairId');
+          assert.equal(new Set(session.sessionPosts.map((post) => post.data.submissionId)).size, 4, '第二局是新的 submissionId');
           assert.ok(session.sessionPosts[2].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
           await session.page.locator(selector(game, 'restart', 1)).click();
           await assertReset(session, game);
@@ -166,6 +170,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           await waitStatus(session, game, SAVED);
           assertPayloads(session.sessionPosts.slice(1), game);
           assert.ok(session.sessionPosts[1].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
+          assert.notEqual(session.sessionPosts[1].data.submissionId, session.sessionPosts[0].data.submissionId, '第二局是新的 submissionId');
         }
         expectNoErrors(session);
       } finally { await session.context.close(); }
@@ -217,13 +222,17 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
       } finally { await session.context.close(); }
     });
 
+    // #42：結果不明不會自己重送；成績帶 submissionId，重送不會多一筆，所以可以重試，
+    // 打完六關按「離開」也會用同一個 submissionId 再送一次，成功才回選遊戲頁。
     for (const failure of ['abort', 'timeout']) {
-      test(`${game}：${failure} 結果未確認，不自動重送也不丟失結果`, async () => {
+      test(`${game}：${failure} 結果未確認，不自動重送；${failure === 'abort' ? '按重試' : '按離開'}用同一個 submissionId 重送後可以離開`, async () => {
+        let serverBack = false;
         const session = await openGame(browser, server.origin, {
           game,
           routeOverride: async ({ route, request, url }) => {
             if (!isSessionPost(request, url)) return false;
-            if (failure === 'abort') await route.abort('failed');
+            if (serverBack) await fulfillSession(route);
+            else if (failure === 'abort') await route.abort('failed');
             // timeout 情況不完成路由回應，讓 fetch 的逾時處理應對未知的寫入結果。
             return true;
           },
@@ -233,16 +242,33 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           await waitStatus(session, game, UNKNOWN);
           const count = session.sessionPosts.length;
           assert.equal(count, game === 'double' ? 2 : 1);
-          const retryUnavailable = await session.page.evaluate((selectors) => selectors.every((s) => {
+          const retryAvailable = await session.page.evaluate((selectors) => selectors.every((s) => {
             const button = document.querySelector(s);
-            return !button || button.hidden || button.disabled;
+            return button && !button.hidden && !button.disabled;
           }), (game === 'double' ? [0, 1] : [0]).map((p) => selector(game, 'retry-save', p)));
-          assert.equal(retryUnavailable, true, '結果未知時不可提供會重複寫入的重試');
+          assert.equal(retryAvailable, true, '結果未知時可以重試（同一個 submissionId 不會重複寫入）');
           await assertReplayRetainsResult(session, game);
-          // 時間推進一分鐘後仍無重送，並持續顯示可供確認的成績。
+          // 時間推進一分鐘後仍無自動重送，並持續顯示可供確認的成績。
           await session.page.clock.runFor(60000);
           assert.equal(session.sessionPosts.length, count);
           await waitStatus(session, game, UNKNOWN);
+
+          serverBack = true;
+          if (failure === 'abort') {
+            for (const p of game === 'double' ? [0, 1] : [0]) await session.page.locator(selector(game, 'retry-save', p)).click();
+            await waitStatus(session, game, SAVED);
+            assert.equal(session.sessionPosts.length, count * 2);
+          }
+          // 打完六關按離開：不再確認；未存好的成績用同一個 submissionId 再送一次，成功才導頁
+          await session.page.locator('#leave-btn').click();
+          await session.page.waitForURL('**/Select/index.html', { timeout: 5000 });
+          assert.equal(session.sessionPosts.length, count * 2, '每位玩家只重送一次，已存好的不再送');
+          for (const caseId of new Set(session.sessionPosts.map((post) => post.data.caseId))) {
+            const posts = session.sessionPosts.filter((post) => post.data.caseId === caseId);
+            assert.match(posts[0].data.submissionId, V4);
+            assert.deepEqual(posts[1], posts[0], `${caseId} 重送同一筆（同一個 submissionId、同樣內容）`);
+          }
+          assert.deepEqual(session.dialogs, []);
           assert.deepEqual(session.pageErrors, []);
         } finally { await session.context.close(); }
       });
