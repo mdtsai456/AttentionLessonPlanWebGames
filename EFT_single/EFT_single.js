@@ -73,23 +73,10 @@ function finishGame() {
     $('mid-break-modal').hidden = true;
 }
 
+// 成績只算到該關結束為止（第 4、5 關中途離開送第 3 關時不含後面關卡）。
 function saveCurrentRun(stage) {
     savedStage = stage;
-    const state = player.getState();
-    const total = Math.max(state.index, 1);
-    const avgReactionMs = state.reactionSamples.length
-        ? state.reactionSamples.reduce((sum, value) => sum + value, 0) / state.reactionSamples.length
-        : 0;
-    return saveGameDataToBackend({
-        score: state.score,
-        wrong: Math.max(total - state.score, 0),
-        accuracy: state.score / total,
-        duration: window.WebGameRuntime.now() - gameStartTime,
-        stage,
-        levelAccuracy: levelAccuracyText(stage),
-        avgReactionMs,
-        questionCount: state.index,
-    });
+    return saveGameDataToBackend(player.checkpointStats(stage));
 }
 
 function levelAccuracyText(stageCount) { return player.levelAccuracyText(stageCount); }
@@ -121,7 +108,8 @@ async function saveGameDataToBackend(data) {
             school,
             currentDay,
             startTime: window.WebGameRuntime.toWallTime(gameStartTime),
-            endTime: Date.now(),
+            // 該關結束當下的時間（中場或第 4、5 關才離開也不會多算）。
+            endTime: data.endTime ?? Date.now(),
             mode: 'single',
             stats: buildEftStats(data),
         },
@@ -147,20 +135,34 @@ function answer(direction) { player.answer(direction); }
 function handleKeydown(event) {
     if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
     const overlay = !$('results').hidden ? $('results') : (!$('mid-break-modal').hidden ? $('mid-break-modal') : null);
-    if (overlay && event.key === 'Tab') {
-        event.preventDefault(); overlay.querySelector('button').focus();
-    }
+    if (!overlay || event.key !== 'Tab') return;
+    // 焦點留在彈窗內，Tab 往後、Shift+Tab 往前循環。
+    event.preventDefault();
+    const buttons = [...overlay.querySelectorAll('button:not(:disabled)')];
+    if (!buttons.length) return;
+    const current = buttons.indexOf(document.activeElement);
+    const step = event.shiftKey ? -1 : 1;
+    const next = current === -1
+        ? (event.shiftKey ? buttons.length - 1 : 0)
+        : (current + step + buttons.length) % buttons.length;
+    buttons[next].focus();
 }
 
+// 先在頁面內確認，確定後才算檢查點、存檔並回大廳；取消什麼都不送，遊戲照常繼續。
 async function leaveGame() {
     $('leave-btn').disabled = true;
+    if (!(await window.confirmLeave())) {
+        $('leave-btn').disabled = false;
+        return;
+    }
     const state = player.getState();
     const completed = state.phase === 'finished' || state.phase === 'break' || state.phase === 'stage_clear'
         ? state.stage
         : state.stage - 1;
     const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
     if (checkpoint && checkpoint !== savedStage) await saveCurrentRun(checkpoint);
-    window.askLeave('../Select/index.html');
+    window.leaveTo('../Select/index.html');
+    // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
     $('leave-btn').disabled = false;
 }
 
