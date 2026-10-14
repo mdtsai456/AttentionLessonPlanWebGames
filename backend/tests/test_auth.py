@@ -1,8 +1,8 @@
-"""帳密登入端點與「每次 API 呼叫都驗身份」的測試。
+"""帳號與密碼登入端點，以及每次 API 請求身分驗證的測試。
 
 見 docs/adr/0004-teacher-student-password-login.md。
-不碰資料庫：hash_password/verify_password 的純函式往返。
-碰測試資料庫：登入成功/失敗、401（無/假/過期 token）、403（跨場域、跨角色）。
+純函式測試驗證 hash_password／verify_password，不存取資料庫。
+資料庫測試驗證登入成功與失敗、401（缺少、無效或過期的 token）、403（跨場域或跨角色）。
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from auth import generate_token, hash_password, verify_password
 
-# --- 不碰資料庫 ---
+# 不存取資料庫
 
 
 def test_hash_and_verify_round_trip():
@@ -25,13 +25,13 @@ def test_verify_rejects_wrong_password():
 
 
 def test_hash_password_uses_random_salt_each_time():
-    # 同樣的明碼兩次雜湊要不同字串（不同 salt），否則資料庫外洩時可以用彩虹表比對。
+    # 相同明文密碼的兩次雜湊須使用不同 salt 並產生不同結果，避免資料外洩後可用彩虹表比對。
     assert hash_password("test1234") != hash_password("test1234")
 
 
 def test_verify_password_rejects_garbage_stored_value():
-    # 對應 password_hash 預設值 ''（尚未指派密碼的帳號）：格式不對一律回 False，
-    # 不拋例外——不然沒設密碼的帳號會讓登入端點噴 500 而不是「帳號或密碼錯誤」。
+    # password_hash 的預設值為空字串，表示尚未指派密碼。格式無效時，回傳 False，
+    # 避免未設定密碼的帳號產生 500，並顯示「帳號或密碼錯誤」。
     assert not verify_password("anything", "")
     assert not verify_password("anything", "not-a-valid-format")
 
@@ -43,7 +43,7 @@ def test_generate_token_is_unique_and_url_safe():
         assert all(c.isalnum() or c in "-_" for c in token)
 
 
-# --- 碰測試資料庫：登入 ---
+# 測試資料庫：登入
 
 
 def test_teacher_login_succeeds_with_correct_password(client, db):
@@ -86,8 +86,9 @@ def test_teacher_login_rejects_unknown_account(client, db):
 
 
 def test_teacher_login_account_is_global_not_scoped_to_a_school(client, db):
-    """account 是全域唯一的，不像 teacher.name 只在 school 內唯一——同一個帳號
-    不管哪個場域建的，登入只認 account+password，不用也不能再帶 school。"""
+    """account 為全域唯一。teacher.name 僅在 school 內唯一。
+登入只使用 account 與 password，不接受 school。
+"""
     db.insert_school("A")
     db.insert_school("B")
     db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
@@ -176,7 +177,7 @@ def test_student_login_rejects_unknown_account(client, db):
     assert response.status_code == 401
 
 
-# --- 碰測試資料庫：401 / 403 ---
+# 測試資料庫：401／403
 
 
 def test_protected_endpoint_requires_token(client, db):
@@ -195,7 +196,7 @@ def test_protected_endpoint_rejects_garbage_token(client, db):
 def test_protected_endpoint_rejects_expired_token(client, db, login_as_teacher):
     _, headers = login_as_teacher(school="A")
     token = headers["Authorization"].removeprefix("Bearer ")
-    # 直接把這筆 session 的 expires_at 改到過去，模擬 token 過期。
+    # 將此登入憑證的 expires_at 設為過去時間，模擬 token 過期。
     db.execute(
         "UPDATE login_session SET expires_at = %s WHERE token = %s",
         [datetime.now(timezone.utc) - timedelta(hours=1), token],

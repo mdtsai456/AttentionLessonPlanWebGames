@@ -2,7 +2,7 @@ import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
-// 每關 60 秒、共 6 關。時間內答完就繼續出題；單題 10 秒沒答算錯並換下一題。
+// 每關 60 秒，共 6 關。關卡時間內持續出題。單題 10 秒未作答時，計為錯誤並換題。
 const STAGE_COUNT = 6;
 const MID_STAGE = 3;
 
@@ -58,7 +58,7 @@ function buildPlayerStats(player, state, stage) {
     });
 }
 
-// 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。
+// 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
 async function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();

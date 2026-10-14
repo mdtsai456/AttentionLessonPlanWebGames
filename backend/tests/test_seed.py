@@ -1,7 +1,7 @@
-"""seed.py 的純邏輯測試,完全不碰資料庫。
+"""seed.py 的純邏輯測試，不存取資料庫。
 
-只斷言產生資料的不變式,讓日後調整 seed 常數時若弄壞這些性質會立刻亮紅。
-tuple 欄位順序沿用 seed.generate():
+驗證產生資料的不變式，讓 seed 常數變更後，仍可偵測資料規則錯誤。
+tuple 欄位順序與 seed.generate() 相同：
   session: (grade, case_id, school, uuid, start_time, game_type,
             mode, pair_id, current_day, end_time)
   detail : (grade, case_id, school, uuid, correct, wrong, accuracy, duration, stage)
@@ -9,7 +9,7 @@ tuple 欄位順序沿用 seed.generate():
 
 import seed
 
-# session tuple 欄位索引
+# session tuple 的欄位索引
 S_GRADE = 0
 S_CASE_ID = 1
 S_SCHOOL = 2
@@ -23,14 +23,14 @@ S_END = 9
 
 
 def test_generate_is_deterministic():
-    # 固定 seed → 兩次產生完全相同,重灌才會可重現。
+    # 固定 seed，使兩次產生的資料相同，並可重現資料匯入結果。
     assert seed.generate() == seed.generate()
 
 
 def test_student_password_hash_constant_matches_plaintext():
-    # TEST_STUDENT_PASSWORD_HASH 是手動算好硬編碼的（見 seed.py 裡的說明：
-    # hash_password() 每次都用新的隨機 salt，現算會讓 generate() 失去決定性）。
-    # 若 TEST_STUDENT_PASSWORD 改了卻忘記重算雜湊，這個測試會抓到。
+    # TEST_STUDENT_PASSWORD_HASH 使用預先計算的固定值，見 seed.py。
+    # hash_password() 每次使用新的隨機 salt，若即時計算，generate() 將失去決定性。
+    # TEST_STUDENT_PASSWORD 變更後，若未重新計算雜湊，此測試會失敗。
     from auth import verify_password
 
     assert verify_password(seed.TEST_STUDENT_PASSWORD, seed.TEST_STUDENT_PASSWORD_HASH)
@@ -46,8 +46,8 @@ def test_row_counts():
 
 
 def test_sessions_per_student_within_configured_range():
-    # 每位學生的場次數(單人+雙人合計)要落在 seed.py 設定的區間內,
-    # 貼近「設計上最多 24 次,但實際到課率更低」的真實使用量。
+    # 每位學生的單人與雙人總場次數，須位於 seed.py 設定的區間內，
+    # 以模擬最多 24 個施測日，但實際到課次數較少的使用情況。
     _, sessions, _ = seed.generate()
     counts: dict[tuple[str, str, str], int] = {}
     for row in sessions:
@@ -66,7 +66,7 @@ def test_single_and_double_session_split():
     for row in sessions:
         by_mode[row[S_MODE]] = by_mode.get(row[S_MODE], 0) + 1
 
-    # 抽樣後的確切數字不再是固定公式,只斷言兩種模式都還有資料可看。
+    # 抽樣後的數量無法使用固定公式計算，只驗證兩種模式皆包含資料。
     assert by_mode.keys() == {"single", "double"}
     assert by_mode["single"] + by_mode["double"] == len(sessions)
 
@@ -83,7 +83,7 @@ def test_double_sessions_only_for_capable_games_and_carry_pair_id():
 
 
 def test_game_type_keys_match_result_tables():
-    # game_type 必須精確對上 queries 的白名單鍵,含全大寫 TGAME,否則 report 查不到 stats。
+    # game_type 須符合 queries 的白名單鍵，包含大寫的 TGAME，否則 report 無法取得 stats。
     from queries import GAME_RESULT_TABLES
 
     _, sessions, _ = seed.generate()
@@ -123,7 +123,7 @@ def test_uuids_unique_and_deterministic():
 
 
 def test_round_b_beats_round_a_overall():
-    # 整體淨進步:Round B(current_day 13..24)平均 accuracy 高於 Round A(1..12)。
+    # Round B 的 current_day 為 13..24，平均 accuracy 須高於 Round A 的 1..12。
     _, sessions, details = seed.generate()
     day_by_uuid = {row[S_UUID]: row[S_CURRENT_DAY] for row in sessions}
 
@@ -140,12 +140,12 @@ def test_daily_timeline_single_block_noon_double_block_afternoon():
     _, sessions, _ = seed.generate()
     for row in sessions:
         start, end = row[S_START], row[S_END]
-        assert end > start        # 有時長
+        assert end > start        # 包含時長。
         if row[S_MODE] == "single":
-            assert start.hour == 12   # 上午 12:00 開始
-            assert end.hour < 13      # 整套單人版落在 13:00 前
+            assert start.hour == 12   # 12:00 開始。
+            assert end.hour < 13      # 全部單人場次須在 13:00 前結束。
         else:
-            assert start.hour == 14   # 雙人版另一時段
+            assert start.hour == 14   # 雙人場次使用另一時段。
             assert end.hour < 15
 
 
@@ -153,7 +153,7 @@ def test_play_days_are_mon_wed_fri_across_two_rounds():
     days = seed.build_play_days()
     assert len(days) == 24
     assert [d["current_day"] for d in days] == list(range(1, 25))
-    assert all(d["date"].weekday() in (0, 2, 4) for d in days)  # 一/三/五
+    assert all(d["date"].weekday() in (0, 2, 4) for d in days)  # 週一、三、五。
     assert {d["round"] for d in days} == {"A", "B"}
     assert all(d["date"].month == 1 for d in days if d["round"] == "A")
     assert all(d["date"].month == 3 for d in days if d["round"] == "B")

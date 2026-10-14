@@ -1,4 +1,4 @@
-"""建立學生遊戲場次所需的 transactional SQL。"""
+"""建立學生遊戲場次所需的交易式 SQL。"""
 
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ def insert_session_with_stats(
     mode: str = "single",
     pair_id: str | None = None,
 ) -> str:
-    """建立 Student、Session 與其五個共同遊戲統計，並回傳 UUID。
+    """建立 Student、Session 與五個共用遊戲統計欄位，並回傳 UUID。
 
-    mode 預設 "single"、pair_id 預設 None —— 現有（只有單人版的）呼叫端不用改。
-    後端對這兩欄完全被動：收到什麼存什麼。
+    mode 預設為 "single"，pair_id 預設為 None。既有單人呼叫端可沿用此預設值。
+    後端依傳入值儲存這兩個欄位。
     """
     table_name = GAME_RESULT_TABLES.get(game_type)
     if table_name is None:
@@ -86,7 +86,7 @@ def insert_session_with_stats(
     return session_id
 
 
-# --- 帳密登入（見 docs/adr/0004-teacher-student-password-login.md） ---
+# 帳號與密碼登入，見 docs/adr/0004-teacher-student-password-login.md。
 
 
 def insert_login_session(
@@ -113,7 +113,7 @@ def insert_login_session(
 
 
 def delete_login_session(token: str) -> None:
-    """登出：刪掉一筆登入憑證。token 不存在也視為成功（冪等）。"""
+    """登出時，刪除登入憑證。token 不存在時，也視為成功，符合冪等行為。"""
     with get_write_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute("DELETE FROM login_session WHERE token = %s", [token])

@@ -1,13 +1,13 @@
-"""灌 mock data,供本機開發/demo 肉眼看 API。
+"""插入模擬資料，供本機開發與展示時檢查 API。
 
 設計見 docs/superpowers/plans/2026-07-10-seed-mock-data.md。
 
-安全:預設只灌 TEST_DB_NAME 指的 `_test` 庫(守衛拒非 `_test`),此路徑不讀
-DB_NAME。只有明確加上 `--prod` 才會讀 DB_NAME 改灌正式庫。兩種模式都是
-先清空再灌,固定亂數種子 → 完全可重現。
+預設使用 TEST_DB_NAME，名稱須以 _test 結尾，此模式不讀取 DB_NAME。
+使用 --prod 時，改用 DB_NAME 指定的正式資料庫。
+兩種模式皆先清空資料，再插入資料。固定亂數種子使結果可重現。
 
-    .venv/bin/python seed.py           # 預設:_test 庫
-    .venv/bin/python seed.py --prod    # 正式庫(先清空!)
+    .venv/bin/python seed.py           # 預設：_test 資料庫
+    .venv/bin/python seed.py --prod    # 正式資料庫，先清空資料
 """
 
 from __future__ import annotations
@@ -23,41 +23,41 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- 產生參數(全是常數,調這裡就能放大縮小) ---
+# 資料產生參數。修改常數可調整資料量。
 
 SEED = 20260710
 SCHEMA_PATH = pathlib.Path(__file__).parent / "tests" / "schema.sql"
 
-# 用 seed_directory.py 的佔位場域代碼的前三個,讓「老師→學生→報告」的驗收流程
-# 走得通(老師掛在這些場域上)。場域字串定案後兩支腳本一起改。
+# 使用 seed_directory.py 的前三個預留場域代碼，支援老師、學生與報告的驗收流程。
+# 老師隸屬這些場域。場域字串變更時，須同步修改兩個腳本。
 SCHOOLS = ["KMU", "NTHU-01", "NTHU-02"]
 STUDENTS = [("G1", "S01"), ("G1", "S02"), ("G1", "S03"),
             ("G2", "S04"), ("G2", "S05"), ("G2", "S06")]
 
-# 每日固定順序;game_type 必須精確對上 queries.GAME_RESULT_TABLES 的鍵(TGAME 全大寫)。
+# 每日使用固定順序。game_type 須符合 queries.GAME_RESULT_TABLES 的鍵，TGAME 須使用大寫。
 GAMES = ["DCCS", "DAT", "EFT", "IM", "TGAME"]
 
-# 假學生統一用這組密碼登入（純測試/本機 demo 用，不代表正式密碼政策——
-# 正式老師密碼由 seed_directory.py 隨機產生，見該檔）。
+# 模擬學生使用此密碼登入，僅供測試與本機展示。
+# 正式老師的密碼由 seed_directory.py 隨機產生。
 TEST_STUDENT_PASSWORD = "test1234"
-# hash_password() 每次呼叫都會生成新的隨機 salt，若在 generate() 裡現算，會讓
-# 「同樣的 SEED 兩次呼叫 generate() 必須完全相同」這個不變式（test_seed.py 的
-# test_generate_is_deterministic）失敗。這裡直接硬編碼算好的結果，等同
-# hash_password(TEST_STUDENT_PASSWORD)，避免每次呼叫都在算。
+# hash_password() 每次呼叫皆產生新的隨機 salt。若在 generate() 中計算，
+# 相同 SEED 的兩次 generate() 結果將不同，造成 test_seed.py 的
+# test_generate_is_deterministic 失敗。此處使用預先計算的固定雜湊值，
+# 等同 hash_password(TEST_STUDENT_PASSWORD)，避免每次重新計算。
 TEST_STUDENT_PASSWORD_HASH = (
     "pbkdf2_sha256$260000$6d14c6d77b17caf8da908e6e35bf1787$"
     "0aa3fbae00fe840815feecee3ec4a5a7ba703e8a62feb369a6edc08042b780e9"
 )
 
-# 廠商只做這三款的雙人版。這些遊戲在下列 day_in_round 額外多灌一場 mode='double',
-# 讓報告頁「單/雙人並陳」的畫面有東西可畫(每 Round 3 場雙人)。
+# 這三款遊戲支援雙人模式。在指定的 day_in_round，額外加入 mode='double' 的場次，
+# 供報告頁顯示單人與雙人結果。每個 Round 有三場雙人遊戲。
 DOUBLE_GAMES = {"DCCS", "DAT", "EFT"}
 DOUBLE_DAYS_IN_ROUND = {2, 6, 9}  # 0..11
 
-# 遊戲設計上一位學生最多只會玩 24 次(= build_play_days() 的 24 個施測日)。
-# 但實際到課率不會每次都玩滿(不是每天都把 5 款單人版全破關),所以每位學生
-# 最終灌入的場次數(單人+雙人合計)從「理論上所有可能的場次」中隨機抽樣到
-# 這個區間,貼近真實使用量。調這兩個常數就能放大縮小資料量。
+# 每位學生最多有 24 個施測日，與 build_play_days() 的結果相同。
+# 實際到課與遊玩情況可能未涵蓋每日五款單人遊戲，因此從所有可能場次中抽樣。
+# 每位學生的單人與雙人總場次數，限制在下列常數指定的區間，
+# 以模擬實際使用量。修改兩個常數可調整資料量。
 MIN_SESSIONS_PER_STUDENT = 10
 MAX_SESSIONS_PER_STUDENT = 20
 GAME_TABLE = {
@@ -68,13 +68,13 @@ GAME_TABLE = {
     "TGAME": "tgame_result",
 }
 
-# 由子表往父表刪,避開外鍵限制。
+# 先刪除子表，再刪除父表，避免違反外鍵約束。
 TABLES_CHILD_FIRST = (
     "dat_result", "dccs_result", "eft_result", "im_result", "tgame_result",
     "assessment_result", "student",
 )
 
-# 日曆:兩個 Round,各連續 4 週、每週一/三/五。B 隔約一個月才開始。
+# 施測日曆包含兩個 Round。每個 Round 連續四週，於週一、三、五施測。B 約隔一個月開始。
 ROUND_STARTS = [("A", date(2026, 1, 5)), ("B", date(2026, 3, 2))]  # 皆為週一
 WEEKDAY_OFFSETS = (0, 2, 4)  # 一、三、五
 WEEKS = 4
@@ -82,7 +82,7 @@ DAILY_START = (12, 0)  # 每天 12:00 開始
 
 
 def build_play_days() -> list[dict]:
-    """展開成 24 個施測日:current_day 1..24(A 為 1-12、B 為 13-24)。"""
+    """產生 24 個施測日。current_day 為 1..24，A 為 1–12，B 為 13–24。"""
     days: list[dict] = []
     current_day = 0
     for label, start in ROUND_STARTS:
@@ -99,9 +99,9 @@ def build_play_days() -> list[dict]:
 
 
 def make_trajectory(rng: random.Random) -> tuple[float, float]:
-    """每個(學生 × 遊戲)的軌跡:回 (Round A 均值, Round B 均值)。
+    """回傳每位學生與每款遊戲的 (Round A 均值, Round B 均值)。
 
-    進步 60% / 持平 25% / 略退 15%,整體淨進步。
+    60% 模擬進步，25% 模擬持平，15% 模擬略為下降，整體均值上升。
     """
     a0 = rng.uniform(0.45, 0.70)
     roll = rng.random()
@@ -109,23 +109,23 @@ def make_trajectory(rng: random.Random) -> tuple[float, float]:
         b_mean = min(a0 + rng.uniform(0.08, 0.20), 0.98)
     elif roll < 0.85:                       # 持平
         b_mean = a0 + rng.uniform(-0.02, 0.02)
-    else:                                   # 略退
+    else:                                   # 略為下降
         b_mean = max(a0 - rng.uniform(0.02, 0.06), 0.30)
     return a0, b_mean
 
 
 def session_accuracy(rng: random.Random, round_label: str, day_in_round: int,
                      a0: float, b_mean: float) -> float:
-    """單場 accuracy(0-1):Round 均值 + 12 天微升趨勢 + 每場雜訊。"""
+    """單場 accuracy 為 0–1，由 Round 均值、12 天的上升趨勢與每場雜訊組成。"""
     mean = a0 if round_label == "A" else b_mean
-    drift = (day_in_round / 11 - 0.5) * 0.04  # 微升
+    drift = (day_in_round / 11 - 0.5) * 0.04  # 略為上升
     noise = rng.uniform(-0.03, 0.03)
     return min(0.99, max(0.02, mean + drift + noise))
 
 
 def make_uuid(school: str, grade: str, case_id: str, game: str, current_day: int,
               mode: str = "single") -> str:
-    """確定性 uuid(uuid5,同輸入永遠同輸出),36 字元,符合 varchar(36)。"""
+    """使用 uuid5 產生確定性的 uuid。相同輸入產生相同結果，共 36 字元，符合 varchar(36)。"""
     key = f"{school}|{grade}|{case_id}|{game}|{current_day}"
     if mode == "double":
         key += "|double"
@@ -133,7 +133,7 @@ def make_uuid(school: str, grade: str, case_id: str, game: str, current_day: int
 
 
 def make_pair_id(school: str, grade: str, case_id: str, game: str, current_day: int) -> str:
-    """雙人局識別碼。假資料裡一場雙人局只有這位學生一筆,pair_id 仍給確定性值。"""
+    """雙人場次的識別碼。模擬資料中，每場雙人遊戲只包含一位學生的成績，pair_id 仍使用確定性值。"""
     key = f"{school}|{grade}|{case_id}|{game}|{current_day}|double"
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, key))
 
@@ -141,10 +141,9 @@ def make_pair_id(school: str, grade: str, case_id: str, game: str, current_day: 
 def generate() -> tuple[list, list, dict[str, list]]:
     """產生 (student_rows, session_rows, detail_rows_by_table)。
 
-    每位學生先照原本規則展開「理論上所有可能的場次」(24 個施測日 × 5 款單人 +
-    特定施測日的雙人場),再從中隨機抽樣到 MIN_SESSIONS_PER_STUDENT..
-    MAX_SESSIONS_PER_STUDENT 筆(單人+雙人合計),按時間排序後才灌入,貼近
-    「設計上最多 24 次,但實際到課率更低」的真實使用量。
+    先建立每位學生的所有可能場次，包含 24 個施測日的五款單人遊戲與指定日期的雙人遊戲。
+    再隨機抽樣，使單人與雙人總場次數位於 MIN_SESSIONS_PER_STUDENT..MAX_SESSIONS_PER_STUDENT。
+    依時間排序後插入資料，以模擬實際到課與遊玩情況。
     """
     rng = random.Random(SEED)
     play_days = build_play_days()
@@ -172,7 +171,7 @@ def generate() -> tuple[list, list, dict[str, list]]:
                     stage = rng.randint(15, 40)
                     correct = max(0, min(stage, round(acc * stage)))
                     wrong = stage - correct
-                    accuracy = correct / stage  # 由計數回算,完全一致
+                    accuracy = correct / stage  # 由計數重新計算，使結果一致。
                     duration_ms = 360000 + rng.uniform(-20000, 20000)
 
                     start_dt = clock
@@ -190,21 +189,21 @@ def generate() -> tuple[list, list, dict[str, list]]:
                         grade, case_id, school, game_uuid,
                         start_dt, game, mode, pair_id, day["current_day"], end_dt,
                     ))
-                    # 只填核心 5 欄;其餘遊戲專屬欄位留 NULL。
+                    # 只填入五個核心欄位，其餘遊戲專用欄位維持 NULL。
                     possible_details[game_uuid] = (GAME_TABLE[game], (
                         grade, case_id, school, game_uuid,
                         correct, wrong, accuracy, duration_ms, stage,
                     ))
-                    return end_dt + timedelta(minutes=rng.uniform(0, 2))  # 小空檔
+                    return end_dt + timedelta(minutes=rng.uniform(0, 2))  # 場次間隔
 
-                # 上午 12:00:5 款單人版一款接一款(整套約 30 分鐘)。
+                # 12:00 開始依序執行五款單人遊戲，總時長約 30 分鐘。
                 clock = datetime(day["date"].year, day["date"].month, day["date"].day,
                                  DAILY_START[0], DAILY_START[1])
                 for game in GAMES:
                     clock = emit(game, "single", clock, 0.0)
 
-                # 下午另一時段:DAT/DCCS/EFT 在特定施測日多一場雙人版。
-                # 雙人版通常較簡單 → accuracy 略高,讓圖上看得出單/雙人差異。
+                # DAT／DCCS／EFT 在指定施測日的下午時段，額外安排一場雙人遊戲。
+                # 模擬雙人模式的 accuracy 略高，以顯示單人與雙人的差異。
                 if day["day_in_round"] in DOUBLE_DAYS_IN_ROUND:
                     clock = datetime(day["date"].year, day["date"].month,
                                      day["date"].day, 14, 0)
@@ -212,11 +211,11 @@ def generate() -> tuple[list, list, dict[str, list]]:
                         if game in DOUBLE_GAMES:
                             clock = emit(game, "double", clock, 0.08)
 
-            # 從所有可能場次中抽樣成這位學生實際玩過的場次。
+            # 從所有可能場次中抽樣，作為該學生的實際遊玩場次。
             target = rng.randint(MIN_SESSIONS_PER_STUDENT, MAX_SESSIONS_PER_STUDENT)
             target = min(target, len(possible_sessions))
             chosen = rng.sample(possible_sessions, target)
-            chosen.sort(key=lambda row: row[4])  # 按 start_time 排序,時間軸合理
+            chosen.sort(key=lambda row: row[4])  # 按 start_time 排序，使場次依時間排列。
 
             session_rows.extend(chosen)
             for row in chosen:
@@ -237,11 +236,11 @@ def _schema_statements() -> list[str]:
 
 
 def _resolve_target() -> str:
-    """回傳要灌的庫名。
+    """回傳資料插入的目標資料庫名稱。
 
-    預設灌 TEST_DB_NAME 指的 `_test` 庫,並要求名字以 `_test` 結尾。
-    只有明確加上 `--prod` 才會改灌 DB_NAME 指的正式庫(一樣先清空再灌)——
-    這道 opt-in 讓正式庫不會被手滑波及。
+    預設使用 TEST_DB_NAME，且名稱須以 _test 結尾。
+    只有使用 --prod 時，才改用 DB_NAME 指定的正式資料庫。
+    兩種模式皆先清空資料，再插入資料。
     """
     if "--prod" in sys.argv:
         name = os.getenv("DB_NAME")
@@ -260,7 +259,7 @@ def _resolve_target() -> str:
 def main() -> None:
     target_db = _resolve_target()
 
-    # 讓 db.get_db_config() 連到解析出的目標庫。
+    # 讓 db.get_db_config() 連線至已解析的目標資料庫。
     os.environ["DB_NAME"] = target_db
     from db import get_connection
 
@@ -268,18 +267,18 @@ def main() -> None:
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            # 建表(若不存在),讓腳本在全新 _test 庫上也能跑。
+            # 資料表不存在時，建立資料表，讓腳本可在新的 _test 資料庫執行。
             for statement in _schema_statements():
                 cursor.execute(statement)
 
-            # 先清空再灌。非 --prod 時,最後再確認一次目標確實是 `_test`。
+            # 先清空資料，再插入新資料。未使用 --prod 時，再次確認目標名稱以 _test 結尾。
             if "--prod" not in sys.argv:
                 _assert_test_database(os.environ["DB_NAME"])
             for table in TABLES_CHILD_FIRST:
                 cursor.execute(f"DELETE FROM {table}")
 
-            # student.school 有外鍵指向 school。灌假學生前先冪等補上這幾個場域
-            # （不清空 school，正式的顯示名稱／排序由 seed_directory.py 負責）。
+            # student.school 的外鍵指向 school。插入模擬學生前，先以冪等操作補齊場域。
+            # 保留 school 既有資料。seed_directory.py 負責顯示名稱與排序。
             cursor.executemany(
                 "INSERT INTO school (school, display_name, sort_order) "
                 "VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE school = school",
@@ -291,10 +290,10 @@ def main() -> None:
                 student_rows,
             )
 
-            # 假學生的 account（登入帳號）沒辦法在上面的 INSERT 裡一起算好：
-            # 格式是 S0001 這種，要用 student_id（AUTO_INCREMENT，insert 當下
-            # 才知道），所以 insert 完再補一次 UPDATE（跟 seed_directory.py
-            # 補老師 account 的手法一樣）。
+            # 模擬學生的 account 需在 INSERT 後產生。
+            # 帳號格式為 S0001，使用 student_id。此 AUTO_INCREMENT 值在插入時才產生，
+            # 因此插入後再以 UPDATE 補上帳號。seed_directory.py
+            # 也使用此流程建立老師的 account。
             cursor.execute("SELECT grade, case_id, school, student_id FROM student")
             sample_account = None
             for row in cursor.fetchall():

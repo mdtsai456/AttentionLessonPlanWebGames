@@ -32,9 +32,9 @@ class GameStats(BaseModel):
     stage: int  # 本場實際作答題數／關卡數
     levelAccuracy: list[float] | None = None  # 第 1 關起，每一關的正確率（0–1）
     avgReactionMs: float | None = None
-    questionCount: int | None = None  # 指令出擊不送
-    aimRatio: float | None = None  # 瓢蟲：準心對準時間 ÷ 有效遊戲時間
-    focusMs: float | None = None  # 瓢蟲：準心疊在目標上的累積時間
+    questionCount: int | None = None  # 指令出擊不送出此欄位。
+    aimRatio: float | None = None  # 瓢蟲追擊令：準心瞄準時間 ÷ 有效遊戲時間。
+    focusMs: float | None = None  # 瓢蟲追擊令：準心與目標重疊的累計時間。
 
 
 class PlayRecord(SessionItem):
@@ -57,7 +57,7 @@ class TrendPoint(BaseModel):
 
 
 class TrendItem(BaseModel):
-    type: str  # 機器鍵：correctCount / wrongCount / accuracy
+    type: str  # 指標識別名稱：correctCount／wrongCount／accuracy。
     stats: list[TrendPoint] = Field(default_factory=list)
 
 
@@ -82,7 +82,7 @@ class StudentListItem(BaseModel):
     studentKey: str
     grade: str
     caseId: str
-    school: str  # 主鍵的一部分：不同場域的 G1_S03 是不同的學生
+    school: str  # 此欄位是主鍵的一部分。不同場域的 G1_S03 代表不同學生。
     sessionCount: int  # 含未完成的場次
     lastPlayedAt: str | None = None  # MAX(start_time)；零場次為 None
 
@@ -93,12 +93,12 @@ class StudentListResponse(BaseModel):
     students: list[StudentListItem] = Field(default_factory=list)
 
 
-# --- 參照資料：場域／老師名錄（選單式登入） ---
+# 參照資料：場域與老師名錄，用於選單式登入。
 
 
 class SchoolItem(BaseModel):
-    school: str  # 場域識別字串，等同 student.school；前端後續呼叫要原樣帶回
-    displayName: str  # 下拉顯示文字，可與 school 相同
+    school: str  # 場域識別字串，等同 student.school。前端後續請求須傳回相同值。
+    displayName: str  # 下拉選單的顯示文字，可與 school 相同。
 
 
 class SchoolListResponse(BaseModel):
@@ -119,7 +119,7 @@ class TeacherStudentsResponse(BaseModel):
     teacherId: int
     teacherName: str
     school: str
-    studentCount: int  # 等同 students 長度，Python 端計算
+    studentCount: int  # 由 Python 計算，等於 students 的長度。
     students: list[StudentListItem] = Field(default_factory=list)
 
 
@@ -132,7 +132,7 @@ class GameListResponse(BaseModel):
     games: list[GameItem] = Field(default_factory=list)
 
 
-# --- 帳密登入（見 docs/adr/0004-teacher-student-password-login.md） ---
+# 帳號與密碼登入，見 docs/adr/0004-teacher-student-password-login.md。
 
 
 class TeacherLoginRequest(BaseModel):
@@ -164,6 +164,6 @@ class StudentLoginResponse(BaseModel):
 
 class AttentionResponse(BaseModel):
     result: int  # 1 = 專心；0 = 不專心／資料過期／找不到
-    subject: str | None = None  # 送給手錶平台的受試者編號，例如 S001
+    subject: str | None = None  # 傳給手錶平台的受試者編號，例如 S001。
     reason: str | None = None
-    source: str | None = None  # "mock" 表示 WATCH_PREDICT_MOCK 假資料
+    source: str | None = None  # "mock" 表示 WATCH_PREDICT_MOCK 提供的模擬資料。

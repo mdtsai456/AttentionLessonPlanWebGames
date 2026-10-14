@@ -1,9 +1,8 @@
-"""「每次 API 呼叫都驗身份」用的 dependency。
+"""驗證每次 API 請求身分所需的依賴。
 
-獨立成一個模組（而非放在 routers/auth.py 裡）：routers/students.py 裡受保護的端點
-（/api/students、/report、/sessions）需要這裡的 dependency，而 routers/auth.py
-（登入端點）反過來需要 routers/students.py 的 parse_student_key。兩邊互相 import
-會循環匯入，所以把 Identity／dependency 抽到這個不依賴 routers/students 的模組。
+routers/students.py 的 /api/students、/report、/sessions 使用此模組的依賴。
+routers/auth.py 使用 routers/students.py 的 parse_student_key。
+將 Identity 與依賴放在獨立模組，且不匯入 routers/students，可避免循環匯入。
 
 見 docs/adr/0004-teacher-student-password-login.md。
 """
@@ -95,7 +94,7 @@ def require_student(identity: Identity = Depends(get_current_identity)) -> Ident
 
 
 def require_same_school(identity: Identity, school: str) -> None:
-    """老師只能查自己場域。學生走 require_own_student_or_same_school_teacher。"""
+    """老師只能查詢自己的場域。學生使用 require_own_student_or_same_school_teacher 驗證。"""
     if identity.school != school:
         raise _FORBIDDEN
 
@@ -103,10 +102,10 @@ def require_same_school(identity: Identity, school: str) -> None:
 def require_own_student_or_same_school_teacher(
     identity: Identity, grade: str, case_id: str, school: str
 ) -> None:
-    """/report、/sessions 共用的授權規則：
+    """/report 與 /sessions 共用的授權規則：
 
-    - 老師：學生所在的 school 必須等於老師自己的 school。
-    - 學生：grade/case_id/school 必須完全等於自己（不能看別人的報告）。
+    老師查詢時，學生的 school 須與老師的 school 相同。
+    學生查詢時，grade／case_id／school 須與登入學生相同。
     """
     if identity.subject_type == "teacher":
         require_same_school(identity, school)

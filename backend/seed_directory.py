@@ -1,25 +1,23 @@
-"""灌『參照資料』:場域(school)與老師(teacher)名錄。
+"""插入場域 school 與老師 teacher 的名錄資料。
 
-與 seed.py 的分工(見 docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md):
+分工見 docs/superpowers/specs/2026-09-08-teacher-directory-login-design.md。
+seed.py 先清空遊戲資料，再插入可重現的模擬成績。
+seed_directory.py 以冪等操作補齊名錄，不清空既有資料。
 
-- seed.py          灌『可重現的假成績』,心態是「先清空再灌、隨時可丟」。
-- seed_directory.py 灌『要跟著正式庫走的真參照資料』,心態是「冪等補齊、絕不清空」。
+使用 INSERT ... ON DUPLICATE KEY UPDATE，不執行 DELETE。
+重複執行不會增加重複資料，也不刪除手動加入的老師。
 
-冪等:以 INSERT ... ON DUPLICATE KEY UPDATE 補齊,不 DELETE。重跑不會產生重複,
-也不會清掉既有資料(例如手動加的老師)。
+預設使用 TEST_DB_NAME，且名稱須以 _test 結尾。
+只有使用 --prod 時，才讀取 DB_NAME，並依 ADR-0001 使用 root 寫入正式資料庫。
 
-安全閘:預設只碰 TEST_DB_NAME 指的 `_test` 庫(守衛拒非 `_test`)。只有明確加上
-`--prod` 才讀 DB_NAME 改灌正式庫,且依 ADR-0001「正式庫寫入走 root」。
+    uv run python seed_directory.py                       # 預設：_test 資料庫
+    DB_USER=root DB_PASSWORD=... uv run python seed_directory.py --prod   # 正式資料庫
 
-    uv run python seed_directory.py                       # 預設:_test 庫
-    DB_USER=root DB_PASSWORD=... uv run python seed_directory.py --prod   # 正式庫
-
---- 場域字串 ---
-下面 SCHOOLS 的第一欄(school 字串)是六張既有表的 join key、Unity POST 的
-payload 欄位、所有查詢的參數。廠商把命名交給後端決定,故**定案為**短 ASCII 代碼:
-KMU、NTHU-01 … NTHU-07(見 docs/school-directory.md,三方共用的唯一真實來源)。
-中文顯示名稱(display_name)與老師名稱可日後由廠商調整 —— 改這裡的常數重跑即可
-(display_name 會 ON DUPLICATE KEY UPDATE;老師若要改名需先清 teacher 表再重跑)。
+場域字串：
+SCHOOLS 的第一欄是既有六張表的 join key、Unity POST 的 payload 欄位與查詢參數。
+使用短 ASCII 代碼 KMU、NTHU-01 … NTHU-07。三方共用定義見 docs/school-directory.md。
+廠商可調整 display_name 與老師名稱。顯示名稱修改常數後，重新執行腳本即可更新。
+display_name 使用 ON DUPLICATE KEY UPDATE。修改老師名稱時，須先清除 teacher 表再重新執行。
 """
 
 from __future__ import annotations
@@ -44,7 +42,7 @@ SCHOOLS: list[tuple[str, str, int]] = [
     ("NTHU-07", "清華大學（第七場）", 7),
 ]
 
-# (場域 school 字串, 老師名稱)。每場域 2 位,共 16 位。老師名稱為佔位,待廠商提供實際 16 位名單。
+# (場域 school 字串, 老師名稱)。每場域兩位，共 16 位。名稱為預留值，待廠商提供正式名單。
 TEACHERS: list[tuple[str, str]] = [
     ("KMU", "吳老師"), ("KMU", "林老師"),
     ("NTHU-01", "王老師"), ("NTHU-01", "陳老師"),
@@ -102,20 +100,19 @@ def _resolve_target() -> str:
 
 
 def _generate_readable_password() -> str:
-    """人可讀長度的隨機密碼，給要手動抄給老師的場景用。"""
+    """產生長度適合人工抄寫的隨機密碼，供管理者交給老師。"""
     return secrets.token_urlsafe(9)
 
 
 def seed(connection) -> tuple[int, int, list[tuple[str, str, str, str]]]:
-    """冪等灌入 SCHOOLS / TEACHERS。
+    """以冪等操作插入 SCHOOLS／TEACHERS。
 
-    回傳 (school 總筆數, teacher 總筆數, 新指派的帳密清單)。帳密清單只包含這次
-    新指派的（原本 account 是 NULL 的老師）——已經有帳號的老師不會被覆蓋，
-    重跑這支腳本不會讓既有帳密失效。
+    回傳 (school 總筆數, teacher 總筆數, 新指派的帳密清單)。
+    帳密清單只包含此次建立的帳號，來源為 account 原為 NULL 的老師。
+    不覆寫既有帳號，因此重複執行不會使既有帳號或密碼失效。
 
-    account 不能跟 school+name 一起在 INSERT 時算好：帳號用 T0001 這種格式，
-    需要 teacher_id（AUTO_INCREMENT，insert 當下才知道），所以分兩步——
-    先 upsert school/name，再對 account 還是 NULL 的列補上 account + 密碼。
+    帳號格式為 T0001，使用插入時才產生的 teacher_id（AUTO_INCREMENT）。
+    先 upsert school/name，再為 account 為 NULL 的列補上 account 與密碼。
     """
     from auth import hash_password
 

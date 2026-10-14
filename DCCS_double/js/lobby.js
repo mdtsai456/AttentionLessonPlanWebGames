@@ -1,5 +1,5 @@
-// 大廳資料來自同源 sessionStorage。currentDay 暫由歷史場次推導；長期應由
-// 後端統一提供，避免各遊戲各自計算而不同步（見 docs/dccs-lobby-handoff.md）。
+// 大廳資料來自同源的 sessionStorage。currentDay 暫由歷史場次推導，
+// 後續應由後端統一提供，避免各遊戲計算結果不同（見 docs/dccs-lobby-handoff.md）。
 
 import { resolveApiBase } from './net/apiBase.js';
 
@@ -9,7 +9,7 @@ function readKey(key) {
   try {
     return sessionStorage.getItem(key);
   } catch (_err) {
-    // 隱私模式下讀 sessionStorage 會 throw；當成「沒有大廳資訊」處理。
+    // 隱私模式下，讀取 sessionStorage 可能拋出錯誤。此時視為沒有大廳資訊。
     return null;
   }
 }
@@ -21,8 +21,8 @@ export function readStoredCurrentDay() {
 }
 
 /**
- * 後端 auth.py 組出來的 studentKey 形如 `G1_S03`（grade_caseId）。
- * caseId 本身可能含底線，所以只切第一個。
+ * 後端 auth.py 產生的 studentKey 格式為 G1_S03，即 grade_caseId。
+ * caseId 可包含底線，因此只使用第一個底線分隔。
  * @param {string | null} studentKey
  * @returns {{grade: string, caseId: string} | null}
  */
@@ -58,15 +58,15 @@ export function readLobbyPlayer(slot) {
     school,
     studentKey: studentKey || `${resolvedGrade}_${resolvedCase}`,
     currentDay: Number(readKey(`student${slot}_day`)) || readStoredCurrentDay(),
-    // 單人另有共用 token；雙人第二位只有 student2_token。
+    // 單人模式另有共用的 token。雙人模式的第二位玩家僅使用 student2_token。
     token: readKey(`student${slot}_token`) || (slot === 1 ? readKey("token") : null),
   };
 }
 
 /**
- * 判斷這一頁是不是從大廳進來的，並回傳該場的玩家。
+ * 判斷頁面是否由大廳進入，並回傳該場玩家資料。
  * @returns {{mode: 'single' | 'double',
- *            players: Array<object>} | null} 不是從大廳進來則為 null
+ *            players: Array<object>} | null} 未由大廳進入時，回傳 null。
  */
 export function readLobbySession() {
   const player1 = readLobbyPlayer(1);
@@ -81,7 +81,7 @@ export function readLobbySession() {
   return { mode: 'single', players: [player1] };
 }
 
-/** 把後端的 "YYYY-MM-DD HH:MM:SS"（UTC naive）轉成本地時區的 Date。 */
+/** 將後端的 "YYYY-MM-DD HH:MM:SS" 格式 UTC naive 時間轉為本地時區的 Date。 */
 function parseUtcTimestamp(value) {
   if (typeof value !== 'string' || !value) return null;
   const date = new Date(`${value.replace(' ', 'T')}Z`);
@@ -89,13 +89,13 @@ function parseUtcTimestamp(value) {
 }
 
 /**
- * 推導這位學生今天的 currentDay。
+ * 推導學生今日的 currentDay。
  *
- * 施測日是「本地日曆上的一天」，後端存的是 UTC，所以比較前先轉回本地時區。
- * 同一天已經玩過別款遊戲 → 沿用那個值；否則取歷史最大值 +1；沒有紀錄 → 1。
+ * 施測日使用本地日曆日期。後端儲存 UTC 時間，比較前須轉為本地時區。
+ * 今日已玩過其他遊戲時，沿用當日值。否則使用歷史最大值加 1。沒有記錄時，使用 1。
  *
- * 失敗一律 throw，**不得**默默猜一個值——currentDay 猜錯會污染研究資料，
- * 寧可退回讓現場人員手動填。
+ * 失敗時拋出錯誤，不使用推測值，避免錯誤的 currentDay 影響研究資料。
+ * 由現場人員手動填入數值。
  *
  * @param {{grade: string, caseId: string, school: string, token: string|null}} player
  * @returns {Promise<number>}
@@ -133,8 +133,8 @@ export async function resolveCurrentDay(player) {
 
     const startedAt = parseUtcTimestamp(session.startTime);
     if (startedAt && startedAt.toDateString() === todayKey) {
-      // 同一施測日的 5 款遊戲共用同一個 currentDay；取最大的那個，避免
-      // 早先某一場寫錯值時整天都被拉低。
+      // 同一施測日的五款遊戲共用 currentDay。取當日的最大值，
+      // 避免先前場次的較低錯誤值影響當日結果。
       todaysDay = todaysDay === null ? day : Math.max(todaysDay, day);
     }
   }

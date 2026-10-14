@@ -1,10 +1,9 @@
-"""管理者手動設定/重設單一老師或學生的密碼。
+"""供管理者設定或重設單一老師或學生的密碼。
 
-給 seed_directory.py（批次指派）之外的日常操作用：某位老師忘記密碼、要換人、
-或廠商晚點才給的某個學生要單獨設密碼，都用這支。
+seed_directory.py 用於批次指派帳號。本腳本用於忘記密碼、人員變更或新增學生等單筆操作。
 
-安全閘沿用 seed_directory.py 的模式：預設只碰 TEST_DB_NAME 指的 `_test` 庫，
-要碰正式庫要明確加 `--prod`（讀 DB_NAME，依 ADR-0001「正式庫寫入走 root」）。
+預設使用 TEST_DB_NAME 指定的資料庫，名稱須以 _test 結尾。
+操作正式資料庫時，須加入 --prod，改讀 DB_NAME，並依 ADR-0001 使用 root 寫入。
 
     uv run python manage_passwords.py teacher <school> <name> <new_password>
     uv run python manage_passwords.py student <school> <studentKey> <new_password>
@@ -48,8 +47,8 @@ def _parse_student_key(student_key: str) -> tuple[str, str]:
 
 
 def set_teacher_password(connection, school: str, name: str, new_password: str) -> str | None:
-    """更新密碼；若這位老師還沒有 account（例如手動建的、沒走過 seed_directory.py），
-    順便補一個。回傳最終的 account，None 表示查無此老師。
+    """更新老師密碼。尚未有 account 時，建立帳號。
+    回傳 account。查無老師時，回傳 None。
     """
     from auth import hash_password
 
@@ -74,7 +73,7 @@ def set_teacher_password(connection, school: str, name: str, new_password: str) 
 def set_student_password(
     connection, school: str, student_key: str, new_password: str
 ) -> str | None:
-    """同 set_teacher_password，但對象是學生；查無此學生回傳 None。"""
+    """使用與 set_teacher_password 相同的流程更新學生密碼。查無學生時，回傳 None。"""
     from auth import hash_password
 
     grade, case_id = _parse_student_key(student_key)

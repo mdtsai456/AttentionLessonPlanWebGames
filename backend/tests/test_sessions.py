@@ -25,7 +25,7 @@ class TestClient(BaseTestClient):
 
 @pytest.fixture(autouse=True)
 def session_writer_login(request, monkeypatch):
-    # 格式／轉換測試用可驗證的學生；整合測試登入真實測試庫。
+    # 格式與轉換測試使用可驗證的學生。整合測試登入實際的測試資料庫。
     if "db" in request.fixturenames or "client" in request.fixturenames:
         login = request.getfixturevalue("login_as_student")
         _, owner = login(grade="G1", case_id="S03", school="測試場域")
@@ -68,8 +68,9 @@ def dccs_payload() -> dict:
 
 @pytest.fixture(autouse=True)
 def _register_school(request):
-    """走真實寫入路徑的 POST 測試（帶 db／client fixture）需要 '測試場域'
-    這個場域先登記，否則 student.school 外鍵會擋下寫入。"""
+    """POST 整合測試使用 db／client fixture，並執行實際寫入流程。
+須先登記「測試場域」，否則 student.school 的外鍵會拒絕寫入。
+"""
     if "db" not in request.fixturenames and "client" not in request.fixturenames:
         return
     request.getfixturevalue("db").insert_school("測試場域")

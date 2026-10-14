@@ -1,4 +1,4 @@
-"""converters 的純函式測試。不碰資料庫。"""
+"""converters 的純函式測試，不存取資料庫。"""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def test_to_float_converts():
 
 
 def test_format_optional_datetime_of_none_is_none():
-    """與 format_datetime 不同：不假裝有值。"""
+    """缺少日期時，回傳 None。format_datetime 則回傳空字串。"""
     assert format_optional_datetime(None) is None
 
 
@@ -107,7 +107,7 @@ def test_normalize_school(given, expected):
         ("Single", "single"),
         ("DOUBLE", "double"),
         ("  double  ", "double"),
-        ("foo", "foo"),  # 打錯的值原樣傳回，讓 SQL 查空、不報錯
+        ("foo", "foo"),  # 無效值原樣回傳，使 SQL 查詢回傳空結果，不拋出錯誤。
     ],
 )
 def test_normalize_mode_for_db(given, expected):

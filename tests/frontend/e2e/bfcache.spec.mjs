@@ -1,15 +1,15 @@
-// 登出後按上一頁：Chrome 會從 bfcache 原樣還原頁面、不重跑 script。
+// 登出後按上一頁時，Chrome 會從 bfcache 還原頁面，不重新執行 script。
 import { test, expect } from "@playwright/test";
 import { DCCS_PAGE } from "../site.mjs";
 import { HOME_URL, STUDENT, loginAs } from "./helpers.mjs";
 
-// Playwright 預設帶 --disable-back-forward-cache，舊版 headless 也不支援 bfcache。
+// Playwright 預設使用 --disable-back-forward-cache。舊版 headless 也不支援 bfcache。
 test.use({
   channel: "chromium",
   launchOptions: { ignoreDefaultArgs: ["--disable-back-forward-cache"] },
 });
 
-/** 記錄每次 pageshow，用來確認頁面真的是從 bfcache 還原。 */
+/** 記錄每次 pageshow，確認頁面從 bfcache 還原。 */
 async function trackPageshow(page) {
   const shows = [];
   await page.addInitScript(() => {
@@ -37,7 +37,7 @@ test("學生在 Select 登出後按上一頁，不會停在還原的 Select", as
   await page.goBack({ waitUntil: "commit" });
   await page.waitForTimeout(1000);
 
-  // 前提：Select 確實是從 bfcache 還原，否則這個測試沒有意義。
+  // 須先確認 Select 從 bfcache 還原，才能驗證本測試的行為。
   expect(shows).toContainEqual({ path: "/Select/index.html", persisted: true });
   await expect(page).toHaveURL(HOME_URL);
 });

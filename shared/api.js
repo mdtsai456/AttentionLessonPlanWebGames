@@ -21,8 +21,8 @@
   }
 
   /**
-   * 401 才是帳密錯誤（回 null）；其他失敗丟出 Error，讓畫面顯示伺服器錯誤。
-   * contact：非 5xx 錯誤時提示該聯絡誰（老師登入失敗時不該提示去找老師）。
+   * 401 回應表示帳號或密碼錯誤，回傳 null。其他失敗拋出 Error，供畫面顯示伺服器錯誤。
+   * contact 指定非 5xx 錯誤時的聯絡對象。老師登入失敗時，不提示聯絡老師。
    */
   async function readLoginResponse(res, contact) {
     if (res.status === 401) return null;
@@ -38,11 +38,11 @@
     try {
       data = await res.json();
     } catch (err) {
-      // 讀 body 時斷線是 TypeError，原樣丟出讓畫面顯示「後端連不上」。
+      // 讀取 body 時斷線會產生 TypeError。保留原錯誤，讓畫面顯示「後端連不上」。
       if (err && err.name === "TypeError") throw err;
       throw new Error(badFormat);
     }
-    // 2xx 但沒有 token（proxy 回 {}、API 位址設錯等）不能算登入成功。
+    // 2xx 回應未包含 token 時，視為登入失敗。例如代理伺服器回傳 {}，或 API 位址錯誤。
     if (!data || typeof data.token !== "string" || !data.token) {
       throw new Error(badFormat);
     }
@@ -72,18 +72,18 @@
   async function logout(token) {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      // keepalive：登出後常馬上換頁或關分頁，請求仍要送到後端。
+      // keepalive 讓登出請求在導向頁面或關閉分頁後，仍可送至後端。
       await fetch(`${resolveApiBase()}/auth/logout`, {
         method: "POST",
         headers,
         keepalive: true,
       });
     } catch (_err) {
-      // 本機狀態仍會清掉，後端失敗不擋登出。
+      // 後端登出失敗時，仍清除本機登入狀態。
     }
   }
 
-  /** 目前 sessionStorage 裡登入中的 token（去掉空值與重複）。 */
+  /** 取得 sessionStorage 中的登入 token，移除空值與重複值。 */
   function storedTokens() {
     return [
       sessionStorage.getItem("student1_token"),
@@ -96,7 +96,7 @@
     await Promise.all(storedTokens().map((token) => logout(token)));
   }
 
-  /** 手錶專心判定：回傳 1（專心）或 0。任何失敗都當 0，不擋畫面。 */
+  /** 手錶專心判定回傳 1 或 0。1 表示專心。失敗時回傳 0，不阻止畫面顯示。 */
   async function fetchAttention(token) {
     if (!token) return 0;
     try {
@@ -116,7 +116,7 @@
     return gameType;
   }
 
-  /** 中場返回：六個遊戲都是打完前 3 關為 50%，打完 6 關為 100%。 */
+  /** 中場返回時，六款遊戲完成前 3 關的進度皆為 50%，完成 6 關為 100%。 */
   function progressFromRecord(gameId, record) {
     const stage = record && record.stats ? Number(record.stats.stage) : NaN;
     if (!Number.isFinite(stage)) return 100;
@@ -138,7 +138,7 @@
     return sameStudent(session.bodies[index], payload.data) ? index : -1;
   }
 
-  /** 雙人每筆使用本人 token 與另一位學生 token，不把 token 放入 payload。 */
+  /** 雙人模式的每筆成績使用本人與搭檔的 token。payload 不包含 token。 */
   async function submitSession(payload, { player, url, signal } = {}) {
     const index = sessionPlayer(payload, player);
     if (index < 0) throw Object.assign(new Error('登入未驗證或成績身分不符'), { status: 401 });

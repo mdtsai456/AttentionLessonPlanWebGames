@@ -24,7 +24,7 @@ function harness(fetchImpl = async () => ({ ok: true, json: async () => ({}) }))
     setTimeout(fn) { const id = ++nextTimer; timers.set(id, fn); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  // Missing production code must fail on its missing API, not a file-read error.
+  // 缺少正式程式碼時，測試應因缺少 API 而失敗，不因檔案讀取錯誤而失敗。
   const source = fs.existsSync(scriptPath) ? fs.readFileSync(scriptPath, 'utf8') : '';
   vm.runInContext(source, context, { filename: scriptPath });
   assert.ok(context.window.DatAssets, 'shared script must expose window.DatAssets');

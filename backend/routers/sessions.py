@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["sessions"])
 
 KNOWN_GAME_NAMES = frozenset({"DCCS", "DAT", "EFT", "IM", "TGame"})
-# 指令出擊沒有雙人版。勇闖迷宮雙人會打到第 3 關後回選單，必須能寫入才有 50% 進度。
+# 指令出擊沒有雙人模式。勇闖迷宮雙人模式可在第 3 關後返回選單，須寫入成績以顯示 50% 進度。
 DOUBLE_CAPABLE_GAMES = frozenset({"DCCS", "DAT", "EFT", "TGame"})
 PAIR_ID_MAX_LENGTH = 36
 UNITY_CORE_STATS = (
@@ -90,7 +90,7 @@ class SessionAcceptResponse(BaseModel):
 
 
 class InvalidTimestampError(ValueError):
-    """Unity timestamp 無法轉成可寫入的 datetime。"""
+    """Unity timestamp 無法轉為可寫入的 datetime。"""
 
 
 def parse_game_name(lesson_id: str) -> str:
@@ -111,7 +111,7 @@ def ms_to_datetime(ms: int) -> datetime:
 
 
 def format_level_accuracy(value: Any) -> str | None:
-    """把每一關正確率收成逗號分隔的 0–1 字串，最多 6 關。"""
+    """將每關正確率轉為逗號分隔的 0–1 字串，最多包含六關。"""
     if value is None:
         return None
     if isinstance(value, str):
@@ -213,12 +213,12 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
         raise ValueError("雙人版僅支援 DAT／DCCS／EFT／TGame")
 
     if mode == "single":
-        # 單人版忽略誤帶的 pairId，一律存 NULL。
+        # 單人模式忽略傳入的 pairId，固定儲存為 NULL。
         pair_id = None
     elif pair_id is not None and len(pair_id) > PAIR_ID_MAX_LENGTH:
         raise ValueError("pairId 格式錯誤")
     elif not pair_id:
-        # 缺 pairId 的雙人筆仍是有效成績，只是少了搭檔連結 —— 接受，記一筆 warning。
+        # 雙人成績缺少 pairId 時，仍接受資料，但無法連結搭檔，並記錄一筆警告。
         pair_id = None
         logger.warning("雙人版場次缺 pairId：school=%s grade=%s caseId=%s",
                        data.school, data.grade, data.caseId)
@@ -262,7 +262,7 @@ def create_session(
             logger.exception("場次 UUID 重複")
             raise HTTPException(status_code=409, detail="場次已存在") from exc
         if exc.args and exc.args[0] == 1452:
-            # student.school → school 的外鍵擋下：Unity 送來的場域字串沒登記。
+            # Unity 傳入的場域未登記，student.school 指向 school 的外鍵因此拒絕寫入。
             logger.warning("未知場域，拒絕寫入：school=%s", payload.data.school)
             raise HTTPException(
                 status_code=400, detail="未知的場域（school 尚未登記）"
@@ -279,10 +279,10 @@ def create_session(
 
 @router.get("/api/games", response_model=GameListResponse)
 def list_games() -> GameListResponse:
-    """靜態遊戲清單，給遊戲大廳頁用。公開端點，不含任何學生資料。
+    """遊戲大廳使用的靜態遊戲清單。公開端點，不包含學生資料。
 
-    直接重用 KNOWN_GAME_NAMES / DOUBLE_CAPABLE_GAMES —— 前端不該自己另外寫死一份
-    遊戲清單，重演 school 曾經在前端寫死、後端一改前端就跟著壞的教訓。
+    使用 KNOWN_GAME_NAMES／DOUBLE_CAPABLE_GAMES 作為來源。
+    前端使用此清單，避免重複設定而與後端不同步。
     """
     return GameListResponse(
         games=[

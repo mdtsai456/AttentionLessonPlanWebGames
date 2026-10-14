@@ -1,6 +1,6 @@
-"""密碼雜湊與登入 token 工具。純函式，不碰資料庫、不依賴 FastAPI。
+"""密碼雜湊與登入 token 工具。使用純函式，不存取資料庫，也不依賴 FastAPI。
 
-只用 stdlib（hashlib／hmac／secrets），不新增依賴，跟這個 repo 現有的精簡依賴清單一致。
+只使用標準函式庫 hashlib／hmac／secrets，不新增依賴。
 """
 
 from __future__ import annotations
@@ -14,15 +14,15 @@ _ALGORITHM = "pbkdf2_sha256"
 _ITERATIONS = 260_000
 _SALT_BYTES = 16
 
-# 學生與老師都是登入後 1 小時失效；前端依登入回應的 expiresAt 自動登出。
+# 學生與老師的登入憑證皆在 1 小時後失效。前端依回應的 expiresAt 自動登出。
 TOKEN_TTL = timedelta(hours=1)
 
 
 def hash_password(password: str) -> str:
-    """回傳可直接存進 password_hash 欄位的字串。
+    """回傳可儲存至 password_hash 的字串。
 
-    格式：pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>。iterations 存進字串裡，
-    之後要調高強度時舊密碼仍可驗證，不用一次性遷移全部使用者。
+    格式為 pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>。
+    字串包含 iterations，因此提高迭代次數後，仍可驗證舊密碼，無須一次遷移所有使用者。
     """
     salt = secrets.token_bytes(_SALT_BYTES)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _ITERATIONS)
@@ -30,7 +30,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored: str) -> bool:
-    """比對明碼密碼與 hash_password 存的字串。格式不對／演算法不符一律回 False。"""
+    """比對明文密碼與 hash_password 產生的字串。格式無效或演算法不符時，回傳 False。"""
     try:
         algorithm, iterations_str, salt_hex, digest_hex = stored.split("$")
         iterations = int(iterations_str)
@@ -46,5 +46,5 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def generate_token() -> str:
-    """產生一組不可預測的登入 token（url-safe，適合放進 Authorization header）。"""
+    """產生不可預測的登入 token。使用 URL 安全字元，可放入 Authorization header。"""
     return secrets.token_urlsafe(32)
