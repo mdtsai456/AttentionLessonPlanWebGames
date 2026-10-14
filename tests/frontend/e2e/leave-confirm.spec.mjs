@@ -163,19 +163,3 @@ test("確認框開著時，別處（例如登入驗證完成）恢復時鐘也�
   await dialog(page).getByRole("button", { name: "繼續遊戲" }).click();
   expect(await page.evaluate(() => window.WebGameRuntime.paused)).toBe(false);
 });
-
-// 舊流程 askLeave 保留給還沒改用 confirmLeave 的頁面（分批合併期間）：
-// 仍跳出瀏覽器的離開詢問；按取消後，之後的程式導向不再詢問。
-test("舊流程 askLeave：仍會詢問，取消後程式導向不再詢問", async ({ page }) => {
-  const nativeDialogs = await openGame(page, "TGame_single/index.html", STUDENT);
-  await page.evaluate(() => window.askLeave("../Select/index.html"));
-  await expect.poll(() => nativeDialogs.length).toBe(1);
-  expect(nativeDialogs[0]).toBe("beforeunload");
-  await page.waitForTimeout(300);
-  expect(new URL(page.url()).pathname).toBe("/TGame_single/index.html");
-  await Promise.all([
-    page.waitForURL("**/Select/index.html", { timeout: 5000 }),
-    page.evaluate(() => { window.location.href = "../Select/index.html"; }),
-  ]);
-  expect(nativeDialogs).toEqual(["beforeunload"]);
-});

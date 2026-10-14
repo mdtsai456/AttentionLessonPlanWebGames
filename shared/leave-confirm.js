@@ -114,21 +114,4 @@
   window.leaveTo = function (url) {
     window.location.href = url;
   };
-
-  // 舊流程：先存檔再跳出瀏覽器的離開詢問。只留給還沒改用 confirmLeave 的頁面
-  // （各遊戲分批合併期間），全部改完後沒有呼叫端。
-  window.addEventListener('beforeunload', (event) => {
-    if (!window.__askLeave) return;
-    event.preventDefault();
-    event.returnValue = '';
-    // 按「取消」留在頁面時，之後的程式導向（返回大廳、結算後跳轉）不能再詢問。
-    window.__askLeave = false;
-  });
-  window.addEventListener('pageshow', (event) => {
-    if (event.persisted) window.__askLeave = false;
-  });
-  window.askLeave = function (url) {
-    window.__askLeave = true;
-    window.location.href = url;
-  };
 })();
