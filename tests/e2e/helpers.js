@@ -145,6 +145,8 @@ function installProbes({ frameMs, realAim, realClock, randomValue }) {
 export async function openGame(browser, origin, { game, mode = 'game', assetFiles = null, routeOverride, realAim = false, realClock = false, randomValue }) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  // 假時鐘的起點；登入到期日也依此計算
+  const start = new Date('2026-10-04T09:00:00+08:00').getTime();
   const errors = [];
   const pageErrors = [];
   const sessionPosts = [];
@@ -180,7 +182,8 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
           caseId,
           school: 'KMU',
           studentKey: `G1_${caseId}`,
-          expiresAt: '2099-01-01T00:00:00.000Z',
+          // 守門用 setTimeout 排登出，延遲超過約 24.8 天會溢位成立刻過期，所以從頁面時鐘起算一天
+          expiresAt: new Date((realClock ? Date.now() : start) + 86400000).toISOString(),
         }),
       });
     }
@@ -213,7 +216,6 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
   });
 
   // 假時鐘在載入前就暫停，之後只靠 runFor 推進，讓每次執行的流程一致
-  const start = new Date('2026-10-04T09:00:00+08:00').getTime();
   if (!realClock) {
     await page.clock.install({ time: start });
     await page.clock.pauseAt(start + 1000);

@@ -133,8 +133,15 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         await waitStatus(session, game, SAVED);
         assertPayloads(session.sessionPosts, game);
 
-        await session.page.evaluate(() => { window.__leaveTargets = []; window.askLeave = (url) => window.__leaveTargets.push(url); document.querySelector('#leave-btn').click(); });
-        await session.driver.waitFor(() => window.__leaveTargets.length === 1, '離開確認');
+        // 完成後離開直接回選單、不經確認；取消導航讓頁面留下，接著測重玩
+        const leaveTargets = [];
+        const lobbyRoute = (route) => { leaveTargets.push(new URL(route.request().url()).pathname); return route.abort('aborted'); };
+        await session.page.route('**/Select/index.html', lobbyRoute);
+        await session.page.evaluate(() => { window.__askLeaveCalls = 0; window.askLeave = () => { window.__askLeaveCalls += 1; }; document.querySelector('#leave-btn').click(); });
+        for (let i = 0; i < 50 && leaveTargets.length === 0; i += 1) await session.page.clock.runFor(100);
+        await session.page.unroute('**/Select/index.html', lobbyRoute);
+        assert.deepEqual(leaveTargets, ['/Select/index.html'], '完成後離開直接回選單');
+        assert.equal(await session.page.evaluate(() => window.__askLeaveCalls), 0, '完成後離開不再確認');
         assert.equal(session.sessionPosts.length, game === 'double' ? 2 : 1, '已完成成績離開時不可重複寫入');
         const firstPair = session.sessionPosts[0].data.pairId;
         await resetDriver(session, game);
