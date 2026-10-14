@@ -8,7 +8,7 @@
 
 這個資料夾有自己的 `index.html`、`js/`、`css/`、`levels.json`、`manifest.json` 與 `assets/`。改雙人關卡或圖時改這裡，不要只改 `DCCS_single/`。
 
-`tools/build_manifest.py` 只產生單人的 `manifest.json`。雙人的清單要另行維護。
+`tools/build_manifest.py` 會同時依這個資料夾的 `levels.json` 與 `assets/` 產生雙人的 `manifest.json`。
 
 操作：
 
@@ -17,7 +17,9 @@
 | 玩家 1 | `A` | `D` |
 | 玩家 2 | `←` | `→` |
 
-兩人各送一筆成績，`mode` 為 `double`，並帶同一組搭檔 token。暫存鍵名同樣是 `dccs_pending_`，規則與單人相同，見 [`../DCCS_single/README.md`](../DCCS_single/README.md)。
+遊戲開始後，左右兩側面板左上方各標示該側玩家的個案編號。
+
+兩人各送一筆成績，`mode` 為 `double`，並帶同一組搭檔 token。按「離開」會先在頁面內詢問「確定要離開嗎？」，詢問時遊戲暫停。按「繼續遊戲」或 Esc 什麼都不送，遊戲照常繼續，打完全場只送全場成績。按「離開」後，兩人都打完第 3 關的話各送一筆第 3 關（或第 6 關）成績再回選擇遊戲頁，不會再跳瀏覽器的離開詢問；同一個關卡檢查點每人只送一次，連點也不會重送。確定離開後遊戲維持暫停到導頁，存檔期間兩側賽道都不前進，按轉動鍵也不記。本局的 `pairId` 由 `WebGameApi.uuid()` 產生。全場成績送出中「離開」會停用。中場休息的「返回遊戲大廳」是明確的選擇，不再詢問，直接送第 3 關成績後回大廳。暫存鍵名同樣是 `dccs_pending_`，規則與單人相同，見 [`../DCCS_single/README.md`](../DCCS_single/README.md)。
 
 ## 怎麼開始
 

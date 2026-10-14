@@ -4,7 +4,7 @@
 
 完整的閥門、判定與模組簽名見 [`SPEC.md`](SPEC.md)。只有這個遊戲有這份規格：引擎拆成多個模組，程式註解與測試照裡面的章節實作。瓢蟲追擊令、漂浮泡泡、勇闖迷宮、指令出擊的規則寫在各自的 README，不再另放 `SPEC.md`。
 
-關卡數量以這個資料夾的 `levels.json` 為準。`SPEC.md` 前半的關卡表仍是較早的五關、每關 120 秒；現在的六關與每關 60 秒以 `levels.json` 和 `js/config.js` 為準。
+關卡數量以這個資料夾的 `levels.json` 為準，`SPEC.md` 的關卡表與它一致（六關、每關 60 秒）。
 
 ## 現在的一局
 
@@ -13,7 +13,7 @@
 每一題都同時有外框與內容，要連過兩道閥才算答對：
 
 - 形狀閥只能往左，鍵是 `A` 或 `←`。選與目標外框相同的形狀。
-- 物件閥只能往右，鍵是 `D` 或 `→`。`model` 選同一張圖，`category` 選同一個語意類別。
+- 物件閥只能往右，鍵是 `D` 或 `→`。`model` 選同一張圖，`category` 選同一個語意類別。`category` 關每一題會把物件閥上同類別的那一格換成目標圖本身，其餘類別是固定的代表圖。
 
 按一下轉一格。按住不連續轉，動畫中再按會排隊。答錯只記錄，遊戲繼續。兩道都對才加一分。
 
@@ -26,7 +26,7 @@
 | 3 | 2 | 4 | 同一類別 | `2`、`3`、`4`、`5` 各一類 |
 | 4 | 2 | 4 | 完全相同 | `assets/4/` |
 | 5 | 2 | 5 | 完全相同 | `assets/5/` |
-| 6 | 2 | 5 | 同一類別 | `2`、`3`、`4`、`5` 各一類 |
+| 6 | 2 | 4 | 同一類別 | `2`、`3`、`4`、`5` 各一類 |
 
 類別就是 `assets/` 底下的一個資料夾。形狀永遠來自 `assets/shape/`。
 
@@ -59,7 +59,7 @@
 python tools/build_manifest.py
 ```
 
-這支程式只寫 `DCCS_single/manifest.json`。終端會印出每一關能不能出題；不可玩的關卡寫進 manifest 的 `warnings`。圖的 `src` 是相對 `DCCS_single/` 的路徑。
+這支程式依各自的 `levels.json` 與 `assets/` 分別寫 `DCCS_single/manifest.json` 和 `DCCS_double/manifest.json`。終端會印出每一關能不能出題；不可玩的關卡寫進 manifest 的 `warnings`。`category` 關的 `sourceCategories` 長度必須等於 `objectCount`，對不上時程式直接報錯、不產生 manifest。圖的 `src` 是相對各遊戲資料夾的路徑。
 
 ## 怎麼開始
 
@@ -70,8 +70,12 @@ python tools/build_manifest.py
 - `?seed=42`：固定亂數。
 - `?sessionSeconds=5`：縮短整場秒數（5～3600）。縮短後仍會送成績，畫面上會有警告。
 
+## 離開
+
+右上角「離開」會先在頁面內詢問「確定要離開嗎？」（`shared/leave-confirm.js`），詢問時遊戲暫停。按「繼續遊戲」或 Esc 什麼都不送，遊戲照常繼續。按「離開」才存檔：打完第 3 關（或第 6 關）就送一筆該檢查點的成績，然後回選擇遊戲頁；還沒打完第 3 關則不送成績直接回去。確定離開後引擎的離頁保護會拿掉，不會再跳瀏覽器的離開詢問；遊戲維持暫停到導頁，存檔期間賽道不前進，按轉動鍵也不記（恢復後不會補轉）。後端不回應時送出照樣 15 秒逾時，成績暫存到本機後回選擇遊戲頁。整場已結束、全場成績還在送出時按「離開」並確定，會等送完（或逾時暫存）才導頁，不另送一筆。中場休息的「返回遊戲大廳」是明確的選擇，不再詢問。
+
 ## 成績
 
 預設 `lessonId` 是 `lesson_DCCS`，統計欄位前綴是 `DCCS_`。送出用 `POST /api/sessions`。
 
-網址由 `js/net/apiBase.js` 決定，優先序是 `window.DCCS_SUBMIT_URL`、`window.API_BASE_URL`，最後才是目前頁面的 API 位址。送失敗的整包暫存在 `localStorage`，鍵名以 `dccs_pending_` 開頭，下次開啟遊戲時重送。伺服器永久拒絕的改存到 `dccs_rejected_`，不再重試。
+送出逾時 15 秒，用 `WebGameRuntime.nativeSetTimeout`，遊戲暫停時照樣計時。網址由 `js/net/apiBase.js` 決定，優先序是 `window.DCCS_SUBMIT_URL`、`window.API_BASE_URL`，最後才是目前頁面的 API 位址。送失敗的整包暫存在 `localStorage`，鍵名以 `dccs_pending_` 開頭，下次開啟遊戲時重送。每筆成績帶一個 `submissionId`（由 `shared/api.js` 的 `WebGameApi.uuid()` 產生），重送時沿用，回應逾時但伺服器其實已存好時也不會重複寫入。伺服器永久拒絕的改存到 `dccs_rejected_`，不再重試。

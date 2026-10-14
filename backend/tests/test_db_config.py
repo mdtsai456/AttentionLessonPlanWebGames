@@ -1,4 +1,4 @@
-"""MariaDB read/write 設定分流測試。"""
+"""MariaDB 讀取與寫入連線設定的分流測試。"""
 
 from __future__ import annotations
 

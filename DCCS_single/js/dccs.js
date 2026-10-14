@@ -2,19 +2,19 @@
 
 import { CONFIG } from './config.js';
 import { createLoop } from './core/loop.js';
-import { createInput } from './core/input.js';
+import { createInput } from './core/input.js?v=2';
 import { loadManifest, preloadImages } from './core/assets.js';
 import { Track } from './game/track.js';
 import { createStats } from './game/stats.js';
-import { buildPayload, submitResult, flushPendingResults } from './net/client.js?v=2';
+import { buildPayload, submitResult, flushPendingResults } from './net/client.js?v=4';
 import { resolveSubmitUrl } from './net/apiBase.js';
-import { createOverlays } from './ui/overlays.js?v=2';
+import { createOverlays } from './ui/overlays.js?v=3';
 
-// 雙人頁只允許一個實例重送暫存成績。
+// 雙人頁面只允許一個實例重送暫存成績。
 let pendingFlushStarted = false;
 
 /**
- * 單頁操作說明；依 SPEC 1.4 不揭露答題規則。
+ * 單頁操作說明。依 SPEC 1.4，不顯示答題規則。
  *
  * @param {object} manifest
  * @param {string} assetBase manifest 相對路徑的基準網址
@@ -187,7 +187,7 @@ export function mountDCCS(options) {
 
   if (!pendingFlushStarted) {
     pendingFlushStarted = true;
-    // 背景重送，不擋這一場開始；失敗就留到下次開場。
+    // 在背景重送成績，不阻止本場遊戲開始。失敗時保留資料，供下次重送。
     flushPendingResults({ url: submitUrl }).catch(() => {});
   }
 
@@ -196,7 +196,7 @@ export function mountDCCS(options) {
       ? opts.onPhase
       : null;
 
-  // 逐題資料只在記憶體中；進行中離頁會遺失，需觸發瀏覽器制式確認。
+  // 逐題資料只儲存在記憶體中。遊戲中離開頁面會遺失資料，須顯示瀏覽器的離開確認。
   const PHASES_IN_PROGRESS = new Set([
     'level-prompt',
     'playing',
@@ -204,6 +204,11 @@ export function mountDCCS(options) {
   ]);
 
   function guardUnload(shouldGuard) {
+    // 已確認離開：之後的階段（例如送出檢查點）不再掛回保護。
+    if (shouldGuard && unloadReleased) {
+      return;
+    }
+
     if (shouldGuard === !!unloadHandler) {
       return;
     }
@@ -211,7 +216,7 @@ export function mountDCCS(options) {
     if (shouldGuard) {
       unloadHandler = (event) => {
         event.preventDefault();
-        // 舊版瀏覽器要 returnValue 有值才會顯示提示。
+        // 舊版瀏覽器需要有值的 returnValue 才會顯示提示。
         event.returnValue = '';
       };
 
@@ -223,8 +228,27 @@ export function mountDCCS(options) {
     unloadHandler = null;
   }
 
+  /** 使用者已在頁面內確認離開：拿掉離開保護，導頁時不再跳瀏覽器的離開詢問。 */
+  function releaseUnloadGuard() {
+    unloadReleased = true;
+    guardUnload(false);
+  }
+
+  /**
+   * 先在頁面內問要不要離開（shared/leave-confirm.js）。
+   * 取消回傳 false，什麼都不做；確定則拿掉離開保護後回傳 true。
+   */
+  async function confirmLeave() {
+    if (!(await window.confirmLeave())) {
+      return false;
+    }
+
+    releaseUnloadGuard();
+    return true;
+  }
+
   function emitPhase(phase) {
-    // 放在 onPhase 之前：沒有傳 onPhase 的呼叫端一樣要有離開保護。
+    // 在 onPhase 前執行，讓未傳入 onPhase 的呼叫端也有離開保護。
     guardUnload(PHASES_IN_PROGRESS.has(phase));
 
     if (!onPhase) {
@@ -360,6 +384,7 @@ export function mountDCCS(options) {
   let startedAtMs = null;
   let destroyed = false;
   let unloadHandler = null;
+  let unloadReleased = false;
   let settleDone;
   let rejectDone;
 
@@ -554,19 +579,35 @@ export function mountDCCS(options) {
       let levelPromptActive = false;
       let completedLevel = 0;
       let ended = false;
+      // 場次結束後送出成績的請求；送完（成功、失敗都會先存好）才能導頁。
+      let finalSubmission = null;
 
-      function leave() {
-        if (destroyed) return;
+      let leaveRequested = false;
+
+      // 先確認再存檔：取消時什麼都不送，遊戲照常繼續；確定後才送檢查點並回大廳。
+      async function leave() {
+        if (destroyed || leaveRequested) return;
+        leaveRequested = true;
+
+        if (!(await confirmLeave())) {
+          leaveRequested = false;
+          return;
+        }
+
         const stage = completedLevel >= 6 ? 6 : completedLevel >= 3 ? 3 : 0;
-        if (!stage || ended) {
-          window.askLeave('../Select/index.html');
+        if (destroyed || !stage || ended) {
+          // 場次已結束、成績還在送：等送完再導頁。導頁會中斷請求，失敗也來不及存到本機，
+          // 成績就不見了。送出有自己的 15 秒逾時（不受遊戲暫停影響），不會一直等。
+          // 這裡不另送一筆，leaveRequested 也維持 true，之後再按離開不會重來。
+          if (finalSubmission) await finalSubmission.catch(() => {});
+          window.leaveTo('../Select/index.html');
           return;
         }
         ended = true;
         void finish({ skipResult: true, stage })
           .catch(fail)
           .then(() => {
-            window.askLeave('../Select/index.html');
+            window.leaveTo('../Select/index.html');
           });
       }
 
@@ -738,11 +779,13 @@ export function mountDCCS(options) {
             );
           }
 
-          submitted =
-            await submitResult(
+          finalSubmission =
+            submitResult(
               payload,
               { url: submitUrl }
             );
+
+          submitted = await finalSubmission;
 
           if (destroyed) {
             return;
@@ -889,9 +932,12 @@ export function mountDCCS(options) {
     }
   }
 
+  // 場次開始前（載入、說明畫面）的離開：沒有成績可送，確認後直接回大廳。
   const exitApi = {
-    leave() {
-      window.askLeave('../Select/index.html');
+    async leave() {
+      if (await confirmLeave()) {
+        window.leaveTo('../Select/index.html');
+      }
     },
   };
 
@@ -901,8 +947,10 @@ export function mountDCCS(options) {
     done,
     destroy,
     leave() {
-      exitApi.leave();
+      return exitApi.leave();
     },
+    /** 雙人版自己問過、確定要離開時呼叫：之後導頁不再跳瀏覽器的離開詢問。 */
+    releaseUnloadGuard,
     get completedLevel() {
       return progressApi.completedLevel;
     },

@@ -1,17 +1,41 @@
-"""帳密登入端點與「每次 API 呼叫都驗身份」的測試。
+"""帳號與密碼登入端點，以及每次 API 請求身分驗證的測試。
 
 見 docs/adr/0004-teacher-student-password-login.md。
-不碰資料庫：hash_password/verify_password 的純函式往返。
-碰測試資料庫：登入成功/失敗、401（無/假/過期 token）、403（跨場域、跨角色）。
+純函式測試驗證 hash_password／verify_password，不存取資料庫。
+資料庫測試驗證登入成功與失敗、401（缺少、無效或過期的 token）、403（跨場域或跨角色）。
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from auth import generate_token, hash_password, verify_password
+import pytest
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-# --- 不碰資料庫 ---
+import main
+import queries
+import writes
+from auth import (
+    DUMMY_PASSWORD_HASH,
+    TOKEN_TTL,
+    generate_token,
+    hash_password,
+    is_usable_password_hash,
+    verify_password,
+)
+from models import StudentLoginRequest, TeacherLoginRequest
+from routers import auth as auth_router
+from routers import identity as identity_router
+from routers.identity import (
+    Identity,
+    get_current_identity,
+    require_same_school,
+    require_student,
+    require_teacher,
+)
+
+# 不存取資料庫
 
 
 def test_hash_and_verify_round_trip():
@@ -25,14 +49,20 @@ def test_verify_rejects_wrong_password():
 
 
 def test_hash_password_uses_random_salt_each_time():
-    # 同樣的明碼兩次雜湊要不同字串（不同 salt），否則資料庫外洩時可以用彩虹表比對。
+    # 相同明文密碼的兩次雜湊須使用不同 salt 並產生不同結果，避免資料外洩後可用彩虹表比對。
     assert hash_password("test1234") != hash_password("test1234")
 
 
 def test_verify_password_rejects_garbage_stored_value():
-    # 對應 password_hash 預設值 ''（尚未指派密碼的帳號）：格式不對一律回 False，
-    # 不拋例外——不然沒設密碼的帳號會讓登入端點噴 500 而不是「帳號或密碼錯誤」。
+    # password_hash 的預設值為空字串，表示尚未指派密碼。格式無效時，回傳 False，
+    # 避免未設定密碼的帳號產生 500，並顯示「帳號或密碼錯誤」。
     assert not verify_password("anything", "")
+
+
+# 資料庫裡的雜湊被改壞（迭代次數為 0、負數或超出範圍）時要當成登入失敗，不能變成 500。
+@pytest.mark.parametrize("iterations", ["0", "-1", "2147483648"])
+def test_verify_password_rejects_invalid_iterations(iterations):
+    assert not verify_password("anything", f"pbkdf2_sha256${iterations}$00$00")
     assert not verify_password("anything", "not-a-valid-format")
 
 
@@ -43,16 +73,200 @@ def test_generate_token_is_unique_and_url_safe():
         assert all(c.isalnum() or c in "-_" for c in token)
 
 
-# --- 碰測試資料庫：登入 ---
+# 不存取資料庫。以 monkeypatch 取代查詢。
+
+
+def _raise_twice(call):
+    """呼叫兩次並收集拋出的 HTTPException，用來比對是否為同一個物件。"""
+    raised = []
+    for _ in range(2):
+        with pytest.raises(HTTPException) as info:
+            call()
+        raised.append(info.value)
+    return raised
+
+
+def _traceback_depth(exc: BaseException) -> int:
+    depth, tb = 0, exc.__traceback__
+    while tb is not None:
+        depth, tb = depth + 1, tb.tb_next
+    return depth
+
+
+def test_auth_errors_are_fresh_exception_objects_per_request(monkeypatch):
+    """重複 raise 同一個模組層級 HTTPException，會讓 __traceback__ 一路累加
+    （記憶體只增不減），而且 frame 會留住登入失敗時的明碼密碼。每次都要是新物件。"""
+    monkeypatch.setattr(queries, "fetch_teacher_by_account", lambda account: None)
+    monkeypatch.setattr(queries, "fetch_student_by_account", lambda account: None)
+    student = Identity(subject_type="student", grade="G1", case_id="S01", school="A")
+    teacher = Identity(subject_type="teacher", teacher_id=1, school="A")
+    calls = {
+        "未登入": lambda: get_current_identity(None),
+        "老師端點擋學生": lambda: require_teacher(student),
+        "學生端點擋老師": lambda: require_student(teacher),
+        "跨場域": lambda: require_same_school(teacher, "B"),
+        "老師登入失敗": lambda: auth_router.teacher_login(
+            TeacherLoginRequest(account="T9999", password="secret-1")
+        ),
+        "學生登入失敗": lambda: auth_router.student_login(
+            StudentLoginRequest(account="S9999", password="secret-2")
+        ),
+    }
+    for label, call in calls.items():
+        first, second = _raise_twice(call)
+        assert first is not second, label
+        assert _traceback_depth(second) == _traceback_depth(first), label
+
+
+def test_auth_me_failures_do_not_grow_shared_traceback():
+    """經過 FastAPI 的真實請求路徑：多次 401 之後，模組層級不得留下帶 traceback 的例外。"""
+    with TestClient(main.app) as client:
+        for _ in range(20):
+            assert client.get("/api/auth/me").status_code == 401
+    for module in (identity_router, auth_router):
+        for name, value in vars(module).items():
+            if isinstance(value, BaseException):
+                assert value.__traceback__ is None, f"{module.__name__}.{name}"
+
+
+@pytest.mark.parametrize(
+    ("path", "fetch_name"),
+    [
+        ("/api/auth/teacher/login", "fetch_teacher_by_account"),
+        ("/api/auth/student/login", "fetch_student_by_account"),
+    ],
+)
+def test_login_unknown_account_still_runs_password_hash(monkeypatch, path, fetch_name):
+    """帳號不存在時也要跑一次 PBKDF2，否則回應時間差會洩漏哪些帳號存在。"""
+    monkeypatch.setattr(queries, fetch_name, lambda account: None)
+    verified = []
+
+    def spy_verify(password, stored):
+        verified.append((password, stored))
+        return verify_password(password, stored)
+
+    monkeypatch.setattr(auth_router, "verify_password", spy_verify)
+
+    with TestClient(main.app) as client:
+        response = client.post(path, json={"account": "NOBODY", "password": "guess"})
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "帳號或密碼錯誤"}
+    assert len(verified) == 1
+    password, stored = verified[0]
+    assert password == "guess"
+    # 假雜湊要跟真密碼用同樣的演算法與迭代次數，花費的時間才會一樣。
+    assert stored.split("$")[:2] == hash_password("x").split("$")[:2]
+
+
+UNUSABLE_STORED_HASHES = [
+    "",
+    None,
+    "garbage",
+    "pbkdf2_sha256$0$00$00",
+    "pbkdf2_sha256$-5$00$00",
+    "pbkdf2_sha256$abc$00$00",
+    "pbkdf2_sha256$99999999999999999999999$00$00",
+    "pbkdf2_sha256$260000$zz$00",
+    "md5$260000$00$00",
+]
+
+
+@pytest.mark.parametrize(
+    ("path", "fetch_name", "row"),
+    [
+        ("/api/auth/teacher/login", "fetch_teacher_by_account",
+         {"teacher_id": 7, "name": "吳老師", "school": "A"}),
+        ("/api/auth/student/login", "fetch_student_by_account",
+         {"grade": "G1", "case_id": "S01", "school": "A"}),
+    ],
+)
+@pytest.mark.parametrize("stored", UNUSABLE_STORED_HASHES)
+def test_login_with_unusable_stored_hash_still_runs_password_hash(
+    monkeypatch, path, fetch_name, row, stored
+):
+    """帳號存在但 password_hash 是空的／壞掉的：verify_password 會立刻回 False、不跑
+    PBKDF2，回應時間會比「帳號不存在」短，洩漏帳號存在。必須改跑一次假雜湊。"""
+    monkeypatch.setattr(queries, fetch_name, lambda account: {**row, "password_hash": stored})
+    verified = []
+
+    def spy_verify(password, stored_hash):
+        verified.append(stored_hash)
+        return verify_password(password, stored_hash)
+
+    monkeypatch.setattr(auth_router, "verify_password", spy_verify)
+
+    with TestClient(main.app) as client:
+        response = client.post(path, json={"account": "A1", "password": "guess"})
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "帳號或密碼錯誤"}
+    assert verified == [DUMMY_PASSWORD_HASH]
+
+
+@pytest.mark.parametrize("stored", UNUSABLE_STORED_HASHES)
+def test_is_usable_password_hash_rejects_unusable_values(stored):
+    assert not is_usable_password_hash(stored)
+
+
+def test_is_usable_password_hash_accepts_real_hash():
+    assert is_usable_password_hash(hash_password("pw"))
+    assert is_usable_password_hash(DUMMY_PASSWORD_HASH)
+
+
+@pytest.mark.parametrize(
+    ("path", "fetch_name", "row"),
+    [
+        ("/api/auth/teacher/login", "fetch_teacher_by_account",
+         {"teacher_id": 7, "name": "吳老師", "school": "A"}),
+        ("/api/auth/student/login", "fetch_student_by_account",
+         {"grade": "G1", "case_id": "S01", "school": "A"}),
+    ],
+)
+def test_login_response_includes_relative_lifetime(monkeypatch, path, fetch_name, row):
+    """expiresIn（秒）讓前端用自己的時鐘算到期時間，裝置時鐘快慢不影響登入長度。"""
+    stored = hash_password("right-password")
+    monkeypatch.setattr(queries, fetch_name, lambda account: {**row, "password_hash": stored})
+    monkeypatch.setattr(writes, "insert_login_session", lambda *args, **kwargs: None)
+
+    with TestClient(main.app) as client:
+        before = datetime.now(timezone.utc)
+        response = client.post(path, json={"account": "A1", "password": "right-password"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["expiresIn"] == int(TOKEN_TTL.total_seconds())
+    expires_at = datetime.fromisoformat(body["expiresAt"])
+    assert abs((expires_at - before).total_seconds() - body["expiresIn"]) < 5
+
+
+def test_auth_me_includes_remaining_lifetime(monkeypatch):
+    """/api/auth/me 回傳剩餘秒數；與 expiresAt 減去伺服器現在時間一致。"""
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=20)
+    monkeypatch.setattr(queries, "fetch_login_session", lambda token: {
+        "subject_type": "student", "grade": "G1", "case_id": "S01",
+        "school": "A", "expires_at": expires_at,
+    })
+
+    with TestClient(main.app) as client:
+        response = client.get("/api/auth/me", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 200
+    remaining = response.json()["expiresIn"]
+    assert isinstance(remaining, int)
+    assert 20 * 60 - 5 <= remaining <= 20 * 60
+
+
+# 測試資料庫：登入
 
 
 def test_teacher_login_succeeds_with_correct_password(client, db):
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "right-password"},
+        json={"account": "T001", "password": "right-password"},
     )
 
     assert response.status_code == 200
@@ -64,11 +278,11 @@ def test_teacher_login_succeeds_with_correct_password(client, db):
 
 def test_teacher_login_rejects_wrong_password(client, db):
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "wrong"},
+        json={"account": "T001", "password": "wrong"},
     )
 
     assert response.status_code == 401
@@ -86,16 +300,17 @@ def test_teacher_login_rejects_unknown_account(client, db):
 
 
 def test_teacher_login_account_is_global_not_scoped_to_a_school(client, db):
-    """account 是全域唯一的，不像 teacher.name 只在 school 內唯一——同一個帳號
-    不管哪個場域建的，登入只認 account+password，不用也不能再帶 school。"""
+    """account 為全域唯一。teacher.name 僅在 school 內唯一。
+登入只使用 account 與 password，不接受 school。
+"""
     db.insert_school("A")
     db.insert_school("B")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
-    db.insert_teacher("陳老師", "B", password="other-password", account="T0002")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    db.insert_teacher("陳老師", "B", password="other-password", account="T002")
 
     response = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0002", "password": "other-password"},
+        json={"account": "T002", "password": "other-password"},
     )
 
     assert response.status_code == 200
@@ -103,11 +318,11 @@ def test_teacher_login_account_is_global_not_scoped_to_a_school(client, db):
 
 
 def test_student_login_succeeds_with_correct_password(client, db):
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     response = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "right-password"},
+        json={"account": "S001", "password": "right-password"},
     )
 
     assert response.status_code == 200
@@ -127,17 +342,17 @@ def _as_utc(value: datetime) -> datetime:
 def test_teacher_and_student_login_expire_after_one_hour(client, db):
     """登入憑證 1 小時後失效。回應的 expiresAt 與 login_session 一致。"""
     db.insert_school("A")
-    db.insert_teacher("吳老師", "A", password="right-password", account="T0001")
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     before = datetime.now(timezone.utc)
     teacher = client.post(
         "/api/auth/teacher/login",
-        json={"account": "T0001", "password": "right-password"},
+        json={"account": "T001", "password": "right-password"},
     )
     student = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "right-password"},
+        json={"account": "S001", "password": "right-password"},
     )
     after = datetime.now(timezone.utc)
 
@@ -157,11 +372,11 @@ def test_teacher_and_student_login_expire_after_one_hour(client, db):
 
 
 def test_student_login_rejects_wrong_password(client, db):
-    db.insert_student("G1", "S01", "A", password="right-password", account="S0001")
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
 
     response = client.post(
         "/api/auth/student/login",
-        json={"account": "S0001", "password": "wrong"},
+        json={"account": "S001", "password": "wrong"},
     )
 
     assert response.status_code == 401
@@ -176,7 +391,7 @@ def test_student_login_rejects_unknown_account(client, db):
     assert response.status_code == 401
 
 
-# --- 碰測試資料庫：401 / 403 ---
+# 測試資料庫：401／403
 
 
 def test_protected_endpoint_requires_token(client, db):
@@ -195,7 +410,7 @@ def test_protected_endpoint_rejects_garbage_token(client, db):
 def test_protected_endpoint_rejects_expired_token(client, db, login_as_teacher):
     _, headers = login_as_teacher(school="A")
     token = headers["Authorization"].removeprefix("Bearer ")
-    # 直接把這筆 session 的 expires_at 改到過去，模擬 token 過期。
+    # 將此登入憑證的 expires_at 設為過去時間，模擬 token 過期。
     db.execute(
         "UPDATE login_session SET expires_at = %s WHERE token = %s",
         [datetime.now(timezone.utc) - timedelta(hours=1), token],
@@ -271,3 +486,14 @@ def test_logout_invalidates_token(client, db, login_as_teacher):
 def test_logout_without_token_is_a_no_op(client, db):
     response = client.post("/api/auth/logout")
     assert response.status_code == 204
+
+
+# 登入帳號格式：三位數（S001、T001），與目前資料庫裡實際指派的帳號一致；超過 999 自然變四位數。
+def test_account_format_is_three_digits():
+    from auth import student_account, teacher_account
+
+    assert student_account(1) == "S001"
+    assert student_account(18) == "S018"
+    assert teacher_account(1) == "T001"
+    assert teacher_account(329) == "T329"
+    assert student_account(1000) == "S1000"
