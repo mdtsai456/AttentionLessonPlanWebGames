@@ -1,6 +1,5 @@
 // js/main.js
-import { generateUUID } from './api.js';
-import { createPlayer } from './game.js?v=10';
+import { createPlayer } from './game.js?v=12';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
@@ -23,22 +22,33 @@ async function withExitLock(action) {
   }
 }
 
-async function exitGame(confirmLeave = true) {
+// askFirst：「離開」與結算的「返回遊戲大廳」先在頁面內確認（#41），兩人都打完六關就不再問；
+// 第 3 關中場的「返回遊戲大廳」是明確選擇，不確認。確定後才存檢查點，取消就什麼都不送。
+async function exitGame(askFirst = true) {
+  if (exitPending) return;
+  const finished = Math.min(...players.map((player) => player.completedStages())) >= 6;
+  if (askFirst && !finished && !(await window.confirmLeave())) {
+    // 取消後焦點會回到「離開」；空白鍵／Enter 在離開鈕上不算作答，移開焦點讓按鍵回到遊戲。
+    document.activeElement?.blur?.();
+    return;
+  }
+  // 確認離開後遊戲維持暫停到導頁；存檔沒成功留在頁面時解除暫停，遊戲照常繼續。
+  const stay = () => window.cancelLeave?.();
   await withExitLock(async () => {
     const completed = Math.min(...players.map((player) => player.completedStages()));
     if (completed >= 6) {
       const saved = await Promise.all(players.map((player) => player.whenSaved()));
-      if (saved.some((result) => result === false)) return;
+      if (saved.some((result) => result === false)) { stay(); return; }
       safeNavigateTo('../Select/index.html');
       return;
     }
     const stage = completed >= 3 ? 3 : 0;
     if (playMode === 'game' && stage) {
+      // 已送過第 6 關的玩家：已儲存視為完成、結果不明或失敗則不改送第 3 關（dat-save）
       const results = await Promise.all(players.map((player) => player.saveRun(stage)));
-      if (!results.every(Boolean)) return;
+      if (!results.every(Boolean)) { stay(); return; }
     }
-    if (confirmLeave) window.askLeave('../Select/index.html');
-    else safeNavigateTo('../Select/index.html');
+    safeNavigateTo('../Select/index.html');
   });
 }
 
@@ -111,12 +121,12 @@ function refreshSaveControls() {
   const statuses = players.map((player) => player.saveStatus());
   const messages = players.map((player, index) => `玩家${index + 1}：${document.querySelector(`.player-${index + 1} [data-ui="save-status"]`).textContent}`);
   document.getElementById('checkpoint-save-status').textContent = messages.join('　');
-  document.getElementById('checkpoint-retry-save').hidden = !statuses.includes('failed');
+  document.getElementById('checkpoint-retry-save').hidden = !players.some((player) => player.canRetrySave());
   const resultsVisible = [...document.querySelectorAll('[data-ui="results"]')].every((panel) => !panel.hidden);
   document.getElementById('save-notice').hidden = resultsVisible || statuses.every((status) => status === 'idle' || status === 'saved');
 }
 document.getElementById('checkpoint-retry-save').addEventListener('click', () => {
-  players.filter((player) => player.saveStatus() === 'failed').forEach((player) => player.retrySave());
+  players.filter((player) => player.canRetrySave()).forEach((player) => player.retrySave());
 });
 
 function restartSession() {
@@ -131,7 +141,7 @@ function beginSession() {
   playerPracticeFinished = [false, false];
   document.getElementById('save-notice').hidden = true;
   clearMidBreak();
-  currentGamePairId = generateUUID();
+  currentGamePairId = window.WebGameApi.uuid();
   const formalButton = document.getElementById('enter-formal-btn');
   if (playMode === 'game') {
     if (formalButton) formalButton.hidden = true;
@@ -153,7 +163,7 @@ if (enterFormalButton) {
     document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
-    currentGamePairId = generateUUID();
+    currentGamePairId = window.WebGameApi.uuid();
     players.forEach((player) => player.startGame());
   });
 }
@@ -176,11 +186,11 @@ function preventLeaveHandler(event) {
 
 window.addEventListener('beforeunload', preventLeaveHandler);
 
+// 已決定離開：先拿掉自己的 beforeunload，才不會再跳出瀏覽器的離開詢問。
 export function safeNavigateTo(url) {
-  window.__askLeave = false;
   window.removeEventListener('beforeunload', preventLeaveHandler);
   window.onbeforeunload = null;
-  window.location.href = url;
+  window.leaveTo(url);
 }
 
 const midContinue = document.getElementById('mid-continue');

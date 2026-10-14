@@ -11,7 +11,7 @@ const scriptPath = path.join(siteRoot, 'shared/dat-assets.js');
 const defaults = ['assets/animals/rabbit.png', 'assets/animals/cat.png'];
 const apiUrl = 'https://assets.example/api/students/S001/assets';
 
-function harness(fetchImpl = async () => ({ ok: true, json: async () => ({}) })) {
+function harness(fetchImpl = async () => ({ ok: true, json: async () => ({}) }), extra = {}) {
   let nextTimer = 0;
   const timers = new Map();
   const images = [];
@@ -23,6 +23,7 @@ function harness(fetchImpl = async () => ({ ok: true, json: async () => ({}) }))
     window: {}, URL, AbortController, fetch: fetchImpl, Image: ControlledImage,
     setTimeout(fn) { const id = ++nextTimer; timers.set(id, fn); return id; },
     clearTimeout(id) { timers.delete(id); },
+    ...extra,
   });
   // 缺少正式程式碼時，測試應因缺少 API 而失敗，不因檔案讀取錯誤而失敗。
   const source = fs.existsSync(scriptPath) ? fs.readFileSync(scriptPath, 'utf8') : '';
@@ -154,4 +155,83 @@ test('setImage 的世代按元素獨立，圖片失敗只替換該元素', async
   assert.equal(await second, 'second-new.png');
   assert.equal(firstElement.src, 'first-fallback.png');
   assert.equal(secondElement.src, 'second-new.png');
+});
+
+// R6：跨來源上傳圖要以 CORS 載入，命中遮罩才讀得到透明度；伺服器不給 CORS 時仍要顯示圖片。
+function pageHarness() {
+  return harness(undefined, {
+    location: { origin: 'http://game.example' },
+    document: { baseURI: 'http://game.example/DAT_single/DAT_single.html' },
+  });
+}
+
+// 記錄 crossOrigin 與 src 的設定順序：crossOrigin 要先設，否則已用非 CORS 方式開始載入
+function recordingElement() {
+  const log = [];
+  return {
+    log,
+    get crossOrigin() { return this._crossOrigin ?? null; },
+    set crossOrigin(value) { log.push(['crossOrigin', value]); this._crossOrigin = value; },
+    get src() { return this._src; },
+    set src(value) { log.push(['src', value]); this._src = value; },
+  };
+}
+
+test('跨來源圖片先設 crossOrigin=anonymous 再設 src，畫面元素用同樣的 CORS 模式（R6）', async () => {
+  const assets = pageHarness();
+  const element = recordingElement();
+  const result = assets.setImage(element, 'https://assets.example/uploads/cat.png', 'fallback.png');
+  assert.equal(assets.images.length, 1);
+  assert.equal(assets.images[0].crossOrigin, 'anonymous');
+  assets.images[0].emit('load');
+  assert.equal(await result, 'https://assets.example/uploads/cat.png');
+  assert.deepEqual(element.log, [['crossOrigin', 'anonymous'], ['src', 'https://assets.example/uploads/cat.png']]);
+  assert.equal(assets.timers.size, 0);
+});
+
+test('同源圖片不設 crossOrigin，畫面元素原本的 crossOrigin 會拿掉（R6）', async () => {
+  const assets = pageHarness();
+  const element = recordingElement();
+  element._crossOrigin = 'anonymous';
+  const result = assets.setImage(element, 'assets/animals/dog.png', 'fallback.png');
+  assert.equal(assets.images[0].crossOrigin, undefined);
+  assets.images[0].emit('load');
+  assert.equal(await result, 'assets/animals/dog.png');
+  assert.deepEqual(element.log, [['crossOrigin', null], ['src', 'assets/animals/dog.png']]);
+});
+
+test('CORS 載入失敗時改用一般載入仍顯示原圖，畫面元素不帶 crossOrigin（R6）', async () => {
+  const assets = pageHarness();
+  const element = recordingElement();
+  const src = 'https://cdn.example/no-cors.png';
+  const result = assets.setImage(element, src, 'fallback.png');
+  assets.images[0].emit('error');
+  assert.equal(assets.images.length, 2, '再試一次一般載入');
+  assert.equal(assets.images[0].onload, null);
+  assert.equal(assets.images[1].crossOrigin, undefined);
+  assert.equal(assets.images[1].src, src);
+  assets.images[1].emit('load');
+  assert.equal(await result, src);
+  assert.deepEqual(element.log, [['src', src]]);
+  assert.equal(assets.timers.size, 0);
+  // 之後同一張圖直接用一般載入，不再先失敗一次
+  const again = assets.loadImage(src, 'fallback.png');
+  assert.equal(assets.images[2].crossOrigin, undefined);
+  assets.images[2].emit('load');
+  assert.equal(await again, src);
+});
+
+test('CORS 與一般載入都失敗才回備援圖，逾時仍有效（R6）', async () => {
+  const assets = pageHarness();
+  const failed = assets.loadImage('https://cdn.example/missing.png', 'fallback.png');
+  assets.images[0].emit('error');
+  assets.images[1].emit('error');
+  assert.equal(await failed, 'fallback.png');
+  assert.equal(assets.timers.size, 0);
+  assert.equal(assets.images[1].onerror, null);
+
+  const slow = assets.loadImage('https://cdn.example/slow.png', 'fallback.png', 20);
+  assets.expire();
+  assert.equal(await slow, 'fallback.png');
+  assert.equal(assets.images[2].onload, null);
 });

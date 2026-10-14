@@ -38,6 +38,7 @@ let stage = 1;
 let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
+let midStageStats = null; // 第 3 關結束時的統計，供第 4–5 關離開時的中場檢查點使用
 
 let saver;
 function showSaveStatus({ status, message, retryable }) {
@@ -64,7 +65,8 @@ function startGame() {
   stageDeadline = 0;
   stageQuestionNo = 0;
   levelOutcomes = [[]];
-  questions = isPractice ? generateRandomQuestions(QUESTIONS_PER_STAGE) : [];
+  midStageStats = null;
+  questions = isPractice ? generatePracticeQuestions(QUESTIONS_PER_STAGE) : [];
 
   index = score = wrong = offTarget = timedOut = elapsed = 0;
   consecutiveCorrect = 0; // 重置動物升級的連擊數。
@@ -168,13 +170,10 @@ function generateMathQuestion() {
   };
 }
 
-function generateRandomQuestions(count = 10) {
-  const list = [];
-  for (let i = 0; i < count; i++) {
-    const q = Math.random() < 0.5 ? generateColorQuestion() : generateMathQuestion();
-    list.push(q);
-  }
-  return list;
+// 練習固定顏色、數學輪流出題（2 題即各 1 題）；正式模式才每題隨機
+function generatePracticeQuestions(count) {
+  const generators = [generateColorQuestion, generateMathQuestion];
+  return Array.from({ length: count }, (_, i) => generators[i % generators.length]());
 }
 
 function enableAnswers(enabled) {
@@ -219,26 +218,7 @@ function renderPositions() {
 }
 
 function isOnAnimal() {
-  const field = $('field').getBoundingClientRect();
-  const aimX = field.left + aim.x / 100 * field.width;
-  const aimY = field.top + aim.y / 100 * field.height;
-  const animalRect = $('animal').getBoundingClientRect();
-  if (animalRect.width && animalRect.height) {
-    const radius = Math.min(animalRect.width, animalRect.height) * 0.36;
-    const centerX = animalRect.left + animalRect.width / 2;
-    const centerY = animalRect.top + animalRect.height / 2;
-    if (Math.hypot(aimX - centerX, aimY - centerY) <= radius) return true;
-  }
-  if (typeof RABBIT_HIT_MASK === 'undefined') return false;
-  const rect = $('animal-image').getBoundingClientRect();
-  const size = Math.min(rect.width, rect.height);
-  if (!size) return false;
-  const left = rect.left + (rect.width - size) / 2;
-  const top = rect.top + (rect.height - size) / 2;
-  const x = Math.floor((aimX - left) / size * 128);
-  const y = Math.floor((aimY - top) / size * 128);
-  if (x < 0 || y < 0 || x >= 128 || y >= 128) return false;
-  return RABBIT_HIT_MASK[y][x] === '1';
+  return window.DatAssets.isOnAnimal($('field'), $('animal'), $('animal-image'), aim);
 }
 
 function showQuestion(previousFeedback = '') {
@@ -270,8 +250,13 @@ function updateClock() {
   $('time-fill').style.width = `${Math.max(0, (1 - elapsed / limit) * 100)}%`;
 }
 
+// 遊戲時鐘暫停時（例如確認離開後正在存檢查點、視窗太小）不接受作答與移動，分數不能再變。
+function runtimePaused() {
+  return Boolean(window.WebGameRuntime?.paused);
+}
+
 function answer() {
-  if (phase !== 'answer' || paused || document.hidden || submitted || elapsed >= answerLimitMs()) return;
+  if (phase !== 'answer' || paused || runtimePaused() || document.hidden || submitted || elapsed >= answerLimitMs()) return;
   submitted = true;
   recordResult(true);
   enableAnswers(false);
@@ -296,7 +281,9 @@ function updateAnimalImage(newIndex) {
     // 升級時先縮小圖片，再恢復原尺寸。
     animalImgElem.style.transform = 'scale(0.6)';
 
-    window.DatAssets.setImage(animalImgElem, targetAssetUrl).then(() => {
+    // 升級素材失敗時保留目前可用圖片，避免已變身的貓退回預設兔子。
+    const currentImage = animalImgElem.getAttribute('src') || DEFAULT_ANIMAL_PATH;
+    window.DatAssets.setImage(animalImgElem, targetAssetUrl, currentImage).then(() => {
       if (imageGeneration !== animalImageGeneration) return;
       animalImgElem.style.opacity = '1';
       animalImgElem.style.transform = 'scale(1)';
@@ -320,7 +307,8 @@ function recordResult(pressed) {
   const isSuccess = correct && onTarget;
   const hadStreak = consecutiveCorrect > 0;
   let message;
-  reactionSamples.push(elapsed);
+  // 只有實際按鍵才有反應時間；「不要按」的等待與漏答不列入平均
+  if (pressed) reactionSamples.push(elapsed);
 
   if (isSuccess) {
     consecutiveCorrect++;
@@ -432,6 +420,7 @@ function endQuestion() {
 
   // 修正最後一秒連續產生多題的問題。
   if (stageDeadline && window.WebGameRuntime.now() >= stageDeadline - 20) {
+    if (stage === MID_STAGE) midStageStats = statsSnapshot();
     if (stage >= STAGE_COUNT) finishGame();
     else showStageClearModal(stage);
     return;
@@ -444,7 +433,17 @@ function answeredCount() {
 }
 
 
-function sessionMetrics() {
+// 目前累計的統計；at 為取樣時的遊戲時間
+function statsSnapshot() {
+  return {
+    score, wrong, offTarget, timedOut, activeMs, focusMs,
+    reactionSamples: [...reactionSamples],
+    at: window.WebGameRuntime.now(),
+  };
+}
+
+function sessionMetrics(stats) {
+  const { score, wrong, offTarget, reactionSamples, activeMs, focusMs } = stats;
   const questionCount = score + wrong + offTarget;
   const avgReactionMs = reactionSamples.length
     ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
@@ -459,14 +458,17 @@ function sessionMetrics() {
 }
 
 function saveCurrentRun(stage) {
-  const metrics = sessionMetrics();
+  // 第 4–5 關離開時存的是第 3 關檢查點，統計停在第 3 關結束，不含之後的作答
+  const stats = stage === MID_STAGE && midStageStats ? midStageStats : statsSnapshot();
+  const metrics = sessionMetrics(stats);
   return saveGameDataToBackend({
-    score: score,
-    wrong: wrong,
-    offTarget: offTarget,
-    timedOut: timedOut,
+    score: stats.score,
+    wrong: stats.wrong,
+    offTarget: stats.offTarget,
+    timedOut: stats.timedOut,
     accuracy: metrics.accuracy,
-    duration: window.WebGameRuntime.now() - gameStartTime,
+    duration: stats.at - gameStartTime,
+    endTime: stats.at,
     stage: stage,
     levelAccuracy: levelAccuracyText(stage),
     avgReactionMs: metrics.avgReactionMs,
@@ -500,13 +502,18 @@ function checkpointStage() {
   return 0;
 }
 
+// 已決定離開（確認過、或按了中場／結算的「返回遊戲大廳」）：存檢查點後回選遊戲頁。
+// 先拿掉自己的 beforeunload，才不會再跳出瀏覽器的離開詢問。
+// 確認離開後遊戲維持暫停到導頁；存檔沒成功留在頁面時解除暫停，遊戲照常繼續。
 async function returnToLobby() {
   await withExitLock(async () => {
     const checkpoint = checkpointStage();
-    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
+    if (checkpoint && !(await saveCurrentRun(checkpoint))) {
+      window.cancelLeave?.();
+      return;
+    }
     window.removeEventListener('beforeunload', blockUnload);
-    window.__askLeave = false;
-    window.location.href = '../Select/index.html';
+    window.leaveTo('../Select/index.html');
   });
 }
 
@@ -573,7 +580,8 @@ async function saveGameDataToBackend(data) {
       school: school,
       currentDay: currentDay,
       startTime: window.WebGameRuntime.toWallTime(gameStartTime),
-      endTime: Date.now(),
+      // 檢查點帶的是該關結束的時間；沒帶時（直接呼叫）用現在，不能送出 null。
+      endTime: data.endTime == null ? Date.now() : window.WebGameRuntime.toWallTime(data.endTime),
       mode: "single",
       stats: [
         { apiname: "DAT_correct",  value: data.score },
@@ -639,17 +647,16 @@ function tick(time) {
 $('answer-true').addEventListener('click', answer);
 $('restart').addEventListener('click', () => { if (phase === 'finished') startGame(); });$('leave-btn').addEventListener('click', leaveGame);
 
+// 遊戲中按「離開」：先在頁面內確認，確定後才存檢查點並離開；取消就什麼都不送（#41）。
+// 打完（含練習結束）直接回大廳，不再確認。
+// 取消後焦點會回到「離開」；空白鍵在離開鈕上不算作答，會再按到離開，所以移開焦點讓按鍵回到遊戲。
 async function leaveGame() {
-  if (phase === 'finished') {
-    await returnToLobby();
+  if (exitPending) return;
+  if (phase !== 'finished' && !(await window.confirmLeave())) {
+    $('leave-btn').blur();
     return;
   }
-  await withExitLock(async () => {
-    const checkpoint = checkpointStage();
-    if (checkpoint && !(await saveCurrentRun(checkpoint))) return;
-    window.removeEventListener('beforeunload', blockUnload);
-    window.askLeave('../Select/index.html');
-  });
+  await returnToLobby();
 }
 $('retry-save').addEventListener('click', () => saver.retry());
 $('checkpoint-retry-save').addEventListener('click', () => saver.retry());
@@ -670,7 +677,7 @@ document.addEventListener('keydown', (event) => {
     buttons[next].focus();
     return;
   }
-  if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused) {
+  if (bindings[event.code] && ['aiming', 'answer'].includes(phase) && !paused && !runtimePaused()) {
     event.preventDefault(); keys.add(event.code);
   }
   if (event.code === 'Space' && phase === 'answer' && !paused && event.target?.id !== 'leave-btn') {
@@ -681,7 +688,7 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('keyup', (event) => keys.delete(event.code));
 document.querySelectorAll('[data-move]').forEach((button) => {
   button.addEventListener('pointerdown', (event) => {
-    if (paused || !['aiming', 'answer'].includes(phase)) return;
+    if (paused || runtimePaused() || !['aiming', 'answer'].includes(phase)) return;
     event.preventDefault();
     button.setPointerCapture(event.pointerId);
     pointerDirections.set(event.pointerId, button.dataset.move);
