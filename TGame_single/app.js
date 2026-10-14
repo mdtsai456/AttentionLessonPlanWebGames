@@ -388,9 +388,9 @@ function endLevel() {
 }
 
 function showLocalStageClear(isMidBreak) {
-  stageClearTitle.textContent = isMidBreak ? "挑戰完成！" : `第 ${state.level} 關結束`;
+  stageClearTitle.textContent = isMidBreak ? "中場休息" : `第 ${state.level} 關結束`;
   stageClearText.innerHTML = isMidBreak
-    ? "第 3 關已結束<br>要繼續遊玩嗎？"
+    ? "已完成一半的遊玩進度<br>要繼續遊玩嗎？"
     : "準備開始下一關嘍！";
   nextStageBtn.textContent = isMidBreak ? "繼續遊玩" : "繼續";
   lobbyBtn.classList.toggle("is-hidden", !isMidBreak);

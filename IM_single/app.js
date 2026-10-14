@@ -1004,7 +1004,7 @@ async function endStage(holdMs = 0) {
 /** 顯示中場畫面，並送出 progress = 50 的結果，使用 Unity 的中場送出規則。 */
 function showMidway() {
   state.busy = true;
-  midwayText.innerHTML = "第 3 關已結束<br>要繼續遊玩嗎？";
+  midwayText.innerHTML = "已完成一半的遊玩進度<br>要繼續遊玩嗎？";
   midwayPanel.classList.remove("is-hidden");
 }
 
