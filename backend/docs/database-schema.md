@@ -41,7 +41,7 @@ erDiagram
         varchar name "老師姓名 UNIQUE(school,name)"
         varchar school FK "所屬場域"
         varchar password_hash "帳密登入 2026-09"
-        varchar account "全域唯一登入帳號 T0001 2026-09"
+        varchar account "全域唯一登入帳號 T001 2026-09"
     }
     student {
         varchar grade PK "年級 例 G1"
@@ -49,7 +49,7 @@ erDiagram
         varchar school PK "場域 FK 到 school"
         varchar password_hash "帳密登入 2026-09"
         int student_id "代理鍵 UNIQUE 2026-09"
-        varchar account "全域唯一登入帳號 S0001 2026-09"
+        varchar account "全域唯一登入帳號 S001 2026-09"
     }
     login_session {
         varchar token PK "Authorization Bearer 帶這個"
@@ -143,7 +143,7 @@ erDiagram
 
 `(grade, case_id)` 每個場域都會重複（每場域都有 `G1_S01`），沒辦法單獨當全域唯一
 的登入帳號來源，所以加一個 `student_id int AUTO_INCREMENT UNIQUE`，純粹拿來推導
-`account`（格式 `S0001`）。**不動**原本 `(grade, case_id, school)` 複合主鍵，
+`account`（格式 `S001`）。**不動**原本 `(grade, case_id, school)` 複合主鍵，
 `assessment_result` 等表的外鍵完全不受影響。
 
 ### 新增 `login_session`

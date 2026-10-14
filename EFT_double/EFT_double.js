@@ -2,7 +2,7 @@ import { buildEftStats } from '../shared/eft-game-logic.js';
 import { preloadEftAssets } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
-// 每關 60 秒、共 6 關。時間內答完就繼續出題；單題 10 秒沒答算錯並換下一題。
+// 每關 60 秒，共 6 關。關卡時間內持續出題。單題 10 秒未作答時，計為錯誤並換題。
 const STAGE_COUNT = 6;
 const MID_STAGE = 3;
 
@@ -46,7 +46,8 @@ let pairId = '';
 // 兩人都打完六關才開放「再玩一次」，避免先打完的人把還在玩的搭檔一起重設。
 const finished = [false, false];
 
-// 漂浮泡泡成績送 EFT；素材 API 也讀 EFT。回傳伺服器回應，連線失敗時回傳 undefined。
+// 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
+// 回傳伺服器回應。連線失敗時回傳 undefined。
 function savePlayerRun(player, playerIndex, stage) {
     const identity = getPlayerIdentity(playerIndex);
     const state = player.getState();

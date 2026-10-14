@@ -1,50 +1,50 @@
 // =============================================================================
 // IM_single / 指令出擊（Instruction Memory）
 //
-// 對齊 Unity Instruction Memory：每關隨機產生房間地圖，玩家用左右移動
-// 靠近門或物品，再以空白鍵／點擊執行 Take（拿取）、Place（放下）、
-// GoTo（進房）。背包固定四格。
+// 依 Unity Instruction Memory 的規則，每關隨機產生房間地圖。玩家左右移動，
+// 靠近門或物品後，按空白鍵或點擊，執行 Take（拿取）、Place（放下）或
+// GoTo（進入房間）。背包固定四格。
 //
-// 一局流程：
+// 場次流程：
 //   init → startGame → prepareStage（出題卡、生成地圖）
 //        → beginCurrentStage（開始倒數與移動）
 //        → 過關或逾時 → finishOrAdvance
-//        → 第 3 關後中場休息，或進入下一關，全部完成則 finishGame
+// 完成第 3 關後顯示中場休息。其餘關卡進入下一關，全部完成後呼叫 finishGame。
 //
-// 目前純前端；拉題與交卷的後端接點在檔案底部 fetchQuestions / submitResult。
+// 目前由前端執行。檔案底部的 fetchQuestions／submitResult 預留題目讀取與成績送出介面。
 // =============================================================================
 
 // -----------------------------------------------------------------------------
 // 常數
 // -----------------------------------------------------------------------------
 
-/** 第幾關結束後跳出中場休息（0-based：index 即將變成 3，也就是打完前 3 關）。 */
+/** 第 3 關結束後顯示中場休息。索引從 0 開始，此時 index 即將變為 3。 */
 const MIDWAY_STAGE = 3;
 const TIME_LIMIT_SEC = 60;
 /** 背包格數上限。 */
 const BAG_SIZE = 4;
 /** 左右移動速度（畫面寬度百分比 / 秒）。 */
 const MOVE_SPEED = 26;
-/** 與門、物品判定「靠近」的水平距離（同樣是畫面寬度百分比）。 */
+/** 玩家可與門或物品互動的水平距離，單位為畫面寬度百分比。 */
 const NEAR_RANGE = 7.5;
-/** 玩家可走到的左右邊界，避免走出畫面。 */
+/** 玩家移動的左右邊界，避免離開畫面。 */
 const PLAYER_MIN = 10;
 const PLAYER_MAX = 90;
-/** 狗狗待機／走路動畫每幀間隔。 */
+/** 角色待機與行走動畫的每幀間隔。 */
 const IDLE_FRAME_MS = 180;
 const WALK_FRAME_MS = 90;
-/** 進房時黑幕淡入淡出時長。 */
+/** 進入房間時，黑色覆蓋層的淡入與淡出時長。 */
 const ROOM_FADE_MS = 280;
-/** GoTo 題走進正確房間後，多等一下再過關，讓玩家看清楚。 */
+/** GoTo 題進入正確房間後，等待玩家看清畫面再判定過關。 */
 const GOTO_WAIT_MS = 1000;
-/** 後端進度只允許 0 / 50 / 100 三檔。 */
+/** 後端進度僅接受 0／50／100 三個值。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
 // -----------------------------------------------------------------------------
 // 房間與物品資料
 // -----------------------------------------------------------------------------
 
-/** Unity 房間類型 id；畫面中文名與背景圖用下面兩張表對應。 */
+/** Unity 房間類型 id。下方兩個表提供中文名稱與背景圖片的對應關係。 */
 const ROOM_TYPES = ["Kitchen", "LivingRoom", "Bedroom", "Bathroom", "Study"];
 const ROOM_LABEL = {
   Kitchen: "廚房",
@@ -61,7 +61,7 @@ const ROOM_SCENE = {
   Study: "img/scene/studyroom.png",
 };
 
-/** 物品 id → 中文名。圖檔路徑固定為 img/object/{id}.png。 */
+/** 物品 id 對應中文名稱。圖片路徑固定為 img/object/{id}.png。 */
 const OBJECT_LABEL = {
   apple: "蘋果",
   banana: "香蕉",
@@ -79,8 +79,8 @@ const OBJECT_LABEL = {
 const OBJECTS = Object.keys(OBJECT_LABEL);
 
 /**
- * 每個房間固定四個放置點（由左到右）。
- * x 是畫面寬度百分比，對應狗狗走到該位置才能互動。
+ * 每個房間由左至右設置四個放置點。
+ * x 是畫面寬度百分比。角色移動至該位置後，才能互動。
  */
 const ZONE_LAYOUT = [
   { id: "ZoneC", x: 20 },
@@ -91,7 +91,7 @@ const ZONE_LAYOUT = [
 
 /**
  * 門在畫面上的水平位置。
- * 同一房間若同時有上、下門，會左右錯開，避免疊在一起。
+ * 同一房間同時有上門與下門時，將兩者左右錯開，避免重疊。
  */
 const DOOR_X = { left: 8, right: 92, up: 44, down: 56 };
 
@@ -101,9 +101,9 @@ const PLAYER_WALK = [1, 2, 3, 4, 5, 6, 7, 8].map(
 );
 
 /**
- * 後端尚未接上時使用的本地題庫。
- * problemType：Take 拿取 / Place 放到指定房間 / GoTo 走到指定房間
- * targetRoom 為 "None" 代表不限房間。
+ * 未連接後端時，使用此本地題庫。
+ * problemType：Take 拿取物品／Place 放至指定房間／GoTo 進入指定房間。
+ * targetRoom 為 "None" 時，不限制房間。
  */
 const LOCAL_QUESTIONS = [
   {
@@ -189,42 +189,42 @@ const resultHint = document.getElementById("result-hint");
 const replayBtn = document.getElementById("replay-btn");
 const backBtn = document.getElementById("back-btn");
 
-/** 鍵盤左右是否按著；點擊互動時會改用 walkTarget 自動走過去。 */
+/** 左右鍵的按住狀態。點擊互動時，改用 walkTarget 自動移動至目標。 */
 const keys = { left: false, right: false };
 window.addEventListener("webgame:pause", () => { keys.left = keys.right = false; });
 
 const state = {
-  questions: [], // 本題題庫（後端或本地）
-  index: 0, // 保留給地圖尺寸；正式關卡用 stage
+  questions: [], // 目前題目的題庫，來源為後端或本地。
+  index: 0, // 用於地圖尺寸。正式關卡使用 stage。
   stage: 1, // 目前關卡（1-based，共 6 關）
-  task: null, // 這一關目前這題
+  task: null, // 目前關卡的題目
   taskCursor: 0,
-  stageTasks: [], // 本關已結束的題
+  stageTasks: [], // 本關已結束的題目
   levelAccuracies: [],
   finishedStages: 0,
   endingStage: false,
   score: 0, // 過關數
   remaining: 60, // 本關剩餘秒數
-  playing: false, // 整局是否進行中（結算後為 false）
-  stageLive: false, // 本關是否已按「開始」、可移動倒數
-  busy: false, // 進房淡出、過場時鎖操作
-  startedAt: 0, // 整局開始時間（交卷 durationSec）
+  playing: false, // 場次是否正在進行。結算後為 false。
+  stageLive: false, // 本關是否已按開始，可開始移動與倒數。
+  busy: false, // 進入房間或轉場時，停用操作。
+  startedAt: 0, // 場次開始時間，用於送出 durationSec。
   stageStartedAt: 0, // 本關開始時間（該關 timeUsage）
   timerId: null, // 每秒倒數的 interval
-  walkTimer: null, // 狗狗動畫 interval
+  walkTimer: null, // 角色動畫的 interval
   walkFrame: 0,
   anim: "", // "idle" | "walk"
   playerX: 50, // 玩家水平位置（%）
   facing: "right",
-  walkTarget: null, // { x, action } 點擊門／物品時自動走近再互動
+  walkTarget: null, // { x, action }。點擊門或物品時，先自動靠近，再執行互動。
   rooms: [], // 二維陣列 rooms[row][col]
   rows: 2,
   cols: 2,
-  row: 0, // 目前所在房間列／欄；開局固定從 (0,0)
+  row: 0, // 目前房間的列與欄。場次固定從 (0,0) 開始。
   col: 0,
-  bag: [], // [{ id, from }] from 是拿起時所在房間類型
+  bag: [], // [{ id, from }]。from 表示拿取物品時所在的房間類型。
   completedItems: [], // 本關已正確完成的目標物品 id
-  stageResults: [], // 每關紀錄，交卷用
+  stageResults: [], // 各關卡的成績記錄，用於送出結果。
   lastTime: 0, // requestAnimationFrame 上一幀時間戳
 };
 
@@ -234,7 +234,7 @@ init();
 // 啟動與事件
 // -----------------------------------------------------------------------------
 
-/** 預載圖片、拉題、綁定操作後開第一局。 */
+/** 預載圖片、讀取題目並綁定操作後，開始第一場遊戲。 */
 async function init() {
   preloadImages();
   renderBackpack();
@@ -263,7 +263,7 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
       keys.left = true;
-      state.walkTarget = null; // 手動移動會取消「自動走近」
+      state.walkTarget = null; // 手動移動時，取消自動靠近。
       event.preventDefault();
     } else if (event.key === "ArrowRight" || event.key === "d" || event.key === "D") {
       keys.right = true;
@@ -302,7 +302,7 @@ function bindEvents() {
 // 關卡生命週期
 // -----------------------------------------------------------------------------
 
-/** 重開一局：清分數，從第 1 關開始。每關 60 秒、一題，做完或逾時就進下一關。 */
+/** 重新開始場次時，清除分數並從第 1 關開始。每關 60 秒，只有一題。完成或逾時後進入下一關。 */
 function startGame() {
   clearInterval(state.timerId);
   state.timerId = null;
@@ -340,7 +340,7 @@ function startStage(stageNumber) {
   prepareTask();
 }
 
-/** 這一關的那一題：生地圖、放物品，並跳出題目卡。倒數要等玩家按「開始」。 */
+/** 為本關題目產生地圖並放置物品，接著顯示題目卡。玩家按開始後，才開始倒數。 */
 function prepareTask() {
   const list = state.questions;
   if (!list.length) {
@@ -375,7 +375,7 @@ function prepareTask() {
   showProblemPanel(state.task);
 }
 
-/** 關掉題目卡，開始這一關的 60 秒倒數與移動。 */
+/** 關閉題目卡，開始本關的 60 秒倒數與移動。 */
 function beginCurrentStage() {
   problemPanel.classList.add("is-hidden");
   state.stageLive = true;
@@ -401,8 +401,9 @@ function currentRoom() {
 }
 
 /**
- * 地圖尺寸對齊 Unity：
- * 第 1、3、5 關（index 偶數）2×3；第 2、4、6 關（index 奇數）2×2。
+ * 地圖尺寸使用 Unity 的規則。
+ * 第 1、3、5 關的 index 為偶數，尺寸為 2×3。
+ * 第 2、4、6 關的 index 為奇數，尺寸為 2×2。
  */
 function generateLevelSpecs(index) {
   return index % 2 === 1 ? { rows: 2, cols: 2 } : { rows: 2, cols: 3 };
@@ -413,8 +414,8 @@ function generateLevelSpecs(index) {
 // -----------------------------------------------------------------------------
 
 /**
- * 產生 rows×cols 的房間網格，先用 DFS 保證全部連通，再隨機加幾條額外門。
- * 每個房間帶四個空的 zone（稍後 placeItems 才放東西）。
+ * 產生 rows×cols 的房間網格。先使用 DFS 連接所有房間，再隨機增加門。
+ * 每個房間包含四個空的 zone。placeItems 隨後放入物品。
  */
 function generateMap(rows, cols) {
   const rooms = [];
@@ -439,7 +440,7 @@ function generateMap(rows, cols) {
   addExtraConnections(2);
   return rooms;
 
-  /** 從 (0,0) 走到所有未拜訪鄰居，走過就開門，確保沒有孤立房間。 */
+  /** 從 (0,0) 遍歷所有未訪問的相鄰房間，並建立連接門，避免房間孤立。 */
   function dfs(r, c) {
     visited.add(key(r, c));
     const neighbors = shuffle(getNeighbors(r, c));
@@ -451,7 +452,7 @@ function generateMap(rows, cols) {
     });
   }
 
-  /** 在已連通的地圖上再亂開門，讓路線不只一條。 */
+  /** 在已連通的地圖上隨機增加門，提供多條路線。 */
   function addExtraConnections(count) {
     for (let i = 0; i < count; i++) {
       const r = rand(rows);
@@ -473,7 +474,7 @@ function generateMap(rows, cols) {
   }
 }
 
-/** 兩邊房間對開同一扇門（左↔右、上↔下）。 */
+/** 在相鄰房間建立對應的門，方向為左與右，或上與下。 */
 function connect(a, b, dir) {
   if (dir === "Left") {
     a.hasLeft = true;
@@ -491,10 +492,10 @@ function connect(a, b, dir) {
 }
 
 /**
- * 幫每個格子指定房間類型。
- * - 起點 (0,0)：GoTo 題不能一開始就站在目標房，其餘隨機。
- * - 目標房、以及目標物品「習慣出現」的房間會優先分到其他格子。
- * - 剩下的格子盡量不重複，用完五種房間後才允許重複。
+ * 為每個網格指定房間類型。
+ * GoTo 題的起點 (0,0) 不可是目標房間。其他題型隨機指定起點類型。
+ * 優先將目標房間與物品的預設房間類型指定至其他網格。
+ * 其餘網格優先使用未出現的類型。五種房間皆使用後，才允許重複。
  */
 function assignRoomTypes(rooms, problem) {
   const cells = rooms.flat();
@@ -531,9 +532,9 @@ function assignRoomTypes(rooms, problem) {
 }
 
 /**
- * 把本題目標物品放到合適房間的 zone，其餘格子有 50% 機率放干擾物。
- * Take 且指定房間：目標只出現在該房。
- * Place：目標不能一開始就在要放的那間（否則不用搬）。
+ * 將目標物品放入指定房間的 zone。其餘格子有 50% 機率放入干擾物。
+ * Take 題若指定房間，目標只出現在該房間。
+ * Place 題的目標初始位置不可在指定的放置房間，避免無須移動物品即可完成。
  */
 function placeItems(rooms, problem) {
   const allRooms = rooms.flat();
@@ -562,7 +563,7 @@ function placeItems(rooms, problem) {
   });
 }
 
-/** 物品比較常出現的房間，用來讓地圖比較合理，不是硬性規則。 */
+/** 物品的預設房間類型，用於分配位置，不是必要條件。 */
 function itemHome(item) {
   if (["apple", "banana", "carrot", "fish"].includes(item)) return "Kitchen";
   if (["book", "key", "hammer"].includes(item)) return "Study";
@@ -575,7 +576,7 @@ function itemHome(item) {
 // 畫面
 // -----------------------------------------------------------------------------
 
-/** 依目前房間重畫背景、門、物品、小地圖，並把狗狗放到 playerX。 */
+/** 依目前房間重繪背景、門、物品與小地圖，並將角色設在 playerX。 */
 function renderRoom() {
   const room = currentRoom();
   bg.style.backgroundImage = `url("${ROOM_SCENE[room.type]}")`;
@@ -590,8 +591,8 @@ function renderRoom() {
 }
 
 /**
- * 依房間開門方向擺門。
- * 同時有上、下門時左右錯開；只有其中一個就放中間。
+ * 依房間的開門方向放置門。
+ * 同時有上門與下門時，將兩者左右錯開。只有一個門時，置於中央。
  */
 function renderDoors(room) {
   const dirs = [];
@@ -618,8 +619,8 @@ function renderDoors(room) {
 }
 
 /**
- * 畫出四個放置點。空位仍保留可點的 zone（放下用）；
- * 物品圖預設透明，靠近後 CSS .is-near 才顯示。
+ * 繪製四個放置點。空位保留可點擊的 zone，供放下物品使用。
+ * 物品圖片預設為透明。角色靠近後，由 CSS 的 .is-near 顯示圖片。
  */
 function renderZones(room) {
   zonesEl.innerHTML = room.zones
@@ -640,8 +641,8 @@ function renderMinimap() {
     for (let c = 0; c < state.cols; c++) {
       const here = r === state.row && c === state.col;
 
-      // Begin - 20260929 - willie
-      // 有門就畫通道 / 沒有門就不畫
+      // 開始：20260929，willie。
+      // 有門時繪製通道。沒有門時不繪製通道。
       const room = state.rooms[r][c];
       const connections = [
         room.hasRight
@@ -651,7 +652,7 @@ function renderMinimap() {
           ? '<span class="map-connection is-down" aria-hidden="true"></span>'
           : "",
       ].join("");
-      // End - 20260929 - willie
+      // 結束：20260929，willie。
 
       html += `<span class="map-cell${here ? " is-here" : ""}" title="${ROOM_LABEL[room.type]}">${connections}</span>`;
     }
@@ -664,7 +665,7 @@ function renderHud() {
   timerBox.textContent = `${Math.max(0, state.remaining)} 秒`;
 }
 
-/** 依 bag 畫四格；空格沒有圖。 */
+/** 依 bag 繪製四個背包格。空格不顯示圖片。 */
 function renderBackpack() {
   backpackEl.innerHTML = Array.from({ length: BAG_SIZE }, (_, index) => {
     const entry = state.bag[index];
@@ -697,8 +698,9 @@ function tickTimer() {
 }
 
 /**
- * 每幀移動。鍵盤優先；沒按鍵但有 walkTarget 時會自動走向點擊的門／物品。
- * 走到距離 ≤ 1.2 就執行當初記下的 action。
+ * 每幀更新移動，優先處理鍵盤輸入。
+ * 沒有按鍵且存在 walkTarget 時，自動移動至點擊的門或物品。
+ * 距離 ≤ 1.2 時，執行已記錄的 action。
  */
 function tickMove(now) {
   const dt = Math.min(0.05, (now - (state.lastTime || now)) / 1000);
@@ -733,9 +735,7 @@ function tickMove(now) {
   requestAnimationFrame(tickMove);
 }
 
-/**
- * 點門或物品：已經靠近就立刻互動，否則記下目標讓 tickMove 自動走過去。
- */
+/** 點擊門或物品時，若已靠近，則立即互動。否則記錄目標，由 tickMove 自動移動。 */
 function goToward(x, action) {
   if (!state.playing || !state.stageLive || state.busy) return;
   if (Math.abs(state.playerX - x) <= NEAR_RANGE) {
@@ -746,8 +746,8 @@ function goToward(x, action) {
 }
 
 /**
- * 依與玩家的距離切 .is-near：
- * 門靠近換成開門圖；物品靠近才顯示黃框與圖（CSS 控制透明度）。
+ * 依玩家與目標的距離切換 .is-near。
+ * 靠近門時，顯示開門圖片。靠近物品時，顯示黃框與圖片。CSS 控制透明度。
  */
 function updateNearHints() {
   doorsEl.querySelectorAll(".door").forEach((door) => {
@@ -764,7 +764,7 @@ function updateNearHints() {
   });
 }
 
-/** 空白鍵／Enter：在靠近範圍內優先走門，否則與最近的放置點互動。 */
+/** 按空白鍵或 Enter 時，優先進入互動範圍內的門。否則與最近的放置點互動。 */
 function tryInteract() {
   if (!state.playing || !state.stageLive || state.busy) return;
   const door = nearest(doorsEl.querySelectorAll(".door"));
@@ -792,8 +792,9 @@ function nearest(nodes) {
 }
 
 /**
- * 進相鄰房間：淡出 → 換格子與入場位置（左右門從對面進來）→ 淡入。
- * GoTo 題若進到目標房，多等 GOTO_WAIT_MS 後過關。
+ * 進入相鄰房間時，先淡出，再更新房間與入場位置，最後淡入。
+ * 使用左右門時，從相鄰房間的對側進入。
+ * GoTo 題進入目標房間後，等待 GOTO_WAIT_MS，再判定過關。
  */
 async function useDoor(dir) {
   if (state.busy) return;
@@ -839,8 +840,8 @@ async function useDoor(dir) {
 }
 
 /**
- * 與放置點互動：空位就放下背包第一格；有物品就撿進背包。
- * 背包滿了只提示、不撿。
+ * 與放置點互動時，若為空位，則放下背包第一格的物品。
+ * 若有物品，則放入背包。背包已滿時，只顯示提示。
  */
 function useZone(zoneId) {
   if (state.busy) return;
@@ -877,14 +878,11 @@ function useZone(zoneId) {
 // -----------------------------------------------------------------------------
 
 /**
- * 記錄 Take / Place 是否算完成；GoTo 成敗在 useDoor 裡直接判斷，這裡不記物品。
- *
- * 正確動作：題型相符，且物品是目標、目前房間符合 targetRoom（None 則不限），
- * 就把該物品列入 completedItems。Take 題必須把東西留在背包，放下會被撤銷。
- *
- * 相反動作會撤銷：
- * - Place 題：從目標房把已放好的目標再拿起來
- * - Take 題：把已拿取的目標放回（from 符合題目房間，None 則一律算放掉）
+ * 記錄 Take／Place 的完成狀態。GoTo 由 useDoor 判定，不在此記錄物品。
+ * 題型、目標物品與目前房間皆符合時，將物品加入 completedItems。
+ * targetRoom 為 None 時，不限制房間。Take 題須將物品留在背包，放下後取消完成狀態。
+ * Place 題從目標房間再次拿起目標物品時，取消完成狀態。
+ * Take 題放回物品且 from 符合指定房間時，取消完成狀態。指定房間為 None 時，放回即取消。
  */
 function handleProcess(type, id, from) {
   const problem = currentProblem();
@@ -909,12 +907,12 @@ function isTargetItem(id) {
   return currentProblem().targetItems.includes(id);
 }
 
-/** targetRoom 為空或 "None" 時，任何房間都算符合。 */
+/** targetRoom 為空或 "None" 時，所有房間皆符合條件。 */
 function roomMatches(targetRoom, roomType) {
   return !targetRoom || targetRoom === "None" || targetRoom === roomType;
 }
 
-/** Take / Place：目標物品都進 completedItems 就過關。 */
+/** Take／Place 題的所有目標物品皆加入 completedItems 時，判定過關。 */
 function completedItemTask() {
   const problem = currentProblem();
   const unique = [...new Set(state.completedItems)];
@@ -934,7 +932,7 @@ function passStage() {
   endStage();
 }
 
-/** 本關 60 秒到：這一題算沒完成，進入下一關或結算。 */
+/** 本關的 60 秒結束時，將題目記為未完成，並進入下一關或結算。 */
 function timeOut() {
   if (!state.stageLive || state.endingStage) return;
   state.stageLive = false;
@@ -943,7 +941,7 @@ function timeOut() {
   endStage();
 }
 
-/** 把這一關（一題）的對錯推進紀錄。 */
+/** 記錄本關題目的作答結果。 */
 function commitStage(passed) {
   const problem = currentProblem();
   const record = {
@@ -958,7 +956,7 @@ function commitStage(passed) {
   state.stageTasks.push(record);
 }
 
-/** 做完或 60 秒到就換下一關。第 3 關先中場，第 6 關結算。 */
+/** 題目完成或 60 秒結束後，進入下一關。第 3 關後顯示中場休息，第 6 關後結算。 */
 async function endStage() {
   if (state.endingStage) return;
   state.endingStage = true;
@@ -984,14 +982,14 @@ async function endStage() {
   startStage(state.stage + 1);
 }
 
-/** 中場畫面，並先送一次 progress = 50 的結果（對齊 Unity 中場交卷）。 */
+/** 顯示中場畫面，並送出 progress = 50 的結果，使用 Unity 的中場送出規則。 */
 function showMidway() {
   state.busy = true;
   midwayText.innerHTML = "第 3 關已結束<br>要繼續遊玩嗎？";
   midwayPanel.classList.remove("is-hidden");
 }
 
-/** 全關結束結算。本遊戲不會因單關逾時直接結束整局。 */
+/** 所有關卡結束後結算。單關逾時不會結束整場遊戲。 */
 function finishGame(reason) {
   if (!state.playing) return;
   state.playing = false;
@@ -1045,10 +1043,10 @@ function averageReaction(stages) {
 }
 
 // -----------------------------------------------------------------------------
-// 交卷資料
+// 成績送出資料
 // -----------------------------------------------------------------------------
 
-/** 組成 Unity SendInstructionMemoryResult 對齊的 payload。 */
+/** 建立符合 Unity SendInstructionMemoryResult 格式的 payload。 */
 function buildPayload(reason, progress) {
   const summary = summarize(state.stageResults);
   return {
@@ -1071,7 +1069,7 @@ function buildPayload(reason, progress) {
   };
 }
 
-/** 依題型統計玩過／成功／失敗次數。passed == null 時只數該題型總數。 */
+/** 依題型統計遊玩、成功與失敗次數。passed == null 時，只計算該題型的總數。 */
 function summarize(stages) {
   const count = (type, passed) =>
     stages.filter((stage) => stage.type === type && (passed == null || stage.passed === passed)).length;
@@ -1115,7 +1113,7 @@ function setPlayerFacing(facing) {
   player.classList.toggle("is-left", facing === "left");
 }
 
-/** 切換待機／走路循環；同一種動畫已在播就不要重設，避免每幀閃回第一張。 */
+/** 切換待機與行走動畫。相同動畫正在播放時，不重置，避免每幀返回第一張圖片。 */
 function playAnim(name) {
   if (state.anim === name && state.walkTimer) return;
   stopWalkCycle();
@@ -1184,7 +1182,7 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 把得分百分比收成 0 / 50 / 100，給學生進度 API 用。 */
+/** 將得分百分比轉換為 0／50／100，供學生進度 API 使用。 */
 function toProgress(score, total) {
   if (!total) return 0;
   const percent = Math.round((score / total) * 100);
@@ -1194,15 +1192,13 @@ function toProgress(score, total) {
 }
 
 // -----------------------------------------------------------------------------
-// 後端接點（尚未接通，之後只改這兩函式即可）
+// 預留的後端介面。連接後端時，修改這兩個函式。
 // -----------------------------------------------------------------------------
 
-/**
- * 讀取本題遊戲的題目。目前回傳本地假資料。
- */
+/** 讀取目前遊戲的題目。現階段回傳本地模擬資料。 */
 async function fetchQuestions() {
   // -------------------------------------------------------------------------
-  // 後端接點：拉題（之後接 API 時改這裡即可）
+  // 預留的題目讀取介面。連接 API 時，修改此處。
   //
   // 建議：GET /api/games/InstructionGame/questions
   //
@@ -1229,15 +1225,15 @@ async function fetchQuestions() {
 }
 
 /**
- * 把本局結果交給後端。目前只 log。
- * 中場（progress 50）與全破（progress 100）都會呼叫一次。
+ * 將本場結果送至後端。現階段只輸出日誌。
+ * 中場 progress 為 50，全部完成時為 100。兩個階段各呼叫一次。
  */
 async function submitResult(data) {
 
   const grade = sessionStorage.getItem("grade") || sessionStorage.getItem("student1_grade");
   const caseId = sessionStorage.getItem("caseId") || sessionStorage.getItem("student1_case");
   const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school");
-  // 讀不到登入學生就不送，避免未登入成績寫進正式庫。
+  // 未取得登入學生資料時，不送出成績，避免將未登入的成績寫入正式資料庫。
   if (!grade || !caseId || !school) {
     console.warn("找不到登入學生資料，成績不送出");
     return;

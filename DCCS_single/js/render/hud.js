@@ -1,4 +1,4 @@
-// SPEC 4.7 — HUD 繪製。字型為 DCCS/fonts 的 MaokenAssortedSans。
+// HUD 繪製（SPEC 4.7）。使用 DCCS/fonts 的 MaokenAssortedSans 字型。
 
 import { CONFIG } from '../config.js';
 
@@ -39,7 +39,7 @@ function drawScorePill(ctx, vx, vy, w, h, score, level) {
   ctx.fill();
   ctx.restore();
 
-  // SCORE_BAR_FULL 是視覺滿格基準，不是分數上限。
+  // SCORE_BAR_FULL 是分數條的滿格顯示基準。分數可超過此值。
   const barMargin = pillW * 0.09;
   const barX = pillX + barMargin;
   const barY = pillY + pillH * 0.66;
@@ -120,7 +120,7 @@ function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
   ctx.fill();
   ctx.restore();
 
-  // 直立標題：逐字往下排列於進度條左側
+  // 直立標題：文字逐字向下排列於進度條左側。
   const title = '賽道攔截';
   const charSize = Math.round(0.028 * h);
   const titleX = barX - 0.012 * w;
@@ -138,7 +138,7 @@ function drawVerticalTitleAndProgress(ctx, vx, vy, w, h, elapsed, total) {
   ctx.restore();
 }
 
-// 往下避開右上角的「離開」按鈕（z-index 高於 canvas，會遮住勾勾）。
+// 向下移動，避開右上角的離開按鈕。該按鈕的 z-index 高於 canvas，會遮住 ✓。
 function drawTick(ctx, vx, vy, w, h) {
   const cx = vx + w * 0.90;
   const cy = vy + h * 0.18;

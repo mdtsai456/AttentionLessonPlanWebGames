@@ -23,7 +23,7 @@ describe('DAT_single 單人版', () => {
   test('正式模式：正確等待後，下一題仍顯示上一題的連擊提示', async () => {
     const session = await openGame(browser, server.origin, { game: 'single', mode: 'game', randomValue: 0.75 });
     try {
-      // 載入前固定亂數，讓遊戲產生不成立的算式，必須不按鍵等待逾時才能答對。
+      // 載入前固定亂數，產生不成立的算式。等待逾時且不按鍵才算答對。
       const [result] = await session.driver.playQuestion('correct');
       assert.equal(result.visibleFeedback, '上一題：正確等待且保持瞄準！＋1 分（再連續答對 4 題變身）');
       const state = await session.page.evaluate(() => ({ index, score, phase }));
@@ -37,7 +37,7 @@ describe('DAT_single 單人版', () => {
   test('正式模式：漏答後，下一題仍顯示上一題的連擊歸零提示', async () => {
     const session = await openGame(browser, server.origin, { game: 'single', mode: 'game', randomValue: 0.25 });
     try {
-      // 載入前固定亂數，讓遊戲產生正確的顏色題，先答對建立連擊，再漏答。
+      // 載入前固定亂數，產生正確的顏色題。先答對以累積連擊，再測試漏答。
       await session.driver.playQuestion('correct');
       const [result] = await session.driver.playQuestion('miss');
       assert.equal(result.visibleFeedback, '上一題：漏答：正確的題目要按 空白鍵（連擊歸零）');
@@ -68,14 +68,14 @@ describe('DAT_single 單人版', () => {
       }
 
       assert.equal(model.image, 'dog.png', '最後應升到第 3 級（狗）');
-      // 內部狀態也要和畫面一致
+      // 內部狀態須與畫面一致。
       const internal = await session.page.evaluate(() => ({
         currentAssetIndex, // eslint-disable-line no-undef
         consecutiveCorrect, // eslint-disable-line no-undef
         hasPrev: typeof switchToPrevAnimal !== 'undefined', // eslint-disable-line no-undef
       }));
       assert.deepEqual(internal, { currentAssetIndex: 2, consecutiveCorrect: 5, hasPrev: false });
-      // 14 題會跨過第 1、2 關，確認動物等級跨關保留的情境確實有被測到
+      // 14 題會跨越第 1、2 關，以驗證換關後保留動物等級。
       const nextStage = await session.page.evaluate(
         () => window.__qa.feedback[0].filter((t) => t === '將準心移到動物身上，開始下一關').length,
       );
@@ -117,4 +117,24 @@ describe('DAT_single 單人版', () => {
       await session.context.close();
     }
   });
+
+  // 亂數固定偏低（原本兩題都是顏色題）或偏高（原本兩題都是數學題），練習仍要顏色、數學各 1 題
+  for (const randomValue of [0.25, 0.75]) {
+    test(`練習模式：2 題固定為顏色、數學各 1 題（亂數 ${randomValue}）`, async () => {
+      const session = await openGame(browser, server.origin, { game: 'single', mode: 'practice', randomValue });
+      try {
+        const types = [];
+        for (let i = 0; i < 2; i++) {
+          const [r] = await session.driver.playQuestion('correct');
+          types.push(r.questionType);
+        }
+        assert.match(types[0], /^顏色判斷/);
+        assert.match(types[1], /^數學判斷/);
+        await session.driver.waitFor(() => !document.querySelector('#results').hidden, '練習結束');
+        expectNoErrors(session);
+      } finally {
+        await session.context.close();
+      }
+    });
+  }
 });

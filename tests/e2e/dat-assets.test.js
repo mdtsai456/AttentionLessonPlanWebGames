@@ -7,7 +7,10 @@ const files = ['/uploads/initial.png', '/uploads/evolved.png'];
 
 async function expectAnimal(session, game, expectedPath = '/assets/animals/rabbit.png') {
   await session.driver.waitFor((expectedPath) => [...document.querySelectorAll('#animal-image, [data-ui="animal-image"]')]
-    .every((img) => img.complete && img.naturalWidth > 0 && img.src.endsWith(expectedPath)),
+    // 換圖的淡入是 CSS transition（真實時間，不受假時鐘控制）；跨來源圖失敗時會先試 CORS 再試一般載入，
+    // 回退較晚完成，要等淡入結束才檢查透明度。
+    .every((img) => img.complete && img.naturalWidth > 0 && img.src.endsWith(expectedPath)
+      && getComputedStyle(img).opacity === '1'),
   '有效動物圖片載入', { maxMs: 15000, arg: expectedPath });
   const images = await session.page.locator('#animal-image, [data-ui="animal-image"]').evaluateAll((list) => list.map((img) => ({
     width: img.naturalWidth, visibility: getComputedStyle(img).visibility,
@@ -93,7 +96,8 @@ describe('DAT 素材錯誤回退', () => {
         for (let i = 0; i < 5; i++) {
           await session.driver.playQuestion(...Array(game === 'double' ? 2 : 1).fill('correct'));
         }
-        await expectAnimal(session, game, game === 'double' ? files[0] : undefined);
+        // 單人、雙人一致：變身圖失敗保留目前顯示的第一張，不退回兔子（#21）
+        await expectAnimal(session, game, files[0]);
       } finally { await session.context.close(); }
     });
   }

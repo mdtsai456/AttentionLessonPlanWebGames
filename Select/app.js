@@ -1,11 +1,11 @@
 // =============================================================================
 // Select / 學生選遊戲頁
-// 單人：五個遊戲、一條進度。雙人：左右各一份選單（不含指令出擊），
-// 各自看自己當天的進度；兩邊都按 ENTER 且選同一個遊戲才進入。
-// 進度依後端該生當天場次：DCCS 只打完前 3 關為 50%，打完後段或其它遊戲為 100%。
+// 單人模式顯示五款遊戲與一份進度。雙人模式左右各顯示一份選單，不含指令出擊，
+// 並分別顯示當日進度。兩人皆按 ENTER 且選擇相同遊戲後，才進入遊戲。
+// 進度使用後端的當日場次。DCCS 完成前 3 關為 50%，完成後段或其他遊戲為 100%。
 // =============================================================================
 
-/** 五個遊戲的固定清單。id 對資料夾，name 給畫面顯示。 */
+/** 五款遊戲的固定清單。id 對應資料夾，name 用於畫面顯示。 */
 const GAMES = [
   { id: "DCCS", name: "賽道攔截" },
   { id: "DAT", name: "瓢蟲追擊令" },
@@ -14,7 +14,7 @@ const GAMES = [
   { id: "InstructionGame", name: "指令出擊" },
 ];
 
-/** 雙人沒有指令出擊。 */
+/** 雙人模式不包含指令出擊。 */
 const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
 
 const ROUTES = {
@@ -40,7 +40,7 @@ const ROUTES = {
   },
 };
 
-/** 進度只允許這三個值；其他數字會被正規化到最接近的一檔。 */
+/** 進度只接受這三個值。其他數值轉換為最接近的值。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
 const isDouble = ["double", "dual"].includes(sessionStorage.getItem("game_mode") || "single");
@@ -64,7 +64,7 @@ const players = {
 
 init();
 
-/** 進頁後先拉進度，再把遊戲列表畫出來；同時查手錶專心判定。 */
+/** 進入頁面後，先讀取進度，再繪製遊戲清單。同時查詢手錶的專心判定。 */
 async function init() {
   celebrateAttention();
   if (isDouble) {
@@ -250,7 +250,7 @@ function progressFromRecords(records, day, games = GAMES) {
   return progress;
 }
 
-/** 讀取這位學生當天的進度。slot 1 用 student1_*，slot 2 用 student2_*。 */
+/** 讀取學生當日的進度。slot 1 使用 student1_*，slot 2 使用 student2_*。 */
 async function fetchStudentProgress(slot) {
   const games = isDouble ? DUO_GAMES : GAMES;
   const progress = emptyProgress(games);
@@ -279,9 +279,9 @@ async function fetchStudentProgress(slot) {
 }
 
 /**
- * 手錶判定專心就放煙火。每次登入只放一次（登入時 sessionStorage 會清空）；
- * 還沒達標時，每次回到這頁都會再查一次。雙人時兩位各自查，任一位達標就放。
- * 雙人一律說「你們」，不點名是哪一位，避免兩人互相比較。
+ * 手錶判定專心時，顯示煙火。每次登入僅顯示一次。登入時會清空 sessionStorage。
+ * 未達標時，每次返回此頁都重新查詢。雙人模式分別查詢兩位學生，任一位達標即顯示煙火。
+ * 雙人模式的提示使用「你們」，不指明達標的學生，避免互相比較。
  */
 async function celebrateAttention() {
   const SHOWN_KEY = "attention_fireworks_shown";
@@ -302,8 +302,8 @@ async function celebrateAttention() {
 }
 
 /**
- * 把任意數字收成 0、50 或 100（取最接近的一檔）。
- * 後端若回傳其他值，畫面仍能對應到三格進度條。
+ * 將數值轉換為最接近的 0、50 或 100。
+ * 後端回傳其他數值時，畫面仍可顯示三格進度條。
  */
 function normalizeProgress(value) {
   const number = Number(value) || 0;
