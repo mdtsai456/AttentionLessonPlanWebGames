@@ -73,7 +73,12 @@ const ALL_ITEMS = [
 ];
 
 const DEFAULT_STAGE_RULES  = [
-  { prompt: "請選擇符合「可以吃的食物」的方向", correct: ["apple", "banana", "carrot"] },
+  // 魚也能吃，不能當「可以吃的食物」的錯誤選項，所以這一關明列錯誤項目
+  {
+    prompt: "請選擇符合「可以吃的食物」的方向",
+    correct: ["apple", "banana", "carrot"],
+    wrong: ["boot", "book", "chair", "hammer", "hat", "key", "soccer", "umbrella"],
+  },
   { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
   { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
   { prompt: "請選擇符合「下雨時用的」的方向", correct: ["umbrella"] },
@@ -125,12 +130,19 @@ nextStageBtn.addEventListener("click", continueNextStage);
 lobbyBtn.addEventListener("click", async () => {
   nextStageBtn.disabled = true;
   lobbyBtn.disabled = true;
-  await saveCurrentRun(MID_STAGE);
-  returnToLobby();
+  try {
+    if (savedStage !== MID_STAGE) await saveCurrentRun(MID_STAGE);
+    returnToLobby();
+  } finally {
+    // 中場回大廳是明確選擇，不再確認。萬一導向沒有發生，恢復按鈕避免卡在中場畫面；已存過不會重送
+    nextStageBtn.disabled = false;
+    lobbyBtn.disabled = false;
+  }
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.repeat || !state.playing || state.paused || state.busy) return;
+  // 遊戲時鐘暫停時（例如確定離開、存檔中）不作答
+  if (event.repeat || !state.playing || state.paused || state.busy || window.WebGameRuntime.paused) return;
 
   if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
     event.preventDefault();
@@ -416,13 +428,25 @@ function completedStage() {
   return Math.max(0, state.level - 1);
 }
 
+// 先確認再存檔：取消時什麼都不送，避免檢查點和之後打完的成績各留一筆。
+// 確定後遊戲維持暫停（計時凍結、按鍵不作答）直到導頁，存檔慢也不會打完下一關多送一筆。
+// 這段只等 fetch，不等遊戲的計時器；萬一出錯沒導頁就解除暫停，讓遊戲繼續。
 async function leaveGame() {
   leaveBtn.disabled = true;
-  const completed = completedStage();
-  const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-  if (stage && stage !== savedStage) await saveCurrentRun(stage);
-  window.askLeave('../Select/index.html');
-  leaveBtn.disabled = false;
+  try {
+    if (!(await window.confirmLeave())) return;
+    try {
+      const completed = completedStage();
+      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      if (stage && stage !== savedStage) await saveCurrentRun(stage);
+      window.leaveTo('../Select/index.html');
+    } catch (err) {
+      console.error("離開失敗：", err);
+      window.cancelLeave();
+    }
+  } finally {
+    leaveBtn.disabled = false;
+  }
 }
 
 function saveCurrentRun(stage) {
