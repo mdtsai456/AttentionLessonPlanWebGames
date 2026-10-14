@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 app = FastAPI(title="DAT_double 本地獨立 SQLite 後端", version="1.0.0")
 
-# 設定 CORS 跨網域放行
+# 設定 CORS，允許跨網域請求。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,16 +19,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 自動定位當前檔案所在的 DAT_double 目錄，並在該目錄生成 local_test.db
+# 取得本檔案所在的 DAT_double 目錄，並在該目錄建立 local_test.db。
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(CURRENT_DIR, "local_test.db")
 
-# 1. 初始化建立 SQLite 本地資料庫表格
+# 1. 初始化本地 SQLite 資料表。
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    # 建立場次紀錄主表
+    # 建立場次記錄主表。
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS assessment_result (
         session_id TEXT PRIMARY KEY,
@@ -61,7 +61,7 @@ def init_db():
 
 init_db()
 
-# 2. Pydantic 數據模型驗證
+# 2. Pydantic 資料模型驗證。
 class StatItem(BaseModel):
     apiname: str
     value: float
@@ -82,10 +82,10 @@ class SessionPayload(BaseModel):
     data: SessionData
 
 # ----------------------------------------------------
-# 3. API 路由接口
+# 3. API 路由介面。
 # ----------------------------------------------------
 
-# 首頁路由：恢復原本 API 狀態 JSON 訊息（不會強行開啟 DAT_double.html）
+# 首頁路由回傳 API 狀態的 JSON 訊息，不開啟 DAT_double.html。
 @app.get("/")
 def root() -> dict[str, str]:
     return {
@@ -95,7 +95,7 @@ def root() -> dict[str, str]:
         "health": "/health"
     }
 
-# POST /api/sessions: 接收遊戲數據寫入本地 local_test.db
+# POST /api/sessions：接收遊戲資料，並寫入本地 local_test.db。
 @app.post("/api/sessions", status_code=status.HTTP_201_CREATED)
 def create_session(payload: SessionPayload):
     d = payload.data
@@ -126,7 +126,7 @@ def create_session(payload: SessionPayload):
         print(f"❌ [SQLite] 寫入失敗: {e}")
         raise HTTPException(status_code=500, detail="本地資料庫寫入失敗")
 
-# GET /api/sessions: 開籤查詢 DAT_double 下的歷史場次紀錄
+# GET /api/sessions：查詢 DAT_double 的歷史場次記錄。
 @app.get("/api/sessions")
 def get_sessions():
     conn = sqlite3.connect(DB_FILE)
@@ -148,7 +148,7 @@ def get_sessions():
     return {"total": len(results), "records": results}
 
 # ----------------------------------------------------
-# 4. 託管 DAT_double 目錄下的靜態素材與指定 HTML 檔
+# 4. 提供 DAT_double 目錄中的靜態素材與指定 HTML 檔案。
 # ----------------------------------------------------
 assets_dir = os.path.join(CURRENT_DIR, "assets")
 if os.path.exists(assets_dir):

@@ -1,11 +1,13 @@
-"""純轉換工具。不依賴 FastAPI，也不碰資料庫。"""
+"""純轉換工具，不依賴 FastAPI，也不存取資料庫。"""
 
 from __future__ import annotations
 
+import math
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-# Unity 的 TGame 在 DB 存為 TGAME
+# Unity 的 TGame 在資料庫中儲存為 TGAME。
 GAME_TYPE_TO_DB = {"TGame": "TGAME", "TGAME": "TGAME"}
 GAME_TYPE_FROM_DB = {"TGAME": "TGame"}
 
@@ -23,11 +25,11 @@ def normalize_game_type_from_db(game_type: str) -> str:
 
 
 def normalize_mode_for_db(mode: str | None) -> str | None:
-    """把查詢用的 ?mode= 參數正規化成 DB 值。
+    """將查詢參數 ?mode= 正規化為資料庫值。
 
-    鏡像 normalize_game_type_for_db 的角色：None／空白 → None（不加篩選條件）。
-    其他值一律 strip().lower() 後原樣傳回 —— 打錯的值（如 "foo"）會讓 SQL
-    查不到任何列、回空結果，不報錯，與 ?game_type=亂打 的既有行為一致。
+    與 normalize_game_type_for_db 相同，None 或空白值回傳 None，不加入篩選條件。
+    其他值執行 strip().lower() 後回傳。無效值如 "foo" 會使 SQL 回傳空結果，不拋出錯誤。
+    此行為與 ?game_type= 的既有處理相同。
     """
     if not mode or not mode.strip():
         return None
@@ -42,19 +44,36 @@ def format_datetime(value: Any) -> str:
     return str(value)
 
 
+def _finite_number(value: Any, cast: Callable[[Any], Any]) -> Any:
+    """None 視為 0；NaN／Infinity、陣列／物件等非數字一律 ValueError。
+
+    呼叫端（POST /api/sessions）把 ValueError 對應成 400；TypeError／OverflowError
+    會落到 500「資料庫寫入失敗」，所以這裡統一轉成 ValueError。
+    """
+    if value is None:
+        return cast(0)
+    try:
+        number = float(value)
+        result = cast(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"不是有限數字：{value!r}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"不是有限數字：{value!r}")
+    return result
+
+
 def to_int(value: Any) -> int:
-    return 0 if value is None else int(value)
+    return _finite_number(value, int)
 
 
 def to_float(value: Any) -> float:
-    return 0.0 if value is None else float(value)
+    return _finite_number(value, float)
 
 
 def format_optional_datetime(value: Any) -> str | None:
-    """給可為空的日期欄位使用。
+    """格式化可為空的日期欄位。
 
-    與 format_datetime 不同：None 就回傳 None，不回傳空字串。
-    空字串會假裝有值，讓呼叫端無法乾淨地判斷「沒有這個時間點」。
+    輸入為 None 時，回傳 None，讓呼叫端識別日期不存在。format_datetime 則回傳空字串。
     """
     if value is None:
         return None
@@ -62,11 +81,7 @@ def format_optional_datetime(value: Any) -> str | None:
 
 
 def normalize_school(school: str | None) -> str | None:
-    """空字串或全為空白的 school 視同未提供。
-
-    沒有人會想查詢「場域名稱是空字串的學生」，把它當成篩選條件只會
-    回傳一個對使用者毫無幫助的空名單。
-    """
+    """school 為空字串或只有空白時，視為未提供，不加入場域篩選條件。"""
     if school is None:
         return None
     return school.strip() or None

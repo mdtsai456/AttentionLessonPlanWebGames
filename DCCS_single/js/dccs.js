@@ -10,11 +10,11 @@ import { buildPayload, submitResult, flushPendingResults } from './net/client.js
 import { resolveSubmitUrl } from './net/apiBase.js';
 import { createOverlays } from './ui/overlays.js?v=2';
 
-// 雙人頁只允許一個實例重送暫存成績。
+// 雙人頁面只允許一個實例重送暫存成績。
 let pendingFlushStarted = false;
 
 /**
- * 單頁操作說明；依 SPEC 1.4 不揭露答題規則。
+ * 單頁操作說明。依 SPEC 1.4，不顯示答題規則。
  *
  * @param {object} manifest
  * @param {string} assetBase manifest 相對路徑的基準網址
@@ -187,7 +187,7 @@ export function mountDCCS(options) {
 
   if (!pendingFlushStarted) {
     pendingFlushStarted = true;
-    // 背景重送，不擋這一場開始；失敗就留到下次開場。
+    // 在背景重送成績，不阻止本場遊戲開始。失敗時保留資料，供下次重送。
     flushPendingResults({ url: submitUrl }).catch(() => {});
   }
 
@@ -196,7 +196,7 @@ export function mountDCCS(options) {
       ? opts.onPhase
       : null;
 
-  // 逐題資料只在記憶體中；進行中離頁會遺失，需觸發瀏覽器制式確認。
+  // 逐題資料只儲存在記憶體中。遊戲中離開頁面會遺失資料，須顯示瀏覽器的離開確認。
   const PHASES_IN_PROGRESS = new Set([
     'level-prompt',
     'playing',
@@ -211,7 +211,7 @@ export function mountDCCS(options) {
     if (shouldGuard) {
       unloadHandler = (event) => {
         event.preventDefault();
-        // 舊版瀏覽器要 returnValue 有值才會顯示提示。
+        // 舊版瀏覽器需要有值的 returnValue 才會顯示提示。
         event.returnValue = '';
       };
 
@@ -224,7 +224,7 @@ export function mountDCCS(options) {
   }
 
   function emitPhase(phase) {
-    // 放在 onPhase 之前：沒有傳 onPhase 的呼叫端一樣要有離開保護。
+    // 在 onPhase 前執行，讓未傳入 onPhase 的呼叫端也有離開保護。
     guardUnload(PHASES_IN_PROGRESS.has(phase));
 
     if (!onPhase) {

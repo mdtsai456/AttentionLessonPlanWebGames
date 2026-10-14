@@ -1,7 +1,7 @@
 //=============================================================================
 // TGame_single / 勇闖迷宮
-// 每個路口都是同一張 T 型背景。按鍵時先切到靠近圖，再切左右轉視角，
-// 角色同步往前走並換成側身；落地後回到 TGameBack，只換牆上物品與題目。
+// 每個路口使用相同的 T 型背景。按鍵時先切換靠近視角，再切換左轉或右轉視角。
+// 角色同時前進並切換為側身。轉場結束後恢復 TGameBack，僅更新牆面物品與題目。
 // =============================================================================
 
 const TIME_LIMIT_SEC = 60;
@@ -82,7 +82,7 @@ const DEFAULT_STAGE_RULES  = [
 ];
 
 let stageRules = DEFAULT_STAGE_RULES;
-let customThemes = null; // 由 CSV 自動載入；失敗時維持 null 使用預設題目
+let customThemes = null; // 自動載入 CSV。失敗時維持 null，並使用預設題目。
 
 
 const state = {
@@ -146,7 +146,7 @@ async function init() {
   const scenesReady = preloadSceneImages();
   const ok = await loadCsvFromUrl(CSV_URL);
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 先排好六關，等場景、角色圖與第 1 關物品圖解碼完才開局；網路太慢時最多等 8 秒
+  // 先安排六關，再等待場景、角色與第 1 關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
   const rules = buildStageRules();
   stageRules = rules;
   await Promise.race([
@@ -321,7 +321,7 @@ async function chooseDirection(choice) {
   const questionReady = renderQuestion();
   hideFeedback();
   resetSceneAndPlayer(true);
-  // 新物品圖解碼完才淡入，避免舊圖殘留或晚出現；最多等 300ms
+  // 新物品圖片解碼完成後才淡入，避免顯示舊圖片或延遲顯示。最多等待 300 ms。
   await Promise.all([
     wait(40),
     questionReady,
@@ -473,7 +473,7 @@ function hideFeedback() {
 //   return `img/items/${id}.png`;
 // }
 function itemSrc(id) {
-  return `img/items/${encodeURIComponent(id)}.png`; //設定編碼，避免中文檔名出錯
+  return `img/items/${encodeURIComponent(id)}.png`; // 設定編碼，避免中文檔名錯誤。
 }
 
 function resetSceneAndPlayer(keepHidden) {
@@ -527,10 +527,10 @@ function setPlayerSprite(src) {
   playerImg.src = src;
 }
 
-// 預載過的 Image 物件留在這裡，避免被 GC 回收後又重新下載、解碼
+// 保留已預載的 Image 物件，避免 GC 回收後重新下載與解碼。
 const preloadedImages = new Map();
 
-// 回傳 Promise<boolean>：圖片可用為 true，載入失敗為 false（不會 reject）
+// 回傳 Promise<boolean>。圖片可用時為 true，載入失敗時為 false，不會 reject。
 function preloadImage(src) {
   if (preloadedImages.has(src)) return preloadedImages.get(src).ready;
   const image = new Image();
@@ -559,7 +559,7 @@ function levelItemIds(level) {
   return Array.from(new Set([...rule.correct, ...wrongItems]));
 }
 
-// 該關所有可能出現的物品圖先下載並解碼；找不到的直接記進 missingImages，之後改用文字卡
+// 預先下載並解碼本關所有可能使用的物品圖片。缺少的圖片記入 missingImages，之後改用文字卡。
 function preloadLevelItems(level) {
   return Promise.all(
     levelItemIds(level)
@@ -614,7 +614,7 @@ function detectDelimiter(text) {
   counts.sort((a, b) => b[1] - a[1]);
   return counts[0][1] > 0 ? counts[0][0] : ",";
 }
-// CSV parser that handles quoted fields and different delimiters
+// CSV 解析器，支援引號欄位與不同的分隔符號。
 function parseCSV(text) {
   const delimiter = detectDelimiter(text);
   const rows = [];
@@ -658,7 +658,7 @@ function parseCSV(text) {
   if (field !== "" || row.length) pushRow();
   return rows;
 }
-// Build themes from parsed CSV rows
+// 從已解析的 CSV 列建立主題。
 function buildThemesFromRows(rows) {
   const warnings = [];
   if (rows.length < 2) {
@@ -730,7 +730,7 @@ function buildThemesFromRows(rows) {
     themes.push(theme);
   });
 
-  // 沒有「錯誤」列的主題：借用其他主題的正確項目當干擾選項
+  // 主題沒有錯誤列時，使用其他主題的正確項目作為干擾選項。
   const usable = themes.filter((theme) => {
     if (theme.wrong.length) return true;
     const borrowed = new Set();
@@ -795,7 +795,7 @@ function shuffled(list) {
   return copy;
 }
 
-// 主題 ≤ 6：照檔案順序；主題 > 6：每次遊戲隨機抽 6 個；主題不足 6：循環補滿
+// 主題不超過 6 個時，使用檔案順序。超過 6 個時，隨機選取 6 個。不足 6 個時，循環補足。
 function buildStageRules() {
   if (!customThemes || !customThemes.length) return DEFAULT_STAGE_RULES;
   const picked =
@@ -922,7 +922,7 @@ async function submitResult(data) {
 function pauseForViewport() {
   if (!state.playing) return false;
   if (state.paused) {
-    // 再次縮小時取消尚未完成的恢復，不能只檢查解碼結束時的尺寸。
+    // 畫面再次縮小時，取消尚未完成的恢復流程。只檢查解碼完成時的尺寸無法處理此情況。
     state.roundToken += 1;
     return true;
   }
@@ -966,5 +966,5 @@ const viewportGuard = window.TGameSupport.createViewportGuard({
   onBlock: pauseForViewport, onResume: resumeViewport, onLeave: leaveGame,
 });
 
-// 所有 const / function 都宣告完才啟動，避免 TDZ 錯誤
+// 所有 const／function 宣告完成後才啟動，避免 TDZ 錯誤。
 init();

@@ -1,4 +1,4 @@
-// 固定時間步迴圈（SPEC 4.2）。MAX_FRAME_DT 避免分頁切回前景時暴衝。
+// 固定時間步迴圈（SPEC 4.2）。MAX_FRAME_DT 限制返回前景時的單幀時間差。
 
 import { CONFIG } from '../config.js';
 
