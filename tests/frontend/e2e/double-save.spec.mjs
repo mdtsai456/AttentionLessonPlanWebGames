@@ -1,16 +1,21 @@
 import { test, expect } from '@playwright/test';
-import { DOUBLE, loginAs, recordWrites } from './helpers.mjs';
+import { DOUBLE, loginAs, recordWrites, stubAssetServer } from './helpers.mjs';
 for (const name of ['DAT', 'EFT', 'TGame', 'DCCS']) {
   test(`${name} 雙人各送正確學生及搭檔 token`, async ({ page }) => {
     const writes = await recordWrites(page);
+    await stubAssetServer(page);
     await loginAs(page, DOUBLE);
     const path = name === 'DAT' ? 'DAT_double/DAT_double.html?mode=game' : name === 'EFT' ? 'EFT_double/EFT_double.html' : name === 'TGame' ? 'TGame_double/index.html' : 'DCCS_double/index.html?sessionSeconds=5';
     await page.goto(path);
     await expect.poll(() => page.evaluate(() => !!window.WebGameApi && !!window.WebGameRuntime)).toBe(true);
     const tokens = await page.evaluate(() => [sessionStorage.getItem('student1_token'), sessionStorage.getItem('student2_token')]);
     if (name === 'DAT') {
+      // 兩位玩家的存檔器在 startGame() 才建立，要等素材預載完、兩邊都進正式模式。
+      await page.waitForFunction(() => document.querySelectorAll('[data-ui="field"][data-mode="game"]').length === 2);
       await page.evaluate(async () => {
-        const { players } = await import('/DAT_double/js/main.js?v=5');
+        // 用頁面實際載入的 main.js 網址（含 ?v= 版本），才會拿到同一個模組實例；
+        // 版本號不同會另外載入一份從未開局的 players。
+        const { players } = await import(document.querySelector('script[type="module"][src*="js/main.js"]').src);
         await Promise.all(players.map((player) => player.saveRun(3)));
       });
     } else if (name === 'EFT') {

@@ -48,7 +48,7 @@ test("學生仍登入時從教學頁按上一頁，留在還原的 Select", asyn
   await page.goto("Select/index.html");
   await page.locator("#game-list [data-select-game]").first().click();
   await page.click("#enter-btn");
-  await expect(page).toHaveURL(/\/tutorial\//);
+  await expect(page).toHaveURL(/\/Tutorial\//);
   await page.waitForTimeout(500);
 
   await page.goBack({ waitUntil: "commit" });
@@ -75,7 +75,7 @@ for (const loggedOut of [true, false]) {
     if (loggedOut) {
       await expect(page).toHaveURL(HOME_URL);
     } else {
-      await expect(page).toHaveURL(/\/DCCS\/index\.html$/);
+      await expect(page).toHaveURL(/\/DCCS_single\/index\.html$/);
       await expect(page.locator("#game-root canvas")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.style.visibility)).not.toBe("hidden");
     }

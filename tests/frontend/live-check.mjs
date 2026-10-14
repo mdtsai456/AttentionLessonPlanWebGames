@@ -78,7 +78,10 @@ try {
           else { startGame(); await submitResult(data); }
         }, id);
       } else if (id === 'DAT') {
-        await page.evaluate(async () => { const { players } = await import('/app/DAT_double/js/main.js?v=5'); await Promise.all(players.map((player) => player.saveRun(3))); });
+        // 存檔器在兩位玩家都進正式模式後才建立；用頁面實際載入的 main.js 網址（含 ?v= 版本），
+        // 寫死舊版號會另外載入一份從未開局的 players。
+        await page.waitForFunction(() => document.querySelectorAll('[data-ui="field"][data-mode="game"]').length === 2);
+        await page.evaluate(async () => { const { players } = await import(document.querySelector('script[type="module"][src*="js/main.js"]').src); await Promise.all(players.map((player) => player.saveRun(3))); });
       } else if (id === 'EFT') {
         await page.evaluate(async () => { const { players } = await import('/app/EFT_double/EFT_double.js'); await Promise.all(players.map((player) => player.saveRun(3))); });
       } else {

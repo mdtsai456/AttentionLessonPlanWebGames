@@ -96,5 +96,5 @@ test("DCCS：學生雙人登入仍轉到雙人遊戲頁", async ({ page }) => {
     student2_day: "1",
   });
   await page.goto(DCCS_PAGE);
-  await expect(page).toHaveURL(/\/DCCS\/double\.html$/);
+  await expect(page).toHaveURL(/\/DCCS_double\/index\.html$/);
 });

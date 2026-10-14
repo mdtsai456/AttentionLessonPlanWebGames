@@ -73,3 +73,14 @@ export const DOUBLE = {
   student2_token: 'student2-token', student2_key: 'G8_S88',
   student2_case: 'S88', student2_grade: 'G8', student2_school: 'TEST', student2_day: '1',
 };
+
+/**
+ * 外部素材平台：DAT 開局前會先向它抓學生素材清單、預載圖片，抓完才呼叫 startGame()。
+ * 一律回 404，讓遊戲立刻改用內建素材；測試不依賴外網，也不用等 5 秒逾時。
+ * 要在 recordWrites 之後呼叫（Playwright 後註冊的 route 先處理）。
+ */
+export async function stubAssetServer(page) {
+  await page.route("https://attention-lesson-plan-assets.zeabur.app/**", (route) => route.fulfill({
+    status: 404, contentType: "application/json", body: "{}", headers: { "Access-Control-Allow-Origin": "*" },
+  }));
+}
