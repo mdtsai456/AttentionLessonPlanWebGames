@@ -72,7 +72,7 @@ async function playToMidBreak(page) {
   await expect(page.locator('#mid-break-modal')).toBeVisible();
 }
 
-test('#41 離開→繼續遊戲什麼都不送、遊戲照常；再離開並確定才送第 3 關後回大廳', async ({ page }) => {
+test('#41 離開→繼續遊戲不多送、遊戲照常；再離開並確定也不重送中場已送的第 3 關', async ({ page }) => {
   const writes = await openSingle(page, { clock: true });
   const nativeDialogs = watchNativeDialogs(page);
   await playToMidBreak(page);
@@ -89,7 +89,8 @@ test('#41 離開→繼續遊戲什麼都不送、遊戲照常；再離開並確�
   await leaveDialog(page).getByRole('button', { name: '繼續遊戲', exact: true }).click();
   await expect(leaveDialog(page)).toHaveCount(0);
   await page.waitForTimeout(300);
-  expect(sessionsOf(writes)).toHaveLength(0);
+  // 只有中場先送的第 3 關，取消離開不會多送。
+  expect(sessionsOf(writes).map((request) => stat(request.body, 'EFT_stage'))).toEqual([3]);
   expect(new URL(page.url()).pathname).toBe('/EFT_single/EFT_single.html');
   expect(await page.evaluate(() => window.WebGameRuntime.paused)).toBe(false);
   await expect(page.locator('#leave-btn')).toBeEnabled();
@@ -118,7 +119,8 @@ test('#41 中場彈窗開著時叫出離開確認：Tab 在確認框內循環，
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(page.locator('#mid-break-modal')).toBeVisible();
   await page.waitForTimeout(300);
-  expect(sessionsOf(writes)).toHaveLength(0);
+  // 只有到中場時先送的第 3 關，取消離開不會多送。
+  expect(sessionsOf(writes).map((request) => stat(request.body, 'EFT_stage'))).toEqual([3]);
 });
 
 test('#41 中場「返回遊戲大廳」不用確認，送第 3 關後直接回大廳', async ({ page }) => {
@@ -187,12 +189,13 @@ async function holdSessionSaves(page) {
 
 test('R3 確定離開後存檔還在路上：方向鍵與按鈕都不算作答，分數不變', async ({ page }) => {
   const writes = await openSingle(page, { clock: true });
+  // 中場先送的第 3 關一直卡著，離開時要等它送完。
+  const release = await holdSessionSaves(page);
   await playToMidBreak(page);
   await page.click('#btn-continue');
   // 第 4 關第 1 題：記憶 1 秒後進入作答。
   await page.clock.runFor(1_200);
   await expect(page.locator('#feedback')).toHaveText('回答剛才位置的泡泡');
-  const release = await holdSessionSaves(page);
   await page.click('#leave-btn');
   await leaveDialog(page).getByRole('button', { name: '離開', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.WebGameRuntime.paused)).toBe(true);

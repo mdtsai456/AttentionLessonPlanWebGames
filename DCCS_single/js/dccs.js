@@ -426,11 +426,15 @@ export function mountDCCS(options) {
     guardUnload(false);
   }
 
+  // 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。
+  // 一次 mountDCCS 就是一局；第一次組成績時才產生（UUID 由 shared/api.js 提供）。
+  let playSubmissionId = null;
+
   function buildResultPayload(
     summary,
     endedAtMs
   ) {
-    return buildPayload({
+    const payload = buildPayload({
       lessonId,
 
       student: {
@@ -450,6 +454,21 @@ export function mountDCCS(options) {
 
       summary,
     });
+    playSubmissionId = playSubmissionId || window.WebGameApi.uuid();
+    payload.data.submissionId = playSubmissionId;
+    return payload;
+  }
+
+  // 第 stage 關為止的檢查點成績（中場先送、雙人版離開時用）。
+  function buildCheckpointPayload(stage) {
+    if (!statsInstance) return null;
+    const elapsedSeconds = track ? track.elapsed : 0;
+    statsInstance.setDuration(
+      Math.round(Math.min(elapsedSeconds, sessionSeconds) * 1000)
+    );
+    const summary = statsInstance.summary();
+    summary.stage = stage;
+    return buildResultPayload(summary, Date.now());
   }
 
   function destroy() {
@@ -585,6 +604,17 @@ export function mountDCCS(options) {
       let ended = false;
       // 場次結束後送出成績的請求；送完（成功、失敗都會先存好）才能導頁。
       let finalSubmission = null;
+      // 單人版到中場就先送第 3 關，之後直接關掉頁面也保得住前三關；失敗時 submitResult 會存到本機下次重送。
+      // 雙人版（submit: false）由 double.js 一起送兩位玩家。
+      let midwaySubmission = null;
+
+      function saveMidway() {
+        if (!submit || midwaySubmission) return;
+        midwaySubmission = submitResult(
+          buildCheckpointPayload(3),
+          { url: submitUrl }
+        );
+      }
 
       let leaveRequested = false;
 
@@ -784,11 +814,14 @@ export function mountDCCS(options) {
             );
           }
 
+          // 只到第 3 關（中場返回、第 4–5 關離開）且中場已送過：沿用那一筆，不再另送。
           finalSubmission =
-            submitResult(
-              payload,
-              { url: submitUrl }
-            );
+            midwaySubmission && summary.stage <= 3
+              ? midwaySubmission
+              : submitResult(
+                payload,
+                { url: submitUrl }
+              );
 
           submitted = await finalSubmission;
 
@@ -883,6 +916,7 @@ export function mountDCCS(options) {
               progressApi.completedLevel = completedLevel;
 
               if (previousLevel === 3 && currentLevel === 4) {
+                saveMidway();
                 const choice = await waitForContinueOrLobby();
                 if (!choice || destroyed) return;
                 if (choice === 'lobby') {
@@ -960,14 +994,7 @@ export function mountDCCS(options) {
       return progressApi.completedLevel;
     },
     buildLeavePayload(stage) {
-      if (!statsInstance) return null;
-      const elapsedSeconds = track ? track.elapsed : 0;
-      statsInstance.setDuration(
-        Math.round(Math.min(elapsedSeconds, sessionSeconds) * 1000)
-      );
-      const summary = statsInstance.summary();
-      summary.stage = stage;
-      return buildResultPayload(summary, Date.now());
+      return buildCheckpointPayload(stage);
     },
 
     get elapsed() {

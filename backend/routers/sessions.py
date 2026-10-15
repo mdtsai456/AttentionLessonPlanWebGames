@@ -262,19 +262,42 @@ def persist_unity_session(payload: UnityGameDataRequest) -> SessionAcceptRespons
         logger.warning("雙人版場次缺 pairId：school=%s grade=%s caseId=%s",
                        data.school, data.grade, data.caseId)
 
-    session_id = writes.insert_session_with_stats(
-        session_id=submission_session_id(data),
-        grade=data.grade,
-        case_id=data.caseId,
-        school=data.school,
-        start_time=start_time,
-        game_type=db_game_type,
-        current_day=data.currentDay,
-        end_time=end_time,
-        stats=unity_core_stats(game_name, data.stats),
-        mode=mode,
-        pair_id=pair_id,
-    )
+    stats = unity_core_stats(game_name, data.stats)
+    derived_session_id = submission_session_id(data)
+    try:
+        session_id = writes.insert_session_with_stats(
+            session_id=derived_session_id,
+            grade=data.grade,
+            case_id=data.caseId,
+            school=data.school,
+            start_time=start_time,
+            game_type=db_game_type,
+            current_day=data.currentDay,
+            end_time=end_time,
+            stats=stats,
+            mode=mode,
+            pair_id=pair_id,
+        )
+    except pymysql.IntegrityError as exc:
+        if derived_session_id is None or not (exc.args and exc.args[0] == 1062):
+            raise
+        # 場次 UUID 由學生身分 + submissionId 推導，撞到的一定是這位學生同一場已寫入的列：
+        # 中場先送的第 3 關（現在送來第 6 關就更新），或回應逾時後重送的同一筆（不動）。
+        upgraded = writes.upgrade_session_stats(
+            session_id=derived_session_id,
+            grade=data.grade,
+            case_id=data.caseId,
+            school=data.school,
+            game_type=db_game_type,
+            end_time=end_time,
+            stats=stats,
+        )
+        logger.info(
+            "同一場已存在，%s：sessionId=%s",
+            "更新為較高關卡的成績" if upgraded else "視為已接收",
+            derived_session_id,
+        )
+        return SessionAcceptResponse(sessionId=derived_session_id)
     return SessionAcceptResponse(sessionId=session_id)
 
 
@@ -298,12 +321,7 @@ def create_session(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except pymysql.IntegrityError as exc:
-        if exc.args and exc.args[0] == 1062 and data.submissionId is not None:
-            # 場次 UUID 由學生身分 + submissionId 推導，撞到的一定是這位學生先前已寫入的
-            # 同一筆（例如上次回應逾時）。
-            session_id = submission_session_id(data)
-            logger.info("重送的場次已存在，視為已接收：sessionId=%s", session_id)
-            return SessionAcceptResponse(sessionId=session_id)
+        # 帶 submissionId 的重複寫入已在 persist_unity_session 處理，這裡只剩沒帶的。
         if exc.args and exc.args[0] == 1062:
             logger.exception("場次 UUID 重複")
             raise HTTPException(status_code=409, detail="場次已存在") from exc

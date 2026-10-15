@@ -11,6 +11,7 @@ const UNKNOWN = '存檔結果未確認，請按重試（不會重複記錄）';
 const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const selector = (game, id, p = 0) => game === 'single' ? `#${id}` : `.player-${p + 1} [data-ui="${id}"]`;
 const isSessionPost = (request, url) => request.method() === 'POST' && new URL(url).pathname.endsWith('/api/sessions');
+const stageOf = (post) => post.data.stats.find((stat) => stat.apiname === 'DAT_stage').value;
 
 async function fulfillSession(route, status = 201) {
   await route.fulfill({
@@ -53,8 +54,17 @@ async function completeSixStages(session, game, questionsRemaining = 36) {
   );
 }
 
-function assertPayloads(posts, game) {
-  assert.equal(posts.length, game === 'double' ? 2 : 1, '每位玩家同局只送一次');
+// 同一局每位玩家送兩次：中場先送第 3 關，打完再用同一個 submissionId 送第 6 關（後端更新同一列）。
+function assertPayloads(all, game) {
+  const midway = all.filter((post) => stageOf(post) === 3);
+  const posts = all.filter((post) => stageOf(post) === 6);
+  assert.equal(all.length, midway.length + posts.length, '只送第 3 關與第 6 關');
+  assert.equal(midway.length, game === 'double' ? 2 : 1, '每位玩家中場只送一次');
+  for (const post of posts) {
+    const own = midway.find((item) => item.data.caseId === post.data.caseId);
+    assert.equal(own?.data.submissionId, post.data.submissionId, '第 6 關沿用中場的 submissionId');
+  }
+  assert.equal(posts.length, game === 'double' ? 2 : 1, '每位玩家同局只送一次第 6 關');
   assert.deepEqual(posts.map((post) => post.data.caseId).sort(), game === 'double' ? ['S01', 'S02'] : ['S03']);
   for (const post of posts) {
     assert.equal(post.lessonId, '1140908_DAT', '瓢蟲追擊令成績代號為 DAT');
@@ -145,7 +155,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         assert.deepEqual(session.dialogs, [], '六關已打完離開：不跳出瀏覽器的離開詢問');
         assert.equal(await leaveDialog(session.page).count(), 0, '六關已打完離開：不再確認');
         await session.page.unroute('**/Select/index.html');
-        assert.equal(session.sessionPosts.length, game === 'double' ? 2 : 1, '已完成成績離開時不可重複寫入');
+        assert.equal(session.sessionPosts.length, game === 'double' ? 4 : 2, '已完成成績離開時不可重複寫入');
         const firstPair = session.sessionPosts[0].data.pairId;
         await resetDriver(session, game);
         await session.page.locator(selector(game, 'restart')).click();
@@ -159,18 +169,18 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           assert.deepEqual(await session.page.locator('[data-ui="score"]').allTextContents(), scoresBeforeStaleClick);
           await completeSixStages(session, game, 35);
           await waitStatus(session, game, SAVED);
-          assertPayloads(session.sessionPosts.slice(2), game);
-          assert.notEqual(session.sessionPosts[2].data.pairId, firstPair, '第二局建立新 pairId');
+          assertPayloads(session.sessionPosts.slice(4), game);
+          assert.notEqual(session.sessionPosts[4].data.pairId, firstPair, '第二局建立新 pairId');
           assert.equal(new Set(session.sessionPosts.map((post) => post.data.submissionId)).size, 4, '第二局是新的 submissionId');
-          assert.ok(session.sessionPosts[2].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
+          assert.ok(session.sessionPosts[4].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
           await session.page.locator(selector(game, 'restart', 1)).click();
           await assertReset(session, game);
         } else {
           await completeSixStages(session, game);
           await waitStatus(session, game, SAVED);
-          assertPayloads(session.sessionPosts.slice(1), game);
-          assert.ok(session.sessionPosts[1].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
-          assert.notEqual(session.sessionPosts[1].data.submissionId, session.sessionPosts[0].data.submissionId, '第二局是新的 submissionId');
+          assertPayloads(session.sessionPosts.slice(2), game);
+          assert.ok(session.sessionPosts[2].data.startTime > session.sessionPosts[0].data.startTime, '第二局有新的開始時間');
+          assert.notEqual(session.sessionPosts[2].data.submissionId, session.sessionPosts[0].data.submissionId, '第二局是新的 submissionId');
         }
         expectNoErrors(session);
       } finally { await session.context.close(); }
@@ -184,7 +194,10 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         game,
         routeOverride: async ({ route, request, url, sessionPosts }) => {
           if (!isSessionPost(request, url)) return false;
-          const count = sessionPosts.filter((post) => post.data.caseId === request.postDataJSON().data.caseId).length;
+          const body = request.postDataJSON();
+          // 中場先送的第 3 關照常成功；第一次送的第 6 關回 500，之後 P1 的重試卡住由測試放行。
+          if (stageOf(body) === 3) { await fulfillSession(route); return true; }
+          const count = sessionPosts.filter((post) => post.data.caseId === body.data.caseId && stageOf(post) === 6).length;
           if (count === 1) await fulfillSession(route, 500);
           else if (request.postDataJSON().data.caseId === (game === 'single' ? 'S03' : 'S01')) { retryRoute = route; notifyRetry(); }
           else await fulfillSession(route);
@@ -194,9 +207,9 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
       try {
         await completeSixStages(session, game);
         await waitStatus(session, game, FAILED);
-        const original = structuredClone(session.sessionPosts.find((post) => post.data.caseId === (game === 'single' ? 'S03' : 'S01')));
+        const original = structuredClone(session.sessionPosts.find((post) => post.data.caseId === (game === 'single' ? 'S03' : 'S01') && stageOf(post) === 6));
         await assertReplayRetainsResult(session, game);
-        assert.equal(session.sessionPosts.length, game === 'double' ? 2 : 1);
+        assert.equal(session.sessionPosts.length, game === 'double' ? 4 : 2);
         await session.page.evaluate((s) => { const button = document.querySelector(s); button.click(); button.click(); button.click(); }, selector(game, 'retry-save'));
         let retryDeadline;
         try {
@@ -207,7 +220,7 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         } finally { clearTimeout(retryDeadline); }
         await waitStatus(session, game, SAVING, [0]);
         await assertReplayRetainsResult(session, game);
-        assert.equal(session.sessionPosts.length, game === 'double' ? 3 : 2, '連按重試不得產生並行寫入');
+        assert.equal(session.sessionPosts.length, game === 'double' ? 5 : 3, '連按重試不得產生並行寫入');
         assert.deepEqual(session.sessionPosts.at(-1), original, '重試保留原成績與時間戳');
         await fulfillSession(retryRoute);
         await waitStatus(session, game, SAVED, [0]);
@@ -240,8 +253,10 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
         try {
           await completeSixStages(session, game);
           await waitStatus(session, game, UNKNOWN);
+          // 中場的第 3 關與打完的第 6 關都結果不明。
+          const players = game === 'double' ? 2 : 1;
           const count = session.sessionPosts.length;
-          assert.equal(count, game === 'double' ? 2 : 1);
+          assert.equal(count, players * 2);
           const retryAvailable = await session.page.evaluate((selectors) => selectors.every((s) => {
             const button = document.querySelector(s);
             return button && !button.hidden && !button.disabled;
@@ -257,14 +272,16 @@ describe('動物追擊令完整流程與存檔錯誤', () => {
           if (failure === 'abort') {
             for (const p of game === 'double' ? [0, 1] : [0]) await session.page.locator(selector(game, 'retry-save', p)).click();
             await waitStatus(session, game, SAVED);
-            assert.equal(session.sessionPosts.length, count * 2);
+            assert.equal(session.sessionPosts.length, count + players);
           }
           // 打完六關按離開：不再確認；未存好的成績用同一個 submissionId 再送一次，成功才導頁
           await session.page.locator('#leave-btn').click();
           await session.page.waitForURL('**/Select/index.html', { timeout: 5000 });
-          assert.equal(session.sessionPosts.length, count * 2, '每位玩家只重送一次，已存好的不再送');
+          // 只重送第 6 關：它和中場的第 3 關是同一個 submissionId，後端會以第 6 關為準。
+          assert.equal(session.sessionPosts.length, count + players, '每位玩家只重送一次，已存好的不再送');
           for (const caseId of new Set(session.sessionPosts.map((post) => post.data.caseId))) {
-            const posts = session.sessionPosts.filter((post) => post.data.caseId === caseId);
+            const posts = session.sessionPosts.filter((post) => post.data.caseId === caseId && stageOf(post) === 6);
+            assert.equal(posts.length, 2);
             assert.match(posts[0].data.submissionId, V4);
             assert.deepEqual(posts[1], posts[0], `${caseId} 重送同一筆（同一個 submissionId、同樣內容）`);
           }

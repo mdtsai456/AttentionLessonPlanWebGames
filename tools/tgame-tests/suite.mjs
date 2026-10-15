@@ -269,7 +269,10 @@ for(const game of ['TGame_single','TGame_double']){
         await t.answer();await t.advance(60100);assert.equal((await t.snapshot()).playing,false);
         if(level===3)await t.page.click(game==='TGame_single'?'#btn-next-stage':'#mid-continue');else if(level<6)await t.page.click('.shared-stage-clear-btn');if(level<6)await t.ready();
       }
-      assert.ok(await t.page.locator('#result').isVisible());for(const save of t.saves)assert.equal(save.data.stats.find(x=>x.apiname==='TGame_stage').value,6);assert.equal(t.saves.length,game==='TGame_single'?1:2);
+      // 中場先送第 3 關，打完再用同一個 submissionId 送第 6 關（後端更新同一列）。
+      const n=game==='TGame_single'?1:2;
+      assert.ok(await t.page.locator('#result').isVisible());assert.deepEqual(t.saves.map(s=>s.data.stats.find(x=>x.apiname==='TGame_stage').value),[...Array(n).fill(3),...Array(n).fill(6)]);
+      assert.deepEqual(t.saves.slice(n).map(s=>s.data.submissionId),t.saves.slice(0,n).map(s=>s.data.submissionId),'第 6 關要沿用中場的 submissionId');
       await t.page.click('#replay-btn');await t.ready();const s=await t.snapshot();assert.equal(s.level,1);assert.ok(s.players.every(p=>p.score===0&&p.answers.length===0));
     }finally{await t.close();}
   });
@@ -286,17 +289,17 @@ for(const game of ['TGame_single','TGame_double']){
   const go=t=>confirmBox(t).getByRole('button',{name:'離開',exact:true});
   const stages=t=>t.saves.map(s=>s.data.stats.find(x=>x.apiname==='TGame_stage').value);
   const playToEnd=async t=>{for(let level=4;level<=6;level++){await t.answer();await t.advance(60100);if(level<6){await t.page.click('.shared-stage-clear-btn');await t.ready();}}};
-  await test(`leave ${game} 第 4 關按離開再取消不存檔，打完六關只存一次`,async()=>{
+  await test(`leave ${game} 第 4 關按離開再取消不多存，打完六關只多存第 6 關`,async()=>{
     const t=await gamePage(game);try{
-      await t.toMidBreak();await t.page.click(next);await t.ready();await t.advance(200);assert.equal(t.saves.length,0,'繼續遊玩前不應存檔');
+      await t.toMidBreak();await t.page.click(next);await t.ready();await t.advance(200);assert.deepEqual(stages(t),Array(saveCount).fill(3),'到中場應先送第 3 關');
       await t.page.click('#leave-btn');await confirmBox(t).waitFor({state:'visible',timeout:2000});
       await stay(t).click();await t.advance(200);
       assert.equal(await confirmBox(t).count(),0,'按繼續遊戲後確認框應關閉');
-      assert.equal(t.saves.length,0,'取消離開不得送出任何成績');
+      assert.equal(t.saves.length,saveCount,'取消離開不得多送成績');
       assert.ok(t.page.url().includes(`/${game}/`),'取消後應留在遊戲頁');
       assert.equal(await t.page.locator('#leave-btn').isEnabled(),true,'取消後「離開」應可再按');
-      await playToEnd(t);await until(t,()=>t.saves.length===saveCount,'六關結束應存檔');await t.advance(200);
-      assert.deepEqual(stages(t),Array(saveCount).fill(6),'取消過的離開不得多留一筆第 3 關成績');
+      await playToEnd(t);await until(t,()=>t.saves.length===2*saveCount,'六關結束應存檔');await t.advance(200);
+      assert.deepEqual(stages(t),[...Array(saveCount).fill(3),...Array(saveCount).fill(6)],'取消過的離開不得多留一筆第 3 關成績');
       assert.deepEqual(t.dialogs,[],'不得出現瀏覽器原生對話框');
     }finally{await t.close();}
   });
@@ -307,7 +310,7 @@ for(const game of ['TGame_single','TGame_double']){
       assert.equal(await t.page.evaluate(()=>window.WebGameRuntime.paused),true,'確認框開著時遊戲應暫停');
       await t.answer();assert.ok((await t.snapshot()).players.every(p=>p.score===3),'確認框開著時按鍵不得作答');
       await stay(t).click();await t.advance(200);
-      assert.equal(t.saves.length,0,'取消離開不得送出任何成績');
+      assert.deepEqual(stages(t),Array(saveCount).fill(3),'只有中場先送的第 3 關，取消離開不得多送');
       assert.equal(await t.page.evaluate(()=>window.WebGameRuntime.paused),false,'取消後遊戲應恢復');
       const before=await t.snapshot();assert.equal(before.playing,true);assert.equal(before.level,4);
       await t.answer();assert.ok((await t.snapshot()).players.every(p=>p.score===4),'取消後應可繼續作答');
@@ -334,7 +337,7 @@ for(const game of ['TGame_single','TGame_double']){
       const leave=pause.getByRole('button',{name:'離開',exact:true});
       await leave.click();await confirmBox(t).waitFor({state:'visible',timeout:2000});
       await stay(t).click();await t.advance(200);
-      assert.equal(t.saves.length,0,'取消離開不得送出任何成績');
+      assert.deepEqual(stages(t),Array(saveCount).fill(3),'只有中場先送的第 3 關，取消離開不得多送');
       assert.ok(t.page.url().includes(`/${game}/`),'取消後應留在遊戲頁');
       assert.ok(await pause.isVisible(),'取消後仍應停在暫停畫面');assert.equal((await t.snapshot()).paused,true);
       assert.equal(await leave.isEnabled(),true,'取消離開後「離開」不得卡在停用');
@@ -345,21 +348,21 @@ for(const game of ['TGame_single','TGame_double']){
     }finally{await t.close();}
   });
   // 確定離開後遊戲維持暫停到導頁（review R3）：存檔慢時第 6 關倒數不能跑完、不能作答，不能多送第 6 關成績。
-  await test(`leave ${game} 確定離開後存檔很慢：計時凍結、不能作答，只送已完成的第 3 關後導頁`,async()=>{
+  await test(`leave ${game} 確定離開時中場的第 3 關還沒送完：計時凍結、不能作答，送完才導頁`,async()=>{
     const t=await gamePage(game);const gate=[];const sent=[];try{
-      await t.toMidBreak();await t.page.click(next);await t.ready();
-      for(let level=4;level<=5;level++){await t.answer();await t.advance(60100);await t.page.click('.shared-stage-clear-btn');await t.ready();}
-      await t.startTimer();await t.answer();await t.advance(2600);
-      // 存檔請求卡住，直到斷言完成才回覆（模擬很慢的網路）
+      // 存檔請求卡住，直到斷言完成才回覆（模擬很慢的網路）；中場先送的第 3 關也一直卡著。
       await t.context.route('**/sessions',async route=>{
         if(route.request().method()!=='POST')return route.fallback();
         sent.push(JSON.parse(route.request().postData()||'{}'));await new Promise(r=>gate.push(r));
         await route.fulfill({status:201,contentType:'application/json',body:'{}'}).catch(()=>{});
       });
+      await t.toMidBreak();await t.page.click(next);await t.ready();
+      for(let level=4;level<=5;level++){await t.answer();await t.advance(60100);await t.page.click('.shared-stage-clear-btn');await t.ready();}
+      await t.startTimer();await t.answer();await t.advance(2600);
       const clock=()=>t.page.evaluate(g=>{const s=g==='TGame_single'?state:session;return {level:s.level,playing:s.playing,leftMs:s.levelDeadline-window.WebGameRuntime.now()};},game);
       const before=await clock();const scores=(await t.snapshot()).players.map(p=>p.score);
       await t.page.click('#leave-btn');await confirmBox(t).waitFor({state:'visible',timeout:2000});await go(t).click();
-      await until(t,()=>sent.length===saveCount,'確定離開應送出第 3 關檢查點');
+      await until(t,()=>sent.length===saveCount,'中場應已送出第 3 關檢查點');
       assert.equal(await t.page.evaluate(()=>window.WebGameRuntime.paused),true,'存檔期間遊戲應維持暫停');
       await t.advance(61000);
       const during=await clock();
@@ -372,6 +375,28 @@ for(const game of ['TGame_single','TGame_double']){
       assert.equal(t.saves.length,0,'不得有其他成績送出');
       assert.deepEqual(t.dialogs,[],'不得出現瀏覽器原生對話框');
     }finally{gate.forEach(r=>r());await t.close();}
+  });
+  // 到中場自動送的第 3 關失敗時，第 4 關按離開要用同一筆（同一個 submissionId）重送。
+  await test(`leave ${game} 中場自動送第 3 關失敗，第 4 關離開時用同一筆重送`,async()=>{
+    const t=await gamePage(game);const failed=[];try{
+      await t.context.route('**/sessions',async route=>{
+        if(route.request().method()!=='POST')return route.fallback();
+        const body=JSON.parse(route.request().postData()||'{}');
+        if(!failed.some(f=>f.data.caseId===body.data.caseId)){failed.push(body);return route.fulfill({status:500,contentType:'application/json',body:'{}'});}
+        return route.fallback();
+      });
+      await t.toMidBreak();await until(t,()=>failed.length===saveCount,'中場應自動送第 3 關');
+      assert.equal(t.saves.length,0,'中場那次失敗了，還沒有存好的成績');
+      await t.page.click(next);await t.ready();await t.startTimer();
+      await t.page.click('#leave-btn');await confirmBox(t).waitFor({state:'visible',timeout:2000});
+      await Promise.all([t.page.waitForURL('**/Select/index.html',{timeout:5000}),go(t).click()]);
+      assert.deepEqual(stages(t),Array(saveCount).fill(3),'離開時重送第 3 關');
+      for(const save of t.saves){
+        const original=failed.find(f=>f.data.caseId===save.data.caseId);
+        assert.equal(save.data.submissionId,original.data.submissionId,'重送沿用同一個 submissionId');
+      }
+      assert.deepEqual(t.dialogs,[],'不得出現瀏覽器原生對話框');
+    }finally{await t.close();}
   });
   await test(`leave ${game} 確定離開後流程出錯留在頁面時遊戲恢復`,async()=>{
     const t=await gamePage(game);try{
@@ -412,13 +437,16 @@ await test('flow TGame_double 兩位玩家成績共用同一個 pairId，重玩�
   const t=await gamePage('TGame_double');try{
     await t.toMidBreak();await t.page.click('#mid-continue');await t.ready();
     for(let level=4;level<=6;level++){await t.answer();await t.advance(60100);if(level<6){await t.page.click('.shared-stage-clear-btn');await t.ready();}}
-    await until(t,()=>t.saves.length===2,'六關結束應存兩筆');
+    // 中場兩筆第 3 關＋六關結束兩筆第 6 關，都是同一局的 pairId。
+    await until(t,()=>t.saves.length===4,'六關結束應再存兩筆');
     const first=t.saves.map(s=>s.data.pairId);
-    assert.match(first[0],UUID_V4,`pairId 應為 UUID v4：${first[0]}`);assert.equal(first[0],first[1]);
+    assert.match(first[0],UUID_V4,`pairId 應為 UUID v4：${first[0]}`);assert.ok(first.every(id=>id===first[0]));
+    const firstPlay=t.saves[0].data.submissionId;
     await t.page.click('#replay-btn');await t.toMidBreak();
     await Promise.all([t.page.waitForURL('**/Select/index.html',{timeout:5000}),t.page.click('#mid-lobby')]);
-    const second=t.saves.slice(2).map(s=>s.data.pairId);
+    const second=t.saves.slice(4).map(s=>s.data.pairId);
     assert.equal(second.length,2);assert.equal(second[0],second[1]);assert.notEqual(second[0],first[0],'重玩應換新的 pairId');
+    assert.notEqual(t.saves[4].data.submissionId,firstPlay,'重玩應換新的 submissionId，不能蓋掉上一局');
   }finally{await t.close();}
 });
 // 區網 http 網址沒有 crypto.randomUUID：pairId 仍須是用 getRandomValues 產生的 UUID v4，不得退回 Math.random（review R10）。

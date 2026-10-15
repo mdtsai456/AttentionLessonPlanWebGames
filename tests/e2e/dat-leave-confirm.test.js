@@ -24,37 +24,39 @@ describe('動物追擊令離開確認', () => {
   for (const game of ['single', 'double']) {
     const players = game === 'double' ? 2 : 1;
 
-    test(`${game}：第 4 關按離開→繼續遊戲不送成績；再按離開→確定才送第 3 關檢查點並回選遊戲頁`, async () => {
+    test(`${game}：第 4 關按離開→繼續遊戲不多送；再按離開→確定也不重送中場已存好的第 3 關`, async () => {
       const session = await openGame(browser, server.origin, { game });
       session.page.setDefaultTimeout(5000);
       try {
         for (let i = 0; i < 19; i++) await session.driver.playQuestion('correct', 'correct');
         const round = await session.page.locator(game === 'single' ? '#round' : '.player-1 [data-ui="round"]').textContent();
         assert.match(round, /第 4 \/ 6 關/);
+        // 到中場時每位玩家已先送一筆第 3 關。
+        assert.equal(session.sessionPosts.length, players, '中場先送第 3 關');
 
         await session.page.locator('#leave-btn').click();
         const dialog = leaveDialog(session.page);
         await dialog.waitFor({ state: 'visible' });
         await session.page.clock.runFor(1000);
-        assert.equal(session.sessionPosts.length, 0, '確認框開著時不可先存檔');
+        assert.equal(session.sessionPosts.length, players, '確認框開著時不可多送');
 
         await dialog.getByRole('button', { name: '繼續遊戲', exact: true }).click();
         await dialog.waitFor({ state: 'detached' });
         await session.page.clock.runFor(1000);
-        assert.equal(session.sessionPosts.length, 0, '取消離開不可送出任何成績');
+        assert.equal(session.sessionPosts.length, players, '取消離開不可多送成績');
         assert.ok(session.page.url().includes(`DAT_${game}.html`), '取消後留在遊戲頁');
         assert.equal(await session.page.locator('#leave-btn').isEnabled(), true, '取消後離開鈕可以再按');
         // 焦點留在離開鈕時，空白鍵會再按到離開而不是作答
         assert.notEqual(await session.page.evaluate(() => document.activeElement?.id), 'leave-btn', '取消後焦點要離開「離開」鈕');
         // 遊戲照常繼續：下一題可以正常作答
         await session.driver.playQuestion('correct', 'correct');
-        assert.equal(session.sessionPosts.length, 0);
+        assert.equal(session.sessionPosts.length, players);
 
         await session.page.locator('#leave-btn').click();
         await dialog.waitFor({ state: 'visible' });
         await dialog.getByRole('button', { name: '離開', exact: true }).click();
         await session.page.waitForURL('**/Select/index.html');
-        assert.equal(session.sessionPosts.length, players, '確定離開後每位玩家送一筆第 3 關檢查點');
+        assert.equal(session.sessionPosts.length, players, '確定離開不重送中場已存好的第 3 關');
         for (const post of session.sessionPosts) assert.equal(stageOf(post), 3);
         assert.deepEqual(session.dialogs, [], '不可跳出瀏覽器的離開詢問');
       } finally { await session.context.close(); }

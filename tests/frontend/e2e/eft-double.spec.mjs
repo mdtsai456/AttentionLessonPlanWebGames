@@ -68,8 +68,13 @@ test('#5 六關打完兩位玩家各送一筆第 6 關成績，共用 pairId 且
   const writes = await openDouble(page);
   const nativeDialogs = watchNativeDialogs(page);
   await playStages(page, 1, 6);
-  await expect.poll(() => sessionsOf(writes).length, { timeout: 5000 }).toBe(2);
-  const sessions = sessionsOf(writes);
+  // 中場各先送一筆第 3 關，打完再各送一筆第 6 關（同一個 submissionId，後端更新同一列）。
+  await expect.poll(() => sessionsOf(writes).length, { timeout: 5000 }).toBe(4);
+  const midway = sessionsOf(writes).slice(0, 2);
+  const sessions = sessionsOf(writes).slice(2);
+  expect(midway.map((request) => stat(request.body, 'EFT_stage'))).toEqual([3, 3]);
+  expect(sessions.map((request) => request.body.data.submissionId))
+    .toEqual(midway.map((request) => request.body.data.submissionId));
   expect(sessions.map((request) => stat(request.body, 'EFT_stage'))).toEqual([6, 6]);
   expect(sessions.map((request) => request.body.data.caseId).sort()).toEqual(['S88', 'S99']);
   expect(sessions.map((request) => stat(request.body, 'EFT_questionCount'))).toEqual([30, 30]);
@@ -77,11 +82,11 @@ test('#5 六關打完兩位玩家各送一筆第 6 關成績，共用 pairId 且
 
   // 打完後再按離開並確定，不可重送第 6 關。
   await leaveAndConfirm(page);
-  expect(sessionsOf(writes)).toHaveLength(2);
+  expect(sessionsOf(writes)).toHaveLength(4);
   expect(nativeDialogs).toEqual([]);
 });
 
-test('#41 離開→繼續遊戲什麼都不送、遊戲照常；再離開並確定才送兩人第 3 關', async ({ page }) => {
+test('#41 離開→繼續遊戲不多送、遊戲照常；再離開並確定也不重送中場已送的第 3 關', async ({ page }) => {
   const writes = await openDouble(page);
   const nativeDialogs = watchNativeDialogs(page);
   await playStages(page, 1, 3);
@@ -97,7 +102,8 @@ test('#41 離開→繼續遊戲什麼都不送、遊戲照常；再離開並確�
   await leaveDialog(page).getByRole('button', { name: '繼續遊戲', exact: true }).click();
   await expect(leaveDialog(page)).toHaveCount(0);
   await page.waitForTimeout(300);
-  expect(sessionsOf(writes)).toHaveLength(0);
+  // 只有中場先送的兩人第 3 關，取消離開不會多送。
+  expect(sessionsOf(writes).map((request) => stat(request.body, 'EFT_stage'))).toEqual([3, 3]);
   expect(new URL(page.url()).pathname).toBe('/EFT_double/EFT_double.html');
   expect(await page.evaluate(() => window.WebGameRuntime.paused)).toBe(false);
   await expect(page.locator('#leave-btn')).toBeEnabled();
@@ -132,8 +138,9 @@ test('#6 連點兩下離開只開一個確認框，確定後每位玩家只送�
 test('#6 再玩一次之後送的成績換新的 pairId', async ({ page }) => {
   const writes = await openDouble(page);
   await playStages(page, 1, 6);
-  await expect.poll(() => sessionsOf(writes).length, { timeout: 5000 }).toBe(2);
+  await expect.poll(() => sessionsOf(writes).length, { timeout: 5000 }).toBe(4);
   const firstPairId = sessionsOf(writes)[0].body.data.pairId;
+  const firstPlayId = sessionsOf(writes)[0].body.data.submissionId;
 
   // 任一人按「再玩一次」兩人一起開新局（與 tianjin 分支的規則一致）。
   await page.click('.player-1 [data-ui="restart"]');
@@ -142,11 +149,14 @@ test('#6 再玩一次之後送的成績換新的 pairId', async ({ page }) => {
   await playStages(page, 1, 3);
   await page.click('#mid-continue');
   await leaveAndConfirm(page);
-  expect(sessionsOf(writes)).toHaveLength(4);
-  const second = sessionsOf(writes).slice(2);
+  // 第二局只有中場先送的兩筆第 3 關；離開不重送。
+  expect(sessionsOf(writes)).toHaveLength(6);
+  const second = sessionsOf(writes).slice(4);
   expect(second.map((request) => stat(request.body, 'EFT_stage'))).toEqual([3, 3]);
   expect(second[0].body.data.pairId).toBe(second[1].body.data.pairId);
   expect(second[0].body.data.pairId).not.toBe(firstPairId);
+  // 新的一局換新的 submissionId，不會蓋掉上一局。
+  expect(second[0].body.data.submissionId).not.toBe(firstPlayId);
 });
 
 test('#20 中場畫面上仍點得到離開，並送出兩人第 3 關成績', async ({ page }) => {
@@ -257,18 +267,19 @@ test('伺服器明確拒絕（400）的檢查點，下次存檔可以重送', as
 
 test('R3 確定離開後存檔還在路上：兩位玩家的按鍵與按鈕都不算作答', async ({ page }) => {
   const writes = await openDouble(page);
-  await playStages(page, 1, 3);
-  await page.click('#mid-continue');
-  await page.clock.runFor(1_200);
-  const feedback = (n) => page.locator(`.player-${n} [data-ui="feedback"]`);
-  await expect(feedback(1)).toHaveText('回答剛才位置的泡泡');
-  await expect(feedback(2)).toHaveText('回答剛才位置的泡泡');
+  // 中場先送的第 3 關一直卡著，離開時要等它送完。
   let release;
   const released = new Promise((resolve) => { release = resolve; });
   await page.route('**/api/sessions', async (route) => {
     await released;
     await route.fallback();
   });
+  await playStages(page, 1, 3);
+  await page.click('#mid-continue');
+  await page.clock.runFor(1_200);
+  const feedback = (n) => page.locator(`.player-${n} [data-ui="feedback"]`);
+  await expect(feedback(1)).toHaveText('回答剛才位置的泡泡');
+  await expect(feedback(2)).toHaveText('回答剛才位置的泡泡');
   await page.click('#leave-btn');
   await leaveDialog(page).getByRole('button', { name: '離開', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.WebGameRuntime.paused)).toBe(true);

@@ -11,7 +11,7 @@ async function waitNotice(session, predicate) {
 }
 
 for (const game of ['single', 'double']) {
-  test(`${game}：第三關離開失敗留在中場，重試成功後離開不重送伙伴成績`, async () => {
+  test(`${game}：中場自動送第 3 關失敗時顯示可重試，按返回大廳用同一筆重送、不重送伙伴成績`, async () => {
     const server = await startStaticServer();
     const browser = await launchBrowser();
     let session;
@@ -34,24 +34,23 @@ for (const game of ['single', 'double']) {
         const panel = document.querySelector('#mid-break, #stage-clear-modal');
         return panel && !panel.hidden;
       });
-      const lobby = game === 'single' ? '#btn-lobby' : '#mid-lobby';
-      await session.page.locator(lobby).click();
+      // 到中場就自動送第 3 關；第一次失敗，畫面提示可重試，還留在遊戲頁。
       await waitNotice(session, () => document.querySelector('#checkpoint-save-status').textContent.includes('成績儲存失敗，請重試'));
       assert.ok(await session.page.locator('#save-notice').isVisible());
       assert.ok(session.page.url().includes(`DAT_${game}.html`));
       assert.equal(session.sessionPosts.length, game === 'single' ? 1 : 2);
       const original = structuredClone(session.sessionPosts.find((post) => post.data.caseId === (game === 'single' ? 'S03' : 'S01')));
-      await session.page.locator('#checkpoint-retry-save').click();
-      await waitNotice(session, () => document.querySelector('#save-notice').hidden);
-      assert.deepEqual(session.sessionPosts.at(-1), original, '重試保存原始時間與成績');
       for (const post of session.sessionPosts) {
         assert.equal(post.data.stats.find((stat) => stat.apiname === 'DAT_stage').value, 3);
         assert.equal(post.data.stats.find((stat) => stat.apiname === 'DAT_levelAccuracy').value, '1,1,1');
       }
+      // 返回大廳時用原本那一筆重送，成功後才回大廳；已存好的伙伴不重送。
       const count = session.sessionPosts.length;
+      const lobby = game === 'single' ? '#btn-lobby' : '#mid-lobby';
       await session.page.locator(lobby).click();
       await session.page.waitForURL('**/Select/index.html');
-      assert.equal(session.sessionPosts.length, count);
+      assert.equal(session.sessionPosts.length, count + 1);
+      assert.deepEqual(session.sessionPosts.at(-1), original, '重送保存原始時間、成績與 submissionId');
       assert.deepEqual(session.dialogs, [], '回大廳不可跳出瀏覽器的離開詢問');
     } finally {
       await session?.context.close();

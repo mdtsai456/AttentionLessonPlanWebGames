@@ -131,7 +131,7 @@ lobbyBtn.addEventListener("click", async () => {
   nextStageBtn.disabled = true;
   lobbyBtn.disabled = true;
   try {
-    if (savedStage !== MID_STAGE) await saveCurrentRun(MID_STAGE);
+    await saveCurrentRun(MID_STAGE);
     returnToLobby();
   } finally {
     // 中場回大廳是明確選擇，不再確認。萬一導向沒有發生，恢復按鈕避免卡在中場畫面；已存過不會重送
@@ -177,6 +177,8 @@ function startGame(rules = buildStageRules()) {
   state.startedAt = window.WebGameRuntime.now();
   state.endReason = "";
   savedStage = 0;
+  savePromise = Promise.resolve();
+  playId = window.WebGameApi.uuid();
   stageRules = rules;
   nextStageBtn.disabled = false;
   lobbyBtn.disabled = false;
@@ -374,6 +376,8 @@ function endLevel() {
   pausePlay();
 
   if (finishedLevel === MID_STAGE) {
+    // 到中場就先送第 3 關，之後直接關掉頁面也保得住前三關。
+    void saveCurrentRun(MID_STAGE);
     showLocalStageClear(true);
     return;
   }
@@ -417,7 +421,11 @@ function finishGame(reason) {
   void saveCurrentRun(STAGE_COUNT);
 }
 
+// 已送出（或正在送）的最高關卡與那次送出；同一關或更低的關卡不再另送。
 let savedStage = 0;
+let savePromise = Promise.resolve();
+// 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。
+let playId = "";
 
 function completedStage() {
   const midOpen = !stageClearModal.classList.contains("is-hidden");
@@ -438,7 +446,7 @@ async function leaveGame() {
     try {
       const completed = completedStage();
       const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
-      if (stage && stage !== savedStage) await saveCurrentRun(stage);
+      if (stage) await saveCurrentRun(stage);
       window.leaveTo('../Select/index.html');
     } catch (err) {
       console.error("離開失敗：", err);
@@ -450,7 +458,17 @@ async function leaveGame() {
 }
 
 function saveCurrentRun(stage) {
+  if (stage <= savedStage) return savePromise;
   savedStage = stage;
+  savePromise = sendStageResult(stage).then((ok) => {
+    // 送失敗時清掉紀錄，下次離開會再送；同一個 submissionId 重送不會多一列。
+    if (!ok && savedStage === stage) savedStage = 0;
+    return ok;
+  });
+  return savePromise;
+}
+
+function sendStageResult(stage) {
   const total = Math.max(state.score + state.wrong, 1);
   return submitResult({
     score: state.score,
@@ -899,7 +917,7 @@ async function submitResult(data) {
   const school = sessionStorage.getItem("school") || sessionStorage.getItem("student1_school");
   if (!grade || !caseId || !school) {
     console.warn("找不到登入學生資料，成績不送出");
-    return;
+    return true;
   }
   const currentDay = parseInt(
     sessionStorage.getItem("currentDay")
@@ -919,6 +937,7 @@ async function submitResult(data) {
       startTime: window.WebGameRuntime.toWallTime(state.startedAt),
       endTime: Date.now(),
       mode: "single",
+      submissionId: playId,
       stats: [
         { apiname: "TGame_correct", value: data.score },
         { apiname: "TGame_wrong", value: data.wrong },
@@ -937,9 +956,12 @@ async function submitResult(data) {
     if (res.status !== 201) {
       const errData = await res.json().catch(() => ({}));
       console.error(`成績送出失敗 ${res.status}:`, errData.detail || "寫入失敗");
+      return false;
     }
+    return true;
   } catch (err) {
     console.error("成績送出失敗：", err);
+    return false;
   }
 }
 

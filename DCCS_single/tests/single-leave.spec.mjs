@@ -87,7 +87,7 @@ test.describe('單人版 離開：先確認，確定後才存檔', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test('第 3 關後取消離開，再打完全場：只送全場成績一筆', async ({ page }) => {
+  test('第 3 關後取消離開，再打完全場：只多送全場成績一筆', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'single');
     await reachBreak(page, 'single');
     await continueAfterBreak(page);
@@ -100,18 +100,19 @@ test.describe('單人版 離開：先確認，確定後才存檔', () => {
     await page.keyboard.press('Escape');
     await expect(leaveDialog(page)).toHaveCount(0);
     await page.waitForTimeout(500);
-    expect(posts).toHaveLength(0);
+    // 只有中場先送的一筆第 3 關。
+    expect(posts).toHaveLength(1);
 
     await leave.click();
     await answerLeave(page, 'stay');
     await page.waitForTimeout(500);
-    expect(posts).toHaveLength(0);
+    expect(posts).toHaveLength(1);
 
     await drive(page, 'single', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
     await page.waitForURL(/\/Select\/index\.html/);
 
-    expect(posts).toHaveLength(1);
-    expect(stat(posts[0], 'stage')).toBe(FULL_SESSION_STAGE);
+    expect(posts.map((p) => stat(p, 'stage'))).toEqual([3, FULL_SESSION_STAGE]);
+    expect(posts[1].data.submissionId).toBe(posts[0].data.submissionId);
     expect(dialogs).toEqual([]);
     expect(pageErrors).toEqual([]);
   });
