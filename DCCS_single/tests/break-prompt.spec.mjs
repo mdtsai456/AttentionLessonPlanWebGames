@@ -87,7 +87,7 @@ test.describe('雙人版 第 3 關後中場休息', () => {
     await reachBreak(page, 'double');
 
     await expect(page.locator('#shared-break')).toBeVisible();
-    await expect(page.locator('#shared-break')).toContainText('第 3 關已結束');
+    await expect(page.locator('#shared-break')).toContainText('已完成一半的遊玩進度');
     await observeTracks(page, 'double');
 
     await page.locator('#shared-break-continue').click();

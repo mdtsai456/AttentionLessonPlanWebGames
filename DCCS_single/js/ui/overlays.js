@@ -750,8 +750,8 @@ export function createOverlays(container) {
   );
   const breakEl = buildOverlay(
     'dccs-overlay-level dccs-overlay-break',
-    '<div class="dccs-level-badge">挑戰完成！</div>' +
-      '<p class="dccs-level-message">第 3 關已結束<br>要繼續遊玩嗎？</p>' +
+    '<div class="dccs-level-badge">中場休息</div>' +
+      '<p class="dccs-level-message">已完成一半的遊玩進度<br>要繼續遊玩嗎？</p>' +
       '<div class="dccs-break-actions">' +
         '<button class="dccs-level-continue" type="button" data-break="continue">繼續遊玩</button>' +
         '<button class="dccs-break-lobby" type="button" data-break="lobby">返回遊戲大廳</button>' +

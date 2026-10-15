@@ -370,8 +370,8 @@ function showStageClearModal(completedStage) {
     window.showStageClear(completedStage).then(continueNextStage);
     return;
   }
-  $('stage-clear-title').textContent = '挑戰完成！';
-  $('stage-clear-text').innerHTML = '第 3 關已結束<br>要繼續遊玩嗎？';
+  $('stage-clear-title').textContent = '中場休息';
+  $('stage-clear-text').innerHTML = '已完成一半的遊玩進度<br>要繼續遊玩嗎？';
   $('btn-next-stage').textContent = '繼續遊玩';
   $('btn-lobby').hidden = false;
   $('stage-clear-modal').hidden = false;
