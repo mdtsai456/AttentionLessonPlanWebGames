@@ -18,6 +18,8 @@
 .webgame-leave-confirm__actions button:focus-visible{outline:3px solid #2b6cb0;outline-offset:3px}`;
 
   let pending = null;
+  // 已確認離開、正在導頁：不再跳瀏覽器的離開詢問。
+  let leaving = false;
 
   function ensureStyle() {
     if (document.getElementById('webgame-leave-confirm-style')) return;
@@ -105,13 +107,31 @@
     if (window.WebGameRuntime) window.WebGameRuntime.resume('leave-confirm');
   };
 
-  // 確定離開後按上一頁回來（bfcache）時，不沿用離開流程的暫停。
+  // 確定離開後按上一頁回來（bfcache）時，不沿用離開流程的暫停，也恢復離開詢問。
   window.addEventListener('pageshow', (event) => {
-    if (event.persisted) window.cancelLeave();
+    if (!event.persisted) return;
+    leaving = false;
+    window.cancelLeave();
   });
 
   /** 已確認要離開：直接導頁，不再跳出瀏覽器的離開詢問。 */
   window.leaveTo = function (url) {
+    leaving = true;
     window.location.href = url;
+  };
+
+  /**
+   * 遊戲進行中直接關掉分頁、重新整理或按上一頁時，先跳出瀏覽器的離開詢問，
+   * 避免一不小心就丟掉這一局的成績（和動物追擊令、賽道攔截一樣）。
+   * isPlaying() 回傳 true 才問。透過 leaveTo 導頁（已確認離開）不問；
+   * 登入逾時登出時 sessionStorage 已清空，也不問，免得擋住登出。
+   */
+  window.guardUnload = function (isPlaying) {
+    window.addEventListener('beforeunload', (event) => {
+      if (leaving || !sessionStorage.getItem('user_role') || !isPlaying()) return;
+      event.preventDefault();
+      // 舊版瀏覽器需要有值的 returnValue 才會顯示提示。
+      event.returnValue = '';
+    });
   };
 })();

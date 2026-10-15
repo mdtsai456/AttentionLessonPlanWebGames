@@ -104,6 +104,7 @@ function createPlayer(element, keyBindings, playerIndex) {
     element.querySelector('[data-ui="restart"]').addEventListener('click', startSession);
     return {
         startGame,
+        isPlaying: () => !['intro', 'finished'].includes(player.getState().phase),
         completedStages: player.completedStages,
         setArrowAssets: player.setArrowAssets,
         saveRun,
@@ -124,6 +125,9 @@ export const players = [
     createPlayer(document.querySelector('.player-1'), { KeyA: 'left', KeyD: 'right' }, 0),
     createPlayer(document.querySelector('.player-2'), { ArrowLeft: 'left', ArrowRight: 'right' }, 1)
 ];
+
+// 任一位玩家還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
+window.guardUnload(() => players.some((player) => player.isPlaying()));
 
 const midWait = [false, false];
 const midResume = [null, null];
@@ -202,7 +206,7 @@ document.getElementById('mid-lobby').addEventListener('click', async () => {
     midButtons.forEach((button) => { button.disabled = true; });
     try {
         await saveBoth(MID_STAGE);
-        window.location.href = '../Select/index.html';
+        window.leaveTo('../Select/index.html');
     } finally {
         // 導頁沒有發生時（例如頁面被攔下）恢復按鈕；已送過的檢查點不會重送。
         midButtons.forEach((button) => { button.disabled = false; });

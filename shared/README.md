@@ -12,7 +12,7 @@
 | `api.js` | 登入、選關、成績 | 決定 API 位址（覆寫網址去掉結尾斜線）、登入、登出、查報告、送成績、把場次換成 0／50／100 進度。`uuid()` 產生成績的 `submissionId` 與雙人局的 `pairId`。 |
 | `session-timeout.js` | 已登入頁面 | 依登入回傳的剩餘秒數 `expiresIn` 加上本機收到回應的時間計算到期（不受裝置時鐘快慢影響；舊後端沒有 `expiresIn` 時改用 `expiresAt`），到期後清掉本機登入並回 `Home/`。計時器分段等待，超過 24.8 天也不會溢位。 |
 | `game-runtime.js` | 遊戲頁 | 驗證或離開期間暫停 `setTimeout` 與動畫幀，回來後扣掉這段時間。`pause(reason)`／`resume(reason)` 依原因計數，全部解除才恢復；`nativeSetTimeout` 給網路請求的逾時用，暫停時照常運作。 |
-| `leave-confirm.js` | 遊戲頁 | 遊戲內的離開確認。「離開」按鈕先呼叫 `confirmLeave()` 顯示頁面內的確認框（開著時暫停遊戲、攔下按鍵、Esc 等於取消），按「離開」才存檔，再用 `leaveTo(url)` 導頁；按「繼續遊戲」什麼都不送，避免取消後檢查點和打完的成績各留一筆。直接關閉分頁或重新整理不經過這裡（DAT、DCCS 另有自己的提示）。 |
+| `leave-confirm.js` | 遊戲頁 | 遊戲內的離開確認。「離開」按鈕先呼叫 `confirmLeave()` 顯示頁面內的確認框（開著時暫停遊戲、攔下按鍵、Esc 等於取消），按「離開」才存檔，再用 `leaveTo(url)` 導頁；按「繼續遊戲」什麼都不送，避免取消後檢查點和打完的成績各留一筆。直接關閉分頁、重新整理或按上一頁時，遊戲呼叫 `guardUnload(isPlaying)` 掛上瀏覽器的離開詢問：`isPlaying()` 為 true 才問，透過 `leaveTo` 導頁與登入逾時登出（sessionStorage 已清空）不問。EFT、IM、TGame 使用；DAT、DCCS 另有自己的提示。 |
 | `stage-clear.js`、`stage-clear.css` | 過關畫面 | 共用的關卡結束面板。 |
 | `fireworks.js`、`fireworks.css` | `Select/` | 手錶判定專心時的煙火。 |
 | `dat-assets.js` | 瓢蟲追擊令 | 向素材平台要 `DAT.assets.files`，失敗時用本機動物圖。跨來源圖片用 `crossOrigin="anonymous"` 載入（素材平台有回 CORS 標頭），失敗再不帶 CORS 重試一次。`isOnAnimal` 判斷準心是否在動物上：中央圓一律算，圓外照目前顯示的圖：本機兔子用 `rabbit-hit-mask.js`，其他圖讀圖片透明度；讀不到透明度時只算中央圓。 |

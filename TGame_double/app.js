@@ -89,8 +89,11 @@ replayBtn.addEventListener("click", () => {
 });
 
 backBtn.addEventListener("click", () => {
-  location.href = "../Select/index.html";
+  window.leaveTo("../Select/index.html");
 });
+
+// 已開始、還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
+window.guardUnload(() => session.startedAt !== 0 && session.endReason === "");
 
 document.getElementById("mid-continue").addEventListener("click", () => {
   startLevel(session.level + 1);
@@ -219,7 +222,7 @@ document.getElementById("mid-lobby").addEventListener("click", async () => {
   document.getElementById("mid-lobby").disabled = true;
   try {
     await saveBoth(MID_STAGE);
-    location.href = "../Select/index.html";
+    window.leaveTo("../Select/index.html");
   } finally {
     // 中場回大廳是明確選擇，不再確認。萬一導向沒有發生，恢復按鈕避免卡在中場畫面；已存過不會重送
     document.getElementById("mid-continue").disabled = false;

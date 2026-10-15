@@ -261,12 +261,14 @@ function bindEvents() {
     continueBtn.disabled = true;
     midwayBackBtn.disabled = true;
     await saveCurrentRun(MIDWAY_STAGE);
-    location.href = "../Select/index.html";
+    window.leaveTo("../Select/index.html");
   });
   replayBtn.addEventListener("click", startGame);
   backBtn.addEventListener("click", () => {
-    location.href = "../Select/index.html";
+    window.leaveTo("../Select/index.html");
   });
+  // 還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
+  window.guardUnload(() => state.playing);
   document.getElementById("leave-btn").addEventListener("click", leaveGame);
 
   document.addEventListener("keydown", (event) => {
