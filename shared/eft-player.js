@@ -152,11 +152,11 @@ export function createEftPlayer({
         getUi('feedback').textContent = '回答剛才位置的泡泡';
         setEnabled(true);
         const remaining = stageRemaining();
-        // 本關剩不到 10 秒時，作答時間被關卡切斷；沒作答就直接結束本關，這題不記錄。
+        // 本關剩不到 10 秒時，作答時間被關卡切斷；沒作答就提示時間到並結束本關，這題不記錄。
         const cutByStage = remaining < ANSWER_LIMIT_MS;
         const wait = Math.min(ANSWER_LIMIT_MS, Math.max(0, remaining));
         timer = setTimeout(() => {
-            if (cutByStage) endStage();
+            if (cutByStage) stopForStageTimeUp();
             else missQuestion('10 秒未作答，這題算錯');
         }, wait);
     }
@@ -184,7 +184,7 @@ export function createEftPlayer({
         timer = setTimeout(() => {
             if (phase !== 'memory') return;
             if (cutByStage || stageRemaining() <= 0) {
-                endStage();
+                stopForStageTimeUp();
                 return;
             }
             field.replaceChildren();
@@ -273,6 +273,17 @@ export function createEftPlayer({
         panel.dataset.result = 'wrong';
         getUi('feedback').textContent = message;
         timer = setTimeout(continueAfterFeedback, FEEDBACK_MS);
+    }
+
+    // 本關時間到時這題還沒作答完：提示「時間到」而不是「答錯」，不記錄也不扣分，
+    // 停留一下讓學生看到提示後再結束本關。
+    function stopForStageTimeUp() {
+        phase = 'time_up';
+        setEnabled(false);
+        clearTimeout(timer);
+        delete panel.dataset.result;
+        getUi('feedback').textContent = '時間到！停止作答';
+        timer = setTimeout(endStage, FEEDBACK_MS);
     }
 
     function finishGame() {
