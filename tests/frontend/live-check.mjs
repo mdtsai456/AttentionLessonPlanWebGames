@@ -83,9 +83,16 @@ try {
         await page.waitForFunction(() => document.querySelectorAll('[data-ui="field"][data-mode="game"]').length === 2);
         await page.evaluate(async () => { const { players } = await import(document.querySelector('script[type="module"][src*="js/main.js"]').src); await Promise.all(players.map((player) => player.saveRun(3))); });
       } else if (id === 'EFT') {
-        await page.evaluate(async () => { const { players } = await import('/app/EFT_double/EFT_double.js'); await Promise.all(players.map((player) => player.saveRun(3))); });
+        // 泡泡出現代表 startSession() 已換好 pairId 並開局。用頁面實際載入的模組網址，
+        // 才不會另外載入一份從未開局的 players。
+        await page.waitForFunction(() => [...document.querySelectorAll('[data-ui="bubble-field"]')].filter((field) => field.querySelector('.bubble')).length === 2);
+        await page.evaluate(async () => {
+          const { players } = await import(document.querySelector('script[type="module"][src*="EFT_double.js"]').src);
+          await Promise.all(players.map((player) => player.saveRun(3)));
+        });
       } else {
-        await page.waitForFunction(() => typeof saveBoth === 'function');
+        // saveBoth 在腳本載入時就存在；pairId 與開局時間要等 startGame()。
+        await page.waitForFunction(() => typeof session !== 'undefined' && session.pairId && session.startedAt);
         await page.evaluate(() => saveBoth(3));
       }
       await page.waitForFunction(() => true); // 等待回應本文的 Promise 完成。
@@ -94,6 +101,12 @@ try {
       const mine = saves.slice(before);
       assert.equal(mine.length, mode === 'double' ? 2 : 1, label);
       assert.ok(mine.every((save) => save.status === 201), JSON.stringify(mine));
+      assert.ok(mine.every((save) => save.request.data.startTime > 0), label);
+      if (mode === 'double') {
+        const pairIds = mine.map((save) => save.request.data.pairId);
+        assert.ok(pairIds.every((id) => typeof id === 'string' && id.length > 0), label);
+        assert.equal(pairIds[0], pairIds[1], label);
+      }
       assert.deepEqual(mine.map((save) => save.request.data.caseId).sort(), mode === 'double' ? ['S88', 'S99'] : ['S99']);
       result.flows.push({ mode, game: label, records: mine.length });
       result.sessions.push(...mine.map((save) => ({ sessionId: save.body?.sessionId, ...save.request.data, stats: undefined })));

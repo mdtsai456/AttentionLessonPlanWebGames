@@ -2,6 +2,10 @@
 
 需要設定 TEST_DB_NAME，且值須以 _test 結尾。
 未設定時，略過需要資料庫的測試。其餘測試照常執行。
+
+每個使用資料庫的測試前後都會清空測試庫。整份測試結束後，若過程中有清空過，
+會把場域、老師與假成績灌回 TEST_DB_NAME，供本機開發繼續使用同一顆庫。
+沒有碰到資料庫的測試不會灌回。
 """
 
 from __future__ import annotations
@@ -9,6 +13,7 @@ from __future__ import annotations
 import os
 import pathlib
 import secrets
+import sys
 from datetime import datetime
 from typing import Any
 
@@ -32,6 +37,9 @@ TABLES_CHILD_FIRST = (
     "teacher",  # teacher 的外鍵指向 school，須先刪除 teacher。
     "school",
 )
+
+# 只有真的清空過測試庫，整份測試結束時才灌回。純函式測試不該改寫開發資料。
+_truncated_test_db = False
 
 
 def _assert_test_database(name: str) -> None:
@@ -165,18 +173,99 @@ def _schema(db_available: str) -> None:
 
 
 def _truncate_all() -> None:
+    global _truncated_test_db
     from db import get_connection
 
     # 刪除前，再次驗證資料庫名稱。point_app_at_test_db 已驗證 fixture 使用的路徑，
     # 但此處還須驗證資料庫本身，因為略過 fixture 並直接連線的程式碼
     # 也會在此刪除資料。
     _assert_test_database(os.environ["DB_NAME"])
+    # 名稱確認後就標記。刪到一半失敗時，結束時仍要嘗試灌回。
+    _truncated_test_db = True
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             for table in TABLES_CHILD_FIRST:
                 cursor.execute(f"DELETE FROM {table}")
         connection.commit()
+
+
+def _reset_autoincrement(connection, table: str) -> None:
+    """空表時把自動編號拉回 1，灌回後帳號才會從 S001、T001 開始。
+
+    測試用的是 DELETE，不會重置 AUTO_INCREMENT。沒有 ALTER 權限時略過，
+    資料仍會灌回，只是帳號可能接著上次的編號。
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"ALTER TABLE {table} AUTO_INCREMENT = 1")
+        connection.commit()
+    except Exception as exc:
+        connection.rollback()
+        print(f"無法把 {table} 的編號重置為 1：{exc}")
+
+
+def _reseed_test_database() -> None:
+    """把測試庫灌回本機可登入的場域、老師與假成績。
+
+    只連 TEST_DB_NAME，且名稱必須以 _test 結尾。不讀 --prod，也不碰正式庫。
+    """
+    if "--prod" in sys.argv:
+        raise RuntimeError("測試結束灌回拒絕在 --prod 下執行。")
+
+    name = os.getenv("TEST_DB_NAME") or ""
+    if not name:
+        raise RuntimeError("未設定 TEST_DB_NAME，無法灌回測試資料庫。")
+    _assert_test_database(name)
+
+    previous_name = os.environ.get("DB_NAME")
+    os.environ["DB_NAME"] = name
+    try:
+        import manage_passwords
+        import seed
+        import seed_directory
+        from db import get_connection
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM login_session")
+            connection.commit()
+            _reset_autoincrement(connection, "student")
+            _reset_autoincrement(connection, "teacher")
+            seed_directory.seed(connection)
+            teacher_account = manage_passwords.set_teacher_password(
+                connection, "KMU", "吳老師", seed.TEST_STUDENT_PASSWORD
+            )
+
+        try:
+            seed.main()
+        except SystemExit as exc:
+            raise RuntimeError(f"seed.py 結束：{exc}") from exc
+        if teacher_account:
+            teacher_note = (
+                f"KMU 吳老師帳號 {teacher_account}，密碼 {seed.TEST_STUDENT_PASSWORD}。"
+            )
+        else:
+            teacher_note = "找不到 KMU 吳老師，未重設老師密碼。"
+        print(f"\n測試已清空 {name}，並已灌回場域、老師與假成績。{teacher_note}")
+        print(f"學生密碼都是 {seed.TEST_STUDENT_PASSWORD}。")
+    finally:
+        if previous_name is None:
+            os.environ.pop("DB_NAME", None)
+        else:
+            os.environ["DB_NAME"] = previous_name
+
+
+def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
+    """使用過資料庫的測試結束後，把開發用的測試庫灌回去。"""
+    if not _truncated_test_db:
+        return
+    try:
+        _reseed_test_database()
+    except Exception as exc:
+        print(f"\n測試已清空資料庫，但灌回失敗：{exc}")
+        if getattr(session, "exitstatus", exitstatus) == 0:
+            session.exitstatus = 1
 
 
 class DbHelper:
