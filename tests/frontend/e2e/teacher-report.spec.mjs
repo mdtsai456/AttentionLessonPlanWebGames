@@ -118,6 +118,7 @@ test("成績讀取失敗時顯示錯誤，不會把上一位學生的場次算�
   await page.selectOption("#student-select", "G9_A01");
   await dayButton(page, 1).click();
   await expect(page.locator("#records-tbody")).toContainText("賽道攔截");
+  await expect(page.locator("#report-retry")).toBeHidden();
 
   const reportB = page.waitForEvent("requestfailed", (request) => request.url().includes("/G9_B02/report"));
   await page.selectOption("#student-select", "G9_B02");
@@ -126,6 +127,11 @@ test("成績讀取失敗時顯示錯誤，不會把上一位學生的場次算�
   await expect(page.locator("#view-student-key")).toHaveText("受試個案：G9_B02");
   await expect(page.locator("#day-prompt")).toBeVisible();
   await expect(page.locator("#day-prompt")).toContainText("讀取失敗");
+  await expect(page.locator("#report-retry")).toBeVisible();
+  const retry = page.waitForEvent("requestfailed", (request) => request.url().includes("/G9_B02/report"));
+  await page.locator("#report-retry").click();
+  await retry;
+  await expect(page.locator("#report-retry")).toBeVisible();
   await expect(dayButton(page, 1)).toBeDisabled();
   await dayButton(page, 1).dispatchEvent("click");
   await expect(page.locator("#day-detail")).toBeHidden();
@@ -141,6 +147,7 @@ test("成績回應非 2xx 也顯示讀取失敗，而不是「這天尚無施測
   );
   await page.selectOption("#student-select", "G9_B02");
   await expect(page.locator("#day-prompt")).toContainText("讀取失敗");
+  await expect(page.locator("#report-retry")).toBeVisible();
   await expect(dayButton(page, 1)).toBeDisabled();
 });
 

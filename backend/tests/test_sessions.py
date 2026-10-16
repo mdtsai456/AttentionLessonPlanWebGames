@@ -365,6 +365,19 @@ def test_post_session_rejects_unknown_or_invalid_game(write_calls, lesson_id):
     assert write_calls == []
 
 
+@pytest.mark.parametrize("value", [True, False])
+def test_post_session_rejects_bool_core_value(write_calls, value):
+    """核心統計的 true／false 會被 float 當成 1／0，必須回 400、不寫入。"""
+    payload = dccs_payload()
+    payload["data"]["stats"][0]["value"] = value
+
+    with TestClient(main.app) as client:
+        response = client.post("/api/sessions", json=payload)
+
+    assert response.status_code == 400, response.text
+    assert write_calls == []
+
+
 def test_post_session_rejects_unconvertible_core_value(write_calls):
     payload = dccs_payload()
     payload["data"]["stats"][0]["value"] = "not-a-number"

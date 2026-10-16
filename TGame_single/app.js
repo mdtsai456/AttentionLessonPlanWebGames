@@ -81,7 +81,12 @@ const DEFAULT_STAGE_RULES  = [
   },
   { prompt: "請選擇符合「可以坐的家具」的方向", correct: ["chair"] },
   { prompt: "請選擇符合「可以戴在頭上」的方向", correct: ["hat"] },
-  { prompt: "請選擇符合「下雨時用的」的方向", correct: ["umbrella"] },
+  // 雨靴也算下雨時用的，不能當錯誤選項，所以這一關明列錯誤項目
+  {
+    prompt: "請選擇符合「下雨時用的」的方向",
+    correct: ["umbrella"],
+    wrong: ["apple", "banana", "carrot", "fish", "book", "chair", "hammer", "hat", "key", "soccer"],
+  },
   { prompt: "請選擇符合「水裡游的動物」的方向", correct: ["fish"] },
   { prompt: "請選擇符合「用來閱讀的」的方向", correct: ["book"] },
 ];

@@ -844,7 +844,7 @@ async function useDoor(dir) {
   await wait(ROOM_FADE_MS);
   state.row = nextRow;
   state.col = nextCol;
-  state.playerX = entryX;
+  state.playerX = clamp(entryX, PLAYER_MIN, PLAYER_MAX);
   state.walkTarget = null;
   renderRoom();
   fadeEl.classList.remove("is-on");

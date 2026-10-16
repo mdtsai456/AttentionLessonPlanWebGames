@@ -23,13 +23,14 @@ const emptyHint = document.getElementById("empty-hint");
 const reportView = document.getElementById("report-view");
 const dayDetail = document.getElementById("day-detail");
 const dayPrompt = document.getElementById("day-prompt");
+const reportRetry = document.getElementById("report-retry");
 const dayTitle = document.getElementById("day-title");
 const recordsBody = document.getElementById("records-tbody");
 const logoutBtn = document.getElementById("logout-btn");
 
 const DAY_PROMPT = "請選擇第幾天，查看當天成績。";
 const DAY_PROMPT_LOADING = "成績載入中…";
-const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重新整理頁面。";
+const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重試。";
 
 /** 每次換學生加一；回應回來時編號不同就是舊學生的，直接丟掉。 */
 let reportRequestId = 0;
@@ -84,6 +85,10 @@ dayRow.addEventListener("click", (event) => {
   const button = event.target.closest("[data-day]");
   if (!button || button.disabled) return; // 未選擇學生時，停用施測日按鈕。
   selectDay(Number(button.dataset.day));
+});
+
+reportRetry.addEventListener("click", () => {
+  if (state.selectedStudentId) selectStudent(state.selectedStudentId);
 });
 
 /**
@@ -191,6 +196,7 @@ function renderProgress() {
     state.reportStatus === "loading" ? DAY_PROMPT_LOADING
       : state.reportStatus === "error" ? DAY_PROMPT_ERROR
         : DAY_PROMPT;
+  reportRetry.hidden = !hasStudent || hasDay || state.reportStatus !== "error";
   dayDetail.hidden = !hasDay;
   if (hasStudent) fillStudentMeta();
   if (!hasDay) {

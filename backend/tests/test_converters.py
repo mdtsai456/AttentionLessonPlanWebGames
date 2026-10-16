@@ -88,6 +88,15 @@ def test_to_int_and_to_float_reject_non_finite_or_non_numeric(value):
             to_int(value)
 
 
+@pytest.mark.parametrize("value", [True, False])
+def test_to_int_and_to_float_reject_bool(value):
+    """布林不是成績數字。True 是 int 的子類別，不能被轉成 1。"""
+    with pytest.raises(ValueError):
+        to_int(value)
+    with pytest.raises(ValueError):
+        to_float(value)
+
+
 def test_to_int_and_to_float_still_accept_db_numeric_types():
     """students.py 讀 DB 欄位也用這兩個函式：Decimal、負數照常轉換。"""
     assert to_int(Decimal("5")) == 5

@@ -638,11 +638,12 @@ export function mountDCCS(options) {
           return;
         }
         ended = true;
-        void finish({ skipResult: true, stage })
-          .catch(fail)
-          .then(() => {
-            window.leaveTo('../Select/index.html');
-          });
+        // 成功時 finish() 會完成 handle.done，由 main.js 導回選遊戲頁。
+        // 這裡再 leaveTo 會多導一次。失敗時 done 不會完成，才由這裡導頁。
+        void finish({ skipResult: true, stage }).catch((error) => {
+          fail(error);
+          window.leaveTo('../Select/index.html');
+        });
       }
 
       exitApi.leave = leave;

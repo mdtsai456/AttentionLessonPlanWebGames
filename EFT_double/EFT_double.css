@@ -148,11 +148,11 @@ button:focus-visible {
 }
 
 .btn-leave {
-  position: absolute;
+  position: fixed;
   top: 2%;
   right: 2%;
-  /* 要蓋在中場畫面（#mid-break，z-index 8）上面，中場時才按得到離開並送第 3 關成績。 */
-  z-index: 9;
+  /* 遊戲區自己是一層，過關畫面又掛在 body（z-index 200）。離開鈕必須在這一層外面，中場和過關時才按得到。 */
+  z-index: 210;
   appearance: none;
   border: none;
   border-radius: 999px;

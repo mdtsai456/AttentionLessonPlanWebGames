@@ -45,11 +45,14 @@ def format_datetime(value: Any) -> str:
 
 
 def _finite_number(value: Any, cast: Callable[[Any], Any]) -> Any:
-    """None 視為 0；NaN／Infinity、陣列／物件等非數字一律 ValueError。
+    """None 視為 0；布林、NaN／Infinity、陣列／物件等非數字一律 ValueError。
 
     呼叫端（POST /api/sessions）把 ValueError 對應成 400；TypeError／OverflowError
     會落到 500「資料庫寫入失敗」，所以這裡統一轉成 ValueError。
+    bool 是 int 的子類別，float(True) 會變成 1.0，必須先擋下來。
     """
+    if isinstance(value, bool):
+        raise ValueError(f"不是有限數字：{value!r}")
     if value is None:
         return cast(0)
     try:

@@ -182,6 +182,11 @@ body {
   font-size: 0.9rem;
 }
 
+#report-retry {
+  margin-top: 0.4rem;
+  padding: 0;
+}
+
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
