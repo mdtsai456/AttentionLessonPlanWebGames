@@ -78,6 +78,14 @@ test("先選 A 再選 B，A 的成績較晚回來也不會蓋掉 B", async ({ pa
   await expect(card(page, "賽道攔截").locator(".card-percent")).toHaveText("0%");
 });
 
+test("有場次紀錄的天數按鈕標示 has-data，沒有紀錄的天數不標示", async ({ page }) => {
+  await openTeacher(page);
+
+  await page.selectOption("#student-select", "G9_A01");
+  await expect(dayButton(page, 1)).toHaveClass(/has-data/);
+  await expect(dayButton(page, 2)).not.toHaveClass(/has-data/);
+});
+
 test("換學生、成績還在載入時，天數不能選，也不會拿上一位學生的成績畫卡片", async ({ page }) => {
   const gateB = deferred();
   const requestedB = deferred();
