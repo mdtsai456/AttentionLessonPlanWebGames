@@ -56,6 +56,11 @@ function stat(write, name) {
   return write.body.data.stats.find((item) => item.apiname === name)?.value;
 }
 
+test("#2 沒有任何關卡紀錄時，平均反應時間是 null（不是 0），老師後台才能顯示「—」", async ({ page }) => {
+  await openGame(page);
+  expect(await page.evaluate(() => averageReaction([]))).toBeNull();
+});
+
 test("#4 直接點門會走過去並進入下一個房間", async ({ page }) => {
   await openGame(page);
   await beginStage(page);
