@@ -271,6 +271,7 @@ export function createEftPlayer({
         clearTimeout(timer);
         recordOutcome(false, reactionMs);
         panel.dataset.result = 'wrong';
+        window.WebGameAudio?.playWrong();
         getUi('feedback').textContent = message;
         timer = setTimeout(continueAfterFeedback, FEEDBACK_MS);
     }
@@ -293,6 +294,7 @@ export function createEftPlayer({
         getUi('final-score').textContent = `${score} / ${index} 分`;
         getUi('accuracy').textContent = `答對 ${score} 題・正確率 ${Math.round(score / total * 100)}%`;
         getUi('results').hidden = false;
+        window.WebGameAudio?.playComplete();
         if (focusRestart) getUi('restart').focus();
         onFinished(getState());
     }
@@ -333,6 +335,7 @@ export function createEftPlayer({
         const correct = direction === expected;
         recordOutcome(correct, Math.max(0, window.WebGameRuntime.now() - answerStartedAt));
         panel.dataset.result = correct ? 'correct' : 'wrong';
+        window.WebGameAudio?.[correct ? 'playCorrect' : 'playWrong']();
         const message = correct
             ? '答對了！＋1 分'
             : `${question.opposite ? '虛線要反向！' : '再加油！'}應選${expected === 'left' ? '左 ←' : '右 →'}`;
