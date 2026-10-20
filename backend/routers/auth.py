@@ -40,6 +40,25 @@ def _login_failed() -> HTTPException:
     return HTTPException(status_code=401, detail="帳號或密碼錯誤")
 
 
+def _already_logged_in() -> HTTPException:
+    # 見 docs/adr/0005-block-duplicate-login.md：擋掉新登入，不影響原本的登入。
+    return HTTPException(status_code=409, detail="此帳號已在別處登入中，請先登出")
+
+
+def _has_active_session(rows: list[dict]) -> bool:
+    """依 expires_at 判斷這些登入憑證裡是否還有未過期的，和 get_current_identity 同一套慣例：
+    在 Python 比較 UTC 時間，不在 SQL 用 NOW()（見 fetch_login_sessions_for_teacher 的說明）。
+    """
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        expires_at = row["expires_at"]
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at > now:
+            return True
+    return False
+
+
 def _password_matches(account: dict | None, password: str) -> bool:
     """每次登入都恰好跑一次 PBKDF2，失敗原因不同、回應時間一致。
 
@@ -67,6 +86,14 @@ def teacher_login(payload: TeacherLoginRequest) -> TeacherLoginResponse:
 
     if not _password_matches(teacher, payload.password):
         raise _login_failed()
+
+    try:
+        if _has_active_session(queries.fetch_login_sessions_for_teacher(teacher["teacher_id"])):
+            raise _already_logged_in()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise db_error(exc) from exc
 
     token = generate_token()
     expires_at = datetime.now(timezone.utc) + TOKEN_TTL
@@ -98,6 +125,16 @@ def student_login(payload: StudentLoginRequest) -> StudentLoginResponse:
         raise _login_failed()
 
     grade, case_id, school = student["grade"], student["case_id"], student["school"]
+
+    try:
+        sessions = queries.fetch_login_sessions_for_student(grade, case_id, school)
+        if _has_active_session(sessions):
+            raise _already_logged_in()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise db_error(exc) from exc
+
     token = generate_token()
     expires_at = datetime.now(timezone.utc) + TOKEN_TTL
     try:
