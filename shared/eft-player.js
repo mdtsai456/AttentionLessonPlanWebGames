@@ -231,11 +231,12 @@ export function createEftPlayer({
         onReset();
     }
 
-    function startGame() {
+    // startStage 是這一局的起始關；當天已完成前半時從第 4 關開始，統計只算到後半。
+    function startGame({ startStage } = {}) {
         resetGame();
         startTimeMs = window.WebGameRuntime.now();
         onGameStart(startTimeMs);
-        beginStage(1);
+        beginStage(startStage || 1);
     }
 
     function recordOutcome(correct, reactionMs) {

@@ -13,6 +13,8 @@ let gameStartTime = 0;
 let playId = '';
 // 已送出（或正在送）的最高關卡與那次送出；同一關或更低的關卡不再另送。
 let savedStage = 0;
+// 當天已完成前半時，這一局從第 4 關開始，只玩並只送後半（stage 6）。
+let secondHalf = false;
 let savePromise = Promise.resolve();
 
 const player = createEftPlayer({
@@ -64,7 +66,10 @@ function renderQuestion() { player.renderQuestion(); }
 
 // 遊戲與關卡的生命週期
 function beginStage(nextStage) { player.beginStage(nextStage); }
-function startGame() { player.startGame(); }
+function startGame(options) {
+    secondHalf = Boolean(options && options.startStage >= MID_STAGE + 1);
+    player.startGame(options);
+}
 function resetGame() { player.resetGame(); }
 
 function returnToLobby() {
@@ -180,7 +185,8 @@ async function leaveGame() {
     const completed = state.phase === 'finished' || state.phase === 'break' || state.phase === 'stage_clear'
         ? state.stage
         : state.stage - 1;
-    const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+    // 後半那一局沒有第 3 關可送：第 4、5 關離開什麼都不送，stage 3 那列留著，下次還是從第 4 關開始。
+    const checkpoint = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE && !secondHalf ? MID_STAGE : 0;
     if (checkpoint) await saveCurrentRun(checkpoint);
     window.leaveTo('../Select/index.html');
     // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
@@ -202,7 +208,7 @@ async function handleMidBreakLobby() {
 function bindEvents() {
     document.addEventListener('keydown', handleKeydown);
     $('leave-btn').addEventListener('click', leaveGame);
-    $('restart').addEventListener('click', startGame);
+    $('restart').addEventListener('click', () => startGame());
     $('btn-lobby-finish').addEventListener('click', returnToLobby);
     $('btn-continue').addEventListener('click', handleContinue);
     $('btn-lobby').addEventListener('click', handleMidBreakLobby);
@@ -212,9 +218,13 @@ function preloadGameAssets() {
     const studentId = sessionStorage.getItem('caseId')
         || sessionStorage.getItem('student1_case')
         || 'S001';
-    preloadEftAssets({ studentId }).then((arrowAssets) => {
+    // 查今天的成績和載入素材同時進行；查不到或超過 5 秒都從第 1 關開始。
+    Promise.all([
+        preloadEftAssets({ studentId }),
+        window.WebGameSecondHalf.startStage('EFT', { mode: 'single', slots: [1] }),
+    ]).then(([arrowAssets, startStage]) => {
         player.setArrowAssets(arrowAssets);
-        startGame();
+        startGame({ startStage });
     }).catch(() => {
         $('feedback').textContent = '遊戲圖片載入失敗，請重新整理';
     });
