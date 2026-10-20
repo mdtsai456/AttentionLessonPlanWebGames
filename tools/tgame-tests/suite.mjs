@@ -28,7 +28,8 @@ async function test(name, fn) {
   try { await fn();console.log(`PASS ${name}`); }
   catch (e) { failures++;console.error(`FAIL ${name}: ${e.stack}`); }
 }
-async function gamePage(game, { stall = false, width = 1440, height = 810, noCsv = false } = {}) {
+// report：{ [studentKey]: records }。有給才設登入的 student{n}_key／_day 並模擬 /report（後半功能用）；沒給就照舊從第 1 關開始。
+async function gamePage(game, { stall = false, width = 1440, height = 810, noCsv = false, report = null } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();const saves = [], errors = [], held = [], dialogs = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -43,6 +44,10 @@ async function gamePage(game, { stall = false, width = 1440, height = 810, noCsv
         caseId: second ? 'S02' : 'S01', studentKey: second ? 'G1_S02' : 'G1_S01',
       }) });
     }
+    const reportKey = report && url.pathname.match(/\/students\/([^/]+)\/report$/);
+    if (reportKey) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ records: report[decodeURIComponent(reportKey[1])] || [] }) });
+    }
     if (route.request().method() === 'POST' && url.pathname.endsWith('/sessions')) {
       saves.push(JSON.parse(route.request().postData() || '{}'));
       return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
@@ -55,7 +60,7 @@ async function gamePage(game, { stall = false, width = 1440, height = 810, noCsv
     }
     return route.continue();
   });
-  await page.addInitScript((mode) => {
+  await page.addInitScript(({ mode, withKeys }) => {
     sessionStorage.setItem('user_role', 'student');
     sessionStorage.setItem('game_mode', mode);
     sessionStorage.setItem('token', 't1');
@@ -72,8 +77,16 @@ async function gamePage(game, { stall = false, width = 1440, height = 810, noCsv
       sessionStorage.setItem('student2_case', 'S02');
       sessionStorage.setItem('student2_school', 'KMU');
     }
+    if (withKeys) {
+      sessionStorage.setItem('student1_key', 'G1_S01');
+      sessionStorage.setItem('student1_day', '3');
+      if (mode === 'double') {
+        sessionStorage.setItem('student2_key', 'G1_S02');
+        sessionStorage.setItem('student2_day', '3');
+      }
+    }
     let seed=12345;Math.random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
-  }, game === 'TGame_double' ? 'double' : 'single');
+  }, { mode: game === 'TGame_double' ? 'double' : 'single', withKeys: Boolean(report) });
   // 安裝後假時鐘會跟著真實時間走，偶爾已超過 Node 端的 new Date()；暫停點往後留 1 秒，避免「Cannot fast-forward to the past」。
   await page.clock.install();await page.clock.pauseAt(new Date(Date.now() + 1000));
   await page.goto(`${base}${process.env.TGAME_TEST_PATH || ""}/${game}/index.html`, { waitUntil: 'domcontentloaded' });
@@ -463,5 +476,87 @@ await test('flow TGame_double 沒有 randomUUID 時 pairId 仍是安全亂數 UU
     assert.equal(await t.page.evaluate(()=>typeof window.createPairId),'undefined','不應保留本地 UUID 產生器');
   }finally{await t.close();}
 });
+// 後半（第 4～6 關）：當天已完成前半的學生，下次進來直接從第 4 關開始。
+{
+  const firstHalf = mode => ({ gameType: 'TGame', mode, currentDay: 3, stats: { stage: 3 } });
+  const reportOf = game => game === 'TGame_single'
+    ? { G1_S01: [firstHalf('single')] }
+    : { G1_S01: [firstHalf('double')], G1_S02: [firstHalf('double')] };
+  const stat = (save, name) => save.data.stats.find(x => x.apiname === name).value;
+  const confirmBox = t => t.page.getByRole('dialog', { name: '確定要離開嗎？' });
+  const playSecondHalf = async t => { for (let level = 4; level <= 6; level++) { await t.answer(); await t.advance(60100); if (level < 6) { await t.page.click('.shared-stage-clear-btn'); await t.ready(); } } };
+  for (const game of ['TGame_single', 'TGame_double']) {
+    const saveCount = game === 'TGame_single' ? 1 : 2;
+    await test(`second-half ${game} 前半已完成：直接從第 4 關開始，沒有中場畫面`, async () => {
+      const t = await gamePage(game, { report: reportOf(game) }); try {
+        await t.ready(); const s = await t.snapshot();
+        assert.equal(s.level, 4); assert.ok(s.players.every(p => p.score === 0 && p.answers.length === 0));
+        const hud = await t.page.evaluate(() => document.body.innerText);
+        assert.match(hud, /4 \/ 6/, '關卡顯示第 4 關');
+        assert.equal(await t.page.locator(game === 'TGame_single' ? '#stage-clear-modal' : '#mid-break').isHidden(), true);
+        assert.deepEqual(t.saves, [], '進場不得送任何成績');
+      } finally { await t.close(); }
+    });
+    await test(`second-half ${game} 打完第 6 關只送一筆 stage 6：只含後半、levelAccuracy 3 個值`, async () => {
+      const t = await gamePage(game, { report: reportOf(game) }); try {
+        await t.ready(); await playSecondHalf(t);
+        await until(t, () => t.saves.length === saveCount, '打完第 6 關應送成績'); await t.advance(200);
+        assert.equal(t.saves.length, saveCount, '只送 stage 6，不送 stage 3');
+        for (const save of t.saves) {
+          assert.equal(stat(save, 'TGame_stage'), 6);
+          assert.equal(stat(save, 'TGame_levelAccuracy'), '1,1,1');
+          assert.equal(stat(save, 'TGame_questionCount'), 3);
+          assert.equal(stat(save, 'TGame_correct'), 3);
+          const duration = stat(save, 'TGame_duration');
+          assert.ok(duration >= 180000 && duration < 190000, `duration 只算後半約 180 秒：${duration}`);
+        }
+        assert.match(t.saves[0].data.submissionId, UUID_V4);
+        if (game === 'TGame_double') assert.equal(t.saves[0].data.pairId, t.saves[1].data.pairId);
+        // 再玩一次是新的一局，從第 1 關開始
+        await t.page.click('#replay-btn'); await t.ready(); const s = await t.snapshot();
+        assert.equal(s.level, 1); assert.ok(s.players.every(p => p.score === 0 && p.answers.length === 0));
+      } finally { await t.close(); }
+    });
+    await test(`second-half ${game} 第 4、5 關中途離開什麼都不送`, async () => {
+      for (const stopAt of [4, 5]) {
+        const t = await gamePage(game, { report: reportOf(game) }); try {
+          await t.ready();
+          for (let level = 4; level < stopAt; level++) { await t.answer(); await t.advance(60100); await t.page.click('.shared-stage-clear-btn'); await t.ready(); }
+          await t.page.click('#leave-btn'); await confirmBox(t).waitFor({ state: 'visible', timeout: 2000 });
+          await Promise.all([t.page.waitForURL('**/Select/index.html', { timeout: 5000 }), confirmBox(t).getByRole('button', { name: '離開', exact: true }).click()]);
+          assert.deepEqual(t.saves, [], `第 ${stopAt} 關離開不得送成績`);
+        } finally { await t.close(); }
+      }
+    });
+    await test(`second-half ${game} 打完第 6 關後離開，stage 6 沒送成功會重送`, async () => {
+      const t = await gamePage(game, { report: reportOf(game) }); try {
+        let failed = 0;
+        await t.context.route('**/sessions', route => {
+          if (route.request().method() === 'POST' && failed < saveCount) { failed += 1; return route.fulfill({ status: 500, body: '{}' }); }
+          return route.fallback();
+        });
+        await t.ready(); await playSecondHalf(t);
+        await until(t, () => failed === saveCount, '第一次送出應失敗'); await t.advance(200);
+        assert.deepEqual(t.saves, []);
+        await t.page.click('#leave-btn'); await confirmBox(t).waitFor({ state: 'visible', timeout: 2000 });
+        await Promise.all([t.page.waitForURL('**/Select/index.html', { timeout: 5000 }), confirmBox(t).getByRole('button', { name: '離開', exact: true }).click()]);
+        assert.equal(t.saves.length, saveCount); assert.ok(t.saves.every(s => stat(s, 'TGame_stage') === 6));
+      } finally { await t.close(); }
+    });
+    await test(`second-half ${game} 報表沒有前半或已有 stage 6：從第 1 關開始`, async () => {
+      const done = { gameType: 'TGame', mode: game === 'TGame_single' ? 'single' : 'double', currentDay: 3, stats: { stage: 6 } };
+      for (const report of [{}, { G1_S01: [firstHalf(done.mode), done], G1_S02: [firstHalf(done.mode)] }]) {
+        const t = await gamePage(game, { report }); try {
+          await t.ready(); assert.equal((await t.snapshot()).level, 1);
+        } finally { await t.close(); }
+      }
+    });
+  }
+  await test('second-half TGame_double 只有一位完成前半：從第 1 關開始', async () => {
+    const t = await gamePage('TGame_double', { report: { G1_S01: [firstHalf('double')] } }); try {
+      await t.ready(); assert.equal((await t.snapshot()).level, 1);
+    } finally { await t.close(); }
+  });
+}
 await browser.close();await new Promise(resolve=>server.close(resolve));
 console.log(`${count-failures}/${count} passed`);process.exitCode=failures?1:0;

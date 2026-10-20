@@ -68,6 +68,8 @@ const toastEl = document.getElementById("toast");
 
 const session = {
   level: 1,
+  // 這一局的起始關：1，或兩位都已完成前半時的 4（後半那一局）
+  firstLevel: 1,
   roundToken: 0,
   levelDeadline: 0,
   playing: false,
@@ -129,7 +131,8 @@ async function leaveGame() {
     if (!(await window.confirmLeave())) return;
     try {
       const completed = completedStage();
-      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      // 後半那一局沒有前三關的成績，中途離開什麼都不送，下次進來仍從第 4 關開始
+      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : session.firstLevel === 1 && completed >= MID_STAGE ? MID_STAGE : 0;
       if (stage) await saveBoth(stage);
       window.leaveTo("../Select/index.html");
     } catch (err) {
@@ -156,7 +159,7 @@ function saveBoth(stage) {
 
 function levelAccuracyText(player, stageCount) {
   const values = [];
-  for (let level = 1; level <= stageCount; level += 1) {
+  for (let level = session.firstLevel; level <= stageCount; level += 1) {
     const mine = player.answers.filter((answer) => answer.level === level);
     const ratio = mine.length
       ? mine.filter((answer) => answer.correct).length / mine.length
@@ -259,16 +262,19 @@ async function init() {
     player.promptEl.textContent = "圖片載入中…";
   });
   const scenesReady = preloadSceneImages();
+  // 兩位玩家都只完成前半才從第 4 關開始；查詢最多等 5 秒，與載入圖片同時進行。
+  const startStagePromise = window.WebGameSecondHalf.startStage("TGame", { mode: "double", slots: [1, 2] });
   const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV。失敗時使用預設題目。
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 先安排六關，再等待場景、角色與第 1 關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
+  // 先安排六關，再等待場景、角色與起始關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
   const rules = buildStageRules();
   stageRules = rules;
+  const firstLevel = await startStagePromise;
   await Promise.race([
-    Promise.all([scenesReady, preloadLevelItems(1)]),
+    Promise.all([scenesReady, preloadLevelItems(firstLevel)]),
     wait(PRELOAD_TIMEOUT_MS),
   ]);
-  startGame(rules);
+  startGame(rules, firstLevel);
 }
 
 function createPlayer(id) {
@@ -339,7 +345,7 @@ function makePlayerAssets(base) {
   };
 }
 
-function startGame(rules = buildStageRules()) {
+function startGame(rules = buildStageRules(), firstLevel = 1) {
   clearInterval(session.timerId);
   savedStage = 0;
   savePromise = Promise.resolve();
@@ -348,6 +354,7 @@ function startGame(rules = buildStageRules()) {
   session.startedAt = window.WebGameRuntime.now();
   session.endReason = "";
   stageRules = rules;
+  session.firstLevel = firstLevel;
   resultEl.classList.add("is-hidden");
   midBreakEl.classList.add("is-hidden");
   document.getElementById("mid-continue").disabled = false;
@@ -360,7 +367,7 @@ function startGame(rules = buildStageRules()) {
     player.promptEl.classList.remove("is-hidden");
   });
 
-  startLevel(1);
+  startLevel(firstLevel);
 }
 
 function startLevel(level) {
