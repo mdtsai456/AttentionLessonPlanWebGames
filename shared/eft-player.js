@@ -395,7 +395,8 @@ export function createEftPlayer({
             duration: snapshot.endedAt - startTimeMs,
             stage: stageCount,
             levelAccuracy: levelAccuracyText(snapshot.levelAccuracies, stageCount),
-            avgReactionMs: samples.length ? samples.reduce((sum, value) => sum + value, 0) / samples.length : 0,
+            // 沒有任何作答記錄時是 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。
+            avgReactionMs: samples.length ? samples.reduce((sum, value) => sum + value, 0) / samples.length : null,
             questionCount: snapshot.index,
             endTime: stageSnapshot ? window.WebGameRuntime.toWallTime(stageSnapshot.endedAt) : Date.now(),
         };
