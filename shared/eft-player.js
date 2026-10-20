@@ -231,7 +231,7 @@ export function createEftPlayer({
         onReset();
     }
 
-    // startStage 是這一局的起始關；當天已完成前半時從第 4 關開始，統計只算到後半。
+    // startStage 是這一局的起始關；同一個課次已完成前半時從第 4 關開始，統計只算到後半。
     function startGame({ startStage } = {}) {
         resetGame();
         startTimeMs = window.WebGameRuntime.now();

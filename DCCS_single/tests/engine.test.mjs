@@ -147,7 +147,7 @@ for (const dir of GAME_DIRS) {
     }
   });
 
-  // 當天已完成前半：從第 4 關開始，只玩第 4～6 關。
+  // 同一個課次已完成前半：從第 4 關開始，只玩第 4～6 關。
   test(`${dir}：Track 從第 4 關開始（startLevelIdx），時間從第 3 關結束接著算，levelAccuracy 只有第 4～6 關`, async () => {
     const manifest = await readJson(dir, 'manifest.json');
     const engine = await loadEngine(dir);

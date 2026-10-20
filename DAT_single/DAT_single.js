@@ -35,7 +35,7 @@ const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
 const MID_STAGE = 3;
 let stage = 1;
-let firstStage = 1; // 這一局的起始關；4 表示後半那一局（今天已完成前半）
+let firstStage = 1; // 這一局的起始關；4 表示後半那一局（這個課次已完成前半）
 let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
@@ -741,7 +741,7 @@ async function fetchStudentAssets() {
 async function initGameWorkflow() {
   console.log('🎮 遊戲開始，執行素材載入流程...');
 
-  // 正式模式看後端當天成績決定起始關，和素材載入一起等；練習模式不查。
+  // 正式模式看後端這個課次的成績決定起始關，和素材載入一起等；練習模式不查。
   const startStageReady = isPractice
     ? Promise.resolve(1)
     : (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'single', slots: [1] }) : Promise.resolve(1));

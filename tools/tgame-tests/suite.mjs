@@ -476,7 +476,7 @@ await test('flow TGame_double 沒有 randomUUID 時 pairId 仍是安全亂數 UU
     assert.equal(await t.page.evaluate(()=>typeof window.createPairId),'undefined','不應保留本地 UUID 產生器');
   }finally{await t.close();}
 });
-// 後半（第 4～6 關）：當天已完成前半的學生，下次進來直接從第 4 關開始。
+// 後半（第 4～6 關）：同一個課次已完成前半的學生，下次進來直接從第 4 關開始。
 {
   const firstHalf = mode => ({ gameType: 'TGame', mode, currentDay: 3, stats: { stage: 3 } });
   const reportOf = game => game === 'TGame_single'

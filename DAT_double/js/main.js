@@ -3,7 +3,7 @@ import { createPlayer } from './game.js?v=13';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
-let sessionStartStage = 1; // 這一局的起始關；4 表示後半那一局（兩人今天都已完成前半）
+let sessionStartStage = 1; // 這一局的起始關；4 表示後半那一局（兩人同一個課次都已完成前半）
 
 const midWait = [false, false];
 const midResume = [null, null];
@@ -138,7 +138,7 @@ function restartSession() {
   beginSession();
 }
 
-// 正式遊戲開始前看後端當天成績：兩人都只完成前半才回 4，否則回 1。
+// 正式遊戲開始前看後端這個課次的成績：兩人都只完成前半才回 4，否則回 1。
 function secondHalfStartStage() {
   return (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1));
 }
@@ -281,7 +281,7 @@ async function initDoubleGameWorkflow() {
   togglePlayerVisibility(p1Elem, false);
   togglePlayerVisibility(p2Elem, false);
 
-  // 正式模式看後端當天成績決定起始關，和素材載入一起等；練習模式不查。
+  // 正式模式看後端這個課次的成績決定起始關，和素材載入一起等；練習模式不查。
   const startStageReady = playMode === 'game' ? secondHalfStartStage() : Promise.resolve(1);
 
   // B. 並行取得 P1 與 P2 的素材清單。

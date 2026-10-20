@@ -102,7 +102,7 @@ export async function mockReport(page, recordsByKey = {}) {
 }
 
 /**
- * 今天只完成前半的 stage 3 紀錄。day 要和登入的課次一致：STUDENT 是 3，DOUBLE 的第 2 位是 1。
+ * 這個課次只完成前半的 stage 3 紀錄。day 要和登入的課次一致：STUDENT 是 3，DOUBLE 的第 2 位是 1。
  * stats 會併進 { stage: 3 }，其他欄位（startTime 等）直接覆寫。
  */
 export function firstHalfRecord(gameType, { mode = "single", day = 3, stats = {}, ...rest } = {}) {

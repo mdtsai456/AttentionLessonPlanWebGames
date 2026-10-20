@@ -48,7 +48,7 @@ function load({ storage = SINGLE, reports = {}, runtime = true } = {}) {
 const single = { mode: 'single', slots: [1] };
 const double = { mode: 'double', slots: [1, 2] };
 
-test('當天同模式只有一列 stage 3 → 從第 4 關開始', async () => {
+test('同一個課次、同模式只有一列 stage 3 → 從第 4 關開始', async () => {
   const { SecondHalf, calls } = load({ reports: { G9_S99: [firstHalf()] } });
   assert.equal(await SecondHalf.startStage('EFT', single), 4);
   assert.equal(calls.length, 1);
@@ -61,7 +61,7 @@ test('前半玩了兩次也算只完成前半', async () => {
   assert.equal(await SecondHalf.startStage('EFT', single), 4);
 });
 
-test('當天已有 stage 4 以上（含 100%）→ 從第 1 關開始', async () => {
+test('同一個課次已有 stage 4 以上（含 100%）→ 從第 1 關開始', async () => {
   for (const stage of [4, 5, 6]) {
     const { SecondHalf } = load({ reports: { G9_S99: [firstHalf(), firstHalf({ stats: { stage } })] } });
     assert.equal(await SecondHalf.startStage('EFT', single), 1, `stage ${stage}`);

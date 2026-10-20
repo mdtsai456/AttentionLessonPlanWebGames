@@ -1,4 +1,5 @@
-// 當天已完成前半（第 1～3 關）時，下次進遊戲從第 4 關開始。看後端當天的成績，換裝置也成立。
+// 同一個課次已完成前半（第 1～3 關）時，下次進遊戲從第 4 關開始。看後端這個課次的成績，換裝置也成立。
+// 課次是登入時填的「第幾天」（currentDay），不是日曆日期：隔天用同一個課次登入，照樣從第 4 關補完。
 (function (global) {
   const TIMEOUT_MS = 5000;
 
@@ -17,7 +18,7 @@
   }
 
   /**
-   * 當天、同遊戲、同模式的紀錄裡有 stage 3，而且沒有 stage 4 以上。
+   * 同一個課次、同遊戲、同模式的紀錄裡有 stage 3，而且沒有 stage 4 以上。
    * 沒有 stage 的紀錄和選遊戲頁一樣當成已完成（progressFromRecord 算 100%）。
    */
   function onlyFirstHalf(records, gameId, day, mode) {

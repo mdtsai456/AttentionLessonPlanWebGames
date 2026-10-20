@@ -87,7 +87,7 @@ CHROME_PATH=/usr/bin/chromium npm run test:e2e
 - `e2e/dat-double-image-retention.test.js`：兔子升級為貓後，下一張圖片404／逾時與之後誤按紅光都保留貓；使用實際貓圖片並確認可見及自然尺寸。
 - `e2e/dat-single-image-retention.test.js`：單人版同上情境，升級圖片失敗保留貓。
 - `e2e/dat-stats.test.js`：平均反應時間只算有按鍵的題目；第 4 關離開時第 3 關檢查點只含前三關 18 題、時長停在第 3 關結束。
-- `e2e/dat-second-half.test.js`：用 `routeOverride` 模擬報表。今天只完成前半時從第 4 關開始、進度 50%、不出現中場，打完每人只送一筆 stage 6（`levelAccuracy` 3 個值、18 題、新的 submissionId，雙人共用新的 pairId）；第 4、5 關離開什麼都不送；stage 6 送失敗後離開照舊重送；「再玩一次」從第 1 關、不再查報表；已有 stage 6、沒有紀錄、雙人只有一人完成前半都從第 1 關；練習不查報表，雙人練習完按「進入正式遊戲」才查。
+- `e2e/dat-second-half.test.js`：用 `routeOverride` 模擬報表。這個課次只完成前半時從第 4 關開始、進度 50%、不出現中場，打完每人只送一筆 stage 6（`levelAccuracy` 3 個值、18 題、新的 submissionId，雙人共用新的 pairId）；第 4、5 關離開什麼都不送；stage 6 送失敗後離開照舊重送；「再玩一次」從第 1 關、不再查報表；已有 stage 6、沒有紀錄、雙人只有一人完成前半都從第 1 關；練習不查報表，雙人練習完按「進入正式遊戲」才查。
 - `e2e/dat-double-save-retry.test.js`：雙人六關成績第一次 500、重試成功後，「離開」與「返回遊戲大廳」都能回選遊戲頁。
 - `e2e/dat-leave-confirm.test.js`：按「離開」先出現頁面內確認框；按「繼續遊戲」或 Esc 不送成績、遊戲繼續、焦點離開「離開」鈕；確定後才送第 3 關檢查點並回選遊戲頁。
 - 所有 E2E 都記錄瀏覽器原生對話框（`session.dialogs`）並一律取消；離開、回大廳的測試要求沒有任何原生的離開詢問。

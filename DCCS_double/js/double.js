@@ -1003,7 +1003,7 @@ async function bootFromLobby() {
 
   cameFromLobby = true;
 
-  // 兩位學生當天都已完成前半才從第 4 關開始；最多等 5 秒，不會 reject。
+  // 兩位學生這個課次都已完成前半才從第 4 關開始；最多等 5 秒，不會 reject。
   // 不在這裡等：startSession 先顯示載入畫面、綁好離開，查詢和載入關卡資料、圖片同時進行。
   const startLevel =
     window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] }) : 1;

@@ -50,7 +50,7 @@ let pairId = '';
 let playId = '';
 // 兩人都打完六關才開放「再玩一次」，避免先打完的人把還在玩的搭檔一起重設。
 const finished = [false, false];
-// 這一局從第 4 關開始（兩人當天都只完成前半）。
+// 這一局從第 4 關開始（兩人同一個課次都只完成前半）。
 let secondHalf = false;
 
 // 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
@@ -218,7 +218,7 @@ document.getElementById('mid-lobby').addEventListener('click', async () => {
     }
 });
 
-// 預載素材後，同時開始兩位玩家的第一題。查今天的成績和載入素材同時進行；
+// 預載素材後，同時開始兩位玩家的第一題。查這個課次的成績和載入素材同時進行；
 // 兩位都只完成前半才從第 4 關開始，查不到或超過 5 秒都從第 1 關開始。
 Promise.all([
     Promise.all(players.map((player, playerIndex) => preloadEftAssets({

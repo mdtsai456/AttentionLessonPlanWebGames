@@ -17,7 +17,7 @@ export class Track {
    *          viewport: {x:number,y:number,w:number,h:number}, rng: () => number, stats: object,
    *          backgroundKey?: string, sessionSeconds?: number,
    *          progressSide?: 'left'|'right', startLevelIdx?: number}} opts
-   *   startLevelIdx：當天已完成前半時從第 4 關（startLevelIdx = 3）開始，
+   *   startLevelIdx：同一個課次已完成前半時從第 4 關（startLevelIdx = 3）開始，
    *   場次時間從第 3 關結束接著算；分數與題號照常從 0 開始。
    */
   constructor({

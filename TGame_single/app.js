@@ -97,7 +97,7 @@ let customThemes = null; // 自動載入 CSV。失敗時維持 null，並使用�
 
 const state = {
   level: 1,
-  // 這一局的起始關：1，或當天已完成前半時的 4（後半那一局）
+  // 這一局的起始關：1，或同一個課次已完成前半時的 4（後半那一局）
   firstLevel: 1,
   roundToken: 0,
   levelDeadline: 0,
@@ -163,7 +163,7 @@ document.addEventListener("keydown", (event) => {
 async function init() {
   promptEl.textContent = "圖片載入中…";
   const scenesReady = preloadSceneImages();
-  // 當天已完成前半就從第 4 關開始；查詢最多等 5 秒，與載入圖片同時進行。
+  // 同一個課次已完成前半就從第 4 關開始；查詢最多等 5 秒，與載入圖片同時進行。
   const startStagePromise = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("TGame", { mode: "single", slots: [1] }) : Promise.resolve(1));
   const ok = await loadCsvFromUrl(CSV_URL);
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);

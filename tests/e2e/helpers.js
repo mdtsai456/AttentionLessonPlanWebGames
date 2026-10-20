@@ -195,7 +195,7 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
     }
     if (/\/api\/sessions$/.test(pathname) && req.method() === 'POST') sessionPosts.push(req.postDataJSON());
     if (routeOverride && await routeOverride({ route, request: req, url, origin, sessionPosts, placeholderPng })) return;
-    // 後端報表（決定是否從第 4 關開始）：預設沒有紀錄，照舊從第 1 關開始。要模擬今天已完成前半時用 routeOverride。
+    // 後端報表（決定是否從第 4 關開始）：預設沒有紀錄，照舊從第 1 關開始。要模擬這個課次已完成前半時用 routeOverride。
     if (/\/api\/students\/[^/]+\/report$/.test(pathname)) {
       return route.fulfill({
         status: 200,

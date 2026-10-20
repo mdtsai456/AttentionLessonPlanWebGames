@@ -42,7 +42,7 @@ npm run test:full -- --grep '共用遮罩關閉|打完全場'
 - 成績本文讀取逾時、暫存重送成功後刪除、暫時性錯誤保留及永久拒絕保留供人工處理；遊戲暫停中送出仍會逾時；`submissionId` 來自 `WebGameApi.uuid()`（`client.spec.mjs` 先載入 `shared/api.js`）。
 - 瀏覽器禁止本機儲存時，送出模組仍能回傳失敗結果。
 - `DCCS_duration`（2026-10-20 起為遊戲時鐘的實際遊玩時間）：單／雙人沒中斷時 `endTime − startTime` 與 `duration` 相差不到 1 秒，中場檢查點算到第 3 關結束當下（`midway-save.spec.mjs`、`double-leave.spec.mjs`）。
-- 當天已完成前半（`second-half.spec.mjs`，模擬學生報表 `/api/students/{key}/report`）：單／雙人一進場就是第 4 關、沒有中場，打完只送 stage 6（新的 `submissionId`、`levelsPlayed` 為 `4,5,6`、`levelAccuracy` 3 個值、題數與 `duration` 只算後半）；第 4、5 關離開什麼都不送；全場成績送出中離開照樣等送完；報表還沒回來時先顯示載入畫面（單人的「離開」照樣能用、什麼都不送），報表晚 2 秒才回來照樣從第 4 關開始；報表沒有紀錄、已有 stage 6、只有別的模式／課次／遊戲、雙人只有一位符合，都從第 1 關開始。`engine.test.mjs` 另測 Track 的 `startLevelIdx` 與 `levelAccuracy` 從第一個有玩的關卡起算。`helpers.mjs` 沒設 `student{n}_key`，其他測試不讀報表，照舊從第 1 關開始。
+- 同一個課次已完成前半（`second-half.spec.mjs`，模擬學生報表 `/api/students/{key}/report`）：單／雙人一進場就是第 4 關、沒有中場，打完只送 stage 6（新的 `submissionId`、`levelsPlayed` 為 `4,5,6`、`levelAccuracy` 3 個值、題數與 `duration` 只算後半）；第 4、5 關離開什麼都不送；全場成績送出中離開照樣等送完；報表還沒回來時先顯示載入畫面（單人的「離開」照樣能用、什麼都不送），報表晚 2 秒才回來照樣從第 4 關開始；報表沒有紀錄、已有 stage 6、只有別的模式／課次／遊戲、雙人只有一位符合，都從第 1 關開始。`engine.test.mjs` 另測 Track 的 `startLevelIdx` 與 `levelAccuracy` 從第一個有玩的關卡起算。`helpers.mjs` 沒設 `student{n}_key`，其他測試不讀報表，照舊從第 1 關開始。
 
 操作截圖存於根目錄的 `.context/`；失敗時的 trace 存於 `test-results/`。
 

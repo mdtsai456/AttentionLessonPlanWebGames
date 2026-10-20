@@ -408,7 +408,7 @@ async function fetchTeacherStudents() {
 }
 
 /**
- * 每個遊戲一張卡片。同一天分兩次玩完（stage 3 加只含第 4～6 關的 stage 6）時合併兩列；
+ * 每個遊戲一張卡片。同一個課次分兩次玩完（stage 3 加只含第 4～6 關的 stage 6）時合併兩列；
  * 否則取關卡最高的那一列。
  */
 function detailFromSessions(sessions, day) {
@@ -478,8 +478,8 @@ function isSecondHalf(session) {
 }
 
 /**
- * 找當天要合併的前後半。後半配同模式、開始時間比它早的最後一筆 stage 3；
- * 有多組時取後半較晚的那組。當天有完整 6 關的一列時不合併，回 null。
+ * 找同一個課次要合併的前後半。後半配同模式、開始時間比它早的最後一筆 stage 3；
+ * 有多組時取後半較晚的那組。同一個課次有完整 6 關的一列時不合併，回 null。
  */
 function halvesPair(gameId, rows) {
   if (rows.some((row) => levelsReached(gameId, Number(row.stats && row.stats.stage)) === 6 && !isSecondHalf(row))) {

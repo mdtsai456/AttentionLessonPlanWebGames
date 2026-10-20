@@ -1,5 +1,5 @@
-// 漂浮泡泡：當天已完成前半（第 1～3 關）時，下次進遊戲直接從第 4 關開始，只玩並只送後半。
-// 後端當天的成績用 mockReport 模擬；用 page.clock 快轉關卡時間，不作答，每關固定 5 題逾時算錯。
+// 漂浮泡泡：同一個課次已完成前半（第 1～3 關）時，下次進遊戲直接從第 4 關開始，只玩並只送後半。
+// 後端這個課次的成績用 mockReport 模擬；用 page.clock 快轉關卡時間，不作答，每關固定 5 題逾時算錯。
 import { test, expect } from '@playwright/test';
 import { STUDENT, DOUBLE, loginAs, recordWrites, mockReport, firstHalfRecord } from './helpers.mjs';
 
@@ -135,7 +135,7 @@ test('EFT 單人：報表沒有紀錄 → 照舊從第 1 關開始，打到中�
   await expect.poll(() => stages(writes)).toEqual([3]);
 });
 
-test('EFT 單人：今天已經有 stage 6 → 照舊從第 1 關開始', async ({ page }) => {
+test('EFT 單人：這個課次已經有 stage 6 → 照舊從第 1 關開始', async ({ page }) => {
   await openSingle(page, { records: [firstHalfRecord('EFT'), firstHalfRecord('EFT', { stats: { stage: 6 } })] });
   await expect(page.locator('#round')).toContainText('第 1 / 6 關');
 });
@@ -252,7 +252,7 @@ test('EFT 雙人：只有一位完成前半 → 兩人都從第 1 關開始', as
   await expect(round(page, 2)).toContainText('第 1 / 6 關');
 });
 
-test('EFT 雙人：第 2 位今天已經有 stage 6 → 兩人都從第 1 關開始', async ({ page }) => {
+test('EFT 雙人：第 2 位這個課次已經有 stage 6 → 兩人都從第 1 關開始', async ({ page }) => {
   await openDouble(page, { reports: { G9_S99: [FIRST()], G8_S88: [SECOND(), SECOND({ stats: { stage: 6 } })] } });
   await expect(round(page, 1)).toContainText('第 1 / 6 關');
   await expect(round(page, 2)).toContainText('第 1 / 6 關');

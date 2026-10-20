@@ -1,4 +1,4 @@
-// 當天已完成前半（後端有今天的 stage 3）：下次進遊戲從第 4 關開始，涵蓋單人與雙人。
+// 同一個課次已完成前半（後端有這個課次的 stage 3）：下次進遊戲從第 4 關開始，涵蓋單人與雙人。
 // 學生報表（/api/students/{key}/report）由測試模擬；成績 POST 一律攔截，不會打到真的後端。
 // 預設使用 ?sessionSeconds=60（每關 10 秒），後半那一局約 30 秒遊戲時間。
 
@@ -22,7 +22,7 @@ const STUDENT_KEYS = { 1: 'G1_T01', 2: 'G1_T02' };
 const TOKENS = { G1_T01: 'token-1', G1_T02: 'token-2' };
 const FIRST_HALF_SUBMISSION_ID = 'first-half-submission';
 
-/** 今天（課次 1）只完成前半的 stage 3 紀錄。 */
+/** 課次 1 只完成前半的 stage 3 紀錄。 */
 function firstHalf(mode, overrides = {}) {
   return {
     gameType: 'DCCS',
@@ -95,7 +95,7 @@ function expectSecondHalfPayload(payload) {
   expect(Math.abs(payload.data.endTime - payload.data.startTime - duration)).toBeLessThan(1000);
 }
 
-test.describe('單人版 當天已完成前半：從第 4 關開始', () => {
+test.describe('單人版 同一個課次已完成前半：從第 4 關開始', () => {
   test('一進場就是第 4 關、沒有中場；打完只送一筆 stage 6，只含第 4～6 關', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'single');
     const reports = await mockReport(page, { 1: [firstHalf('single')] });
@@ -217,7 +217,7 @@ test.describe('單人版 當天已完成前半：從第 4 關開始', () => {
 
   for (const [name, records] of [
     ['報表沒有紀錄', []],
-    ['今天已有 stage 6（已經 100%）', [firstHalf('single'), firstHalf('single', { stats: { stage: 6 } })]],
+    ['這個課次已有 stage 6（已經 100%）', [firstHalf('single'), firstHalf('single', { stats: { stage: 6 } })]],
     ['只有雙人模式的前半', [firstHalf('double')]],
     ['只有別的課次的前半', [firstHalf('single', { currentDay: 2 })]],
     ['只有別的遊戲的前半', [firstHalf('single', { gameType: 'DAT' })]],
@@ -233,7 +233,7 @@ test.describe('單人版 當天已完成前半：從第 4 關開始', () => {
   }
 });
 
-test.describe('雙人版 當天已完成前半：兩人都符合才從第 4 關開始', () => {
+test.describe('雙人版 同一個課次已完成前半：兩人都符合才從第 4 關開始', () => {
   test('兩人都只完成前半：第 4 關開始、沒有中場；打完各送一筆 stage 6，同一個新的 pairId', async ({ page }) => {
     const { posts, pageErrors } = await setup(page, 'double');
     const reports = await mockReport(page, { 1: [firstHalf('double')], 2: [firstHalf('double')] });

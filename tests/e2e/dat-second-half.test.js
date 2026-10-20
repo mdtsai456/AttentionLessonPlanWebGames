@@ -1,4 +1,4 @@
-// 後半那一局：當天同模式只完成前 3 關時，進遊戲直接從第 4 關開始，打完只送一筆只含第 4～6 關的 stage 6。
+// 後半那一局：同一個課次、同模式只完成前 3 關時，進遊戲直接從第 4 關開始，打完只送一筆只含第 4～6 關的 stage 6。
 // 用 routeOverride 模擬後端報表（/api/students/{key}/report）。openGame 登入的課次是 1。
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const TOKENS = { G1_S01: 'student-S01', G1_S02: 'student-S02', G1_S03: 'student-
 const selector = (game, id, p = 0) => game === 'single' ? `#${id}` : `.player-${p + 1} [data-ui="${id}"]`;
 const statsOf = (post) => Object.fromEntries(post.data.stats.map(({ apiname, value }) => [apiname, value]));
 
-// 今天在 mode 模式只完成前半的紀錄
+// 這個課次在 mode 模式只完成前半的紀錄
 const firstHalf = (mode, stats = {}) => ({ gameType: 'DAT', mode, currentDay: 1, stats: { stage: 3, ...stats } });
 
 /**
@@ -113,7 +113,7 @@ describe('動物追擊令後半那一局', () => {
   for (const game of ['single', 'double']) {
     const allFirstHalf = Object.fromEntries(KEYS[game].map((key) => [key, [firstHalf(game)]]));
 
-    test(`${game}：今天只完成前半 → 從第 4 關開始、不出現中場，打完只送 stage 6；再玩一次從第 1 關`, async () => {
+    test(`${game}：這個課次只完成前半 → 從第 4 關開始、不出現中場，打完只送 stage 6；再玩一次從第 1 關`, async () => {
       const { reportRequests, routeOverride } = backend(allFirstHalf);
       const session = await openGame(browser, server.origin, { game, routeOverride });
       try {
@@ -181,7 +181,7 @@ describe('動物追擊令後半那一局', () => {
       } finally { await session.context.close(); }
     });
 
-    test(`${game}：今天已有 stage 6 → 照舊從第 1 關開始`, async () => {
+    test(`${game}：這個課次已有 stage 6 → 照舊從第 1 關開始`, async () => {
       const reports = Object.fromEntries(KEYS[game].map((key) => [key, [firstHalf(game), firstHalf(game, { stage: 6 })]]));
       const { reportRequests, routeOverride } = backend(reports);
       const session = await openGame(browser, server.origin, { game, routeOverride });
@@ -213,7 +213,7 @@ describe('動物追擊令後半那一局', () => {
     } finally { await session.context.close(); }
   });
 
-  test('double：只有一人今天完成前半 → 兩人都從第 1 關開始', async () => {
+  test('double：只有一人在這個課次完成前半 → 兩人都從第 1 關開始', async () => {
     const { reportRequests, routeOverride } = backend({ G1_S01: [firstHalf('double')] });
     const session = await openGame(browser, server.origin, { game: 'double', routeOverride });
     try {

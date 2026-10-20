@@ -1,5 +1,5 @@
-// 指令出擊（IM）後半：今天只完成前 3 關時，下次進遊戲從第 4 關開始。
-// 看後端當天的成績（/report）決定；第 4、5 關離開什麼都不送，打完第 6 關只送一筆 stage 6。
+// 指令出擊（IM）後半：這個課次只完成前 3 關時，下次進遊戲從第 4 關開始。
+// 看後端這個課次的成績（/report）決定；第 4、5 關離開什麼都不送，打完第 6 關只送一筆 stage 6。
 import { test, expect } from '@playwright/test';
 import { STUDENT, loginAs, recordWrites, mockReport, firstHalfRecord } from './helpers.mjs';
 
@@ -41,7 +41,7 @@ async function confirmLeave(page) {
   await page.waitForURL('**/Select/index.html');
 }
 
-test('IM 後半：今天只完成前半，一進場就是第 4 關（P004），沒有中場、不送 stage 3', async ({ page }) => {
+test('IM 後半：這個課次只完成前半，一進場就是第 4 關（P004），沒有中場、不送 stage 3', async ({ page }) => {
   const writes = await openIm(page, [firstHalfRecord('IM')]);
   await expect(page.locator('#problem-title')).toHaveText('第 4 關');
   expect(await taskId(page)).toBe('P004');
@@ -120,7 +120,7 @@ test('IM 後半：報表是空的，照舊從第 1 關開始，第 3 關後有�
   await expect.poll(() => stages(writes)).toEqual([3]);
 });
 
-test('IM 後半：今天已經有 stage 6，從第 1 關開始', async ({ page }) => {
+test('IM 後半：這個課次已經有 stage 6，從第 1 關開始', async ({ page }) => {
   await openIm(page, [
     firstHalfRecord('IM'),
     firstHalfRecord('IM', { stats: { stage: 6 } }),

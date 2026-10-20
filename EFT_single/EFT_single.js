@@ -13,7 +13,7 @@ let gameStartTime = 0;
 let playId = '';
 // 已送出（或正在送）的最高關卡與那次送出；同一關或更低的關卡不再另送。
 let savedStage = 0;
-// 當天已完成前半時，這一局從第 4 關開始，只玩並只送後半（stage 6）。
+// 同一個課次已完成前半時，這一局從第 4 關開始，只玩並只送後半（stage 6）。
 let secondHalf = false;
 let savePromise = Promise.resolve();
 
@@ -218,7 +218,7 @@ function preloadGameAssets() {
     const studentId = sessionStorage.getItem('caseId')
         || sessionStorage.getItem('student1_case')
         || 'S001';
-    // 查今天的成績和載入素材同時進行；查不到或超過 5 秒都從第 1 關開始。
+    // 查這個課次的成績和載入素材同時進行；查不到或超過 5 秒都從第 1 關開始。
     Promise.all([
         preloadEftAssets({ studentId }),
         (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('EFT', { mode: 'single', slots: [1] }) : Promise.resolve(1)),

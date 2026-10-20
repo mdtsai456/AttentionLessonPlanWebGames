@@ -3,7 +3,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT, loginAs, recordWrites, mockReport, firstHalfRecord } from './helpers.mjs';
 
-test('IM：HTML 沒載入 second-half.js 時從第 1 關開始（即使今天已完成前半）', async ({ page }) => {
+test('IM：HTML 沒載入 second-half.js 時從第 1 關開始（即使這個課次已完成前半）', async ({ page }) => {
   await recordWrites(page);
   // 就算後端說前半已完成，模組不在就不會有人去查，只能從第 1 關。
   await mockReport(page, { [STUDENT.student1_key]: [firstHalfRecord('IM')] });

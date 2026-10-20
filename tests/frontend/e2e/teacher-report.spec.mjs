@@ -193,7 +193,7 @@ test.describe("裝置時區不是台灣（例如美東）", () => {
   });
 });
 
-// ---- 同一天分兩次玩完：stage 3（第 1～3 關）＋只含第 4～6 關的 stage 6，卡片合併兩列 ----
+// ---- 同一個課次分兩次玩完：stage 3（第 1～3 關）＋只含第 4～6 關的 stage 6，卡片合併兩列 ----
 
 const play = (gameType, startTime, stats, mode = "single") =>
   ({ gameType, mode, currentDay: 1, startTime, stats });
@@ -277,7 +277,7 @@ test("一列完整 6 關的 stage 6：照舊顯示，不標成後半", async ({ 
   await expect(page.locator("#records-tbody tr").first().locator("td").nth(5)).toHaveText("6");
 });
 
-test("當天有完整 6 關的一列時，卡片顯示完整那一列，不合併前後半", async ({ page }) => {
+test("同一個課次有完整 6 關的一列時，卡片顯示完整那一列，不合併前後半", async ({ page }) => {
   await openDay(page, [
     play("EFT", "2026-07-01 03:00:00", {
       stage: 3, levelAccuracy: [0.1, 0.1, 0.1], correctCount: 1, wrongCount: 9, questionCount: 10, accuracy: 0.1, duration: 1000,

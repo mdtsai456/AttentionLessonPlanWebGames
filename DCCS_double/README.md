@@ -23,11 +23,11 @@
 
 `DCCS_duration` 的定義與單人相同（2026-10-20 起）：每位玩家各自用 `WebGameRuntime` 的遊戲時鐘，從第一個關卡提示按下繼續起（一般是第 1 關，後半那一局是第 4 關），算到最後完成那一關結束，包含關卡提示與中場休息，只扣暫停；`startTime`／`endTime` 是同一段時間換回的真實時間，沒中斷時 `endTime − startTime ≈ duration`。中場先送的第 3 關算到第 3 關結束當下。在這之前是賽道的模擬時間 `min(track.elapsed, sessionSeconds)`，完整一場固定 360000；**改版前後的 `duration` 不能直接比較**，以 `start_time` 是否在 2026-10-20 之後分界。
 
-## 當天已完成前半
+## 同一個課次已完成前半
 
-進遊戲時 `js/double.js` 的 `bootFromLobby` 先用 `WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] })` 讀兩位學生各自的報表（第 2 位用 `student2_token`）。**兩位**今天（各自的課次）在雙人模式的 DCCS 紀錄都有 stage 3、而且沒有 stage 4 以上，才從第 4 關開始；只有一位符合、讀取失敗、逾時（最多等 5 秒）都從第 1 關開始。查詢和載入關卡資料、圖片同時進行，報表還沒回來時顯示共用的載入畫面，到關卡提示前才等結果。不檢查前半是和誰一起玩的；單人模式玩的前半不算。
+進遊戲時 `js/double.js` 的 `bootFromLobby` 先用 `WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] })` 讀兩位學生各自的報表（第 2 位用 `student2_token`）。**兩位**在各自的課次、雙人模式的 DCCS 紀錄都有 stage 3、而且沒有 stage 4 以上，才從第 4 關開始；只有一位符合、讀取失敗、逾時（最多等 5 秒）都從第 1 關開始。查詢和載入關卡資料、圖片同時進行，報表還沒回來時顯示共用的載入畫面，到關卡提示前才等結果。不檢查前半是和誰一起玩的；單人模式玩的前半不算。
 
-從第 4 關開始的那一局規則與單人相同（見 [`../DCCS_single/README.md`](../DCCS_single/README.md) 的「當天已完成前半」）：共用的關卡提示顯示第 4 關、沒有中場休息、統計只算第 4～6 關；兩人各用新的 `submissionId`，本局另產生新的 `pairId`。在第 4、5 關按「離開」並確定，兩人都不送任何成績，直接回選擇遊戲頁。打完第 6 關兩人各送一筆 stage 6，`levelAccuracy` 剛好 3 個值（第 4、5、6 關）。
+從第 4 關開始的那一局規則與單人相同（見 [`../DCCS_single/README.md`](../DCCS_single/README.md) 的「同一個課次已完成前半」）：共用的關卡提示顯示第 4 關、沒有中場休息、統計只算第 4～6 關；兩人各用新的 `submissionId`，本局另產生新的 `pairId`。在第 4、5 關按「離開」並確定，兩人都不送任何成績，直接回選擇遊戲頁。打完第 6 關兩人各送一筆 stage 6，`levelAccuracy` 剛好 3 個值（第 4、5、6 關）。
 
 ## 怎麼開始
 

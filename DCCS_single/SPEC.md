@@ -654,7 +654,7 @@ export function createStats() -> {
 - `levelAccuracy`、`questionCount` 同樣以**題**為單位；場次結束時只通過形狀閥、
   還沒通過物件閥的題目不算入題數（它的形狀閥那一列照樣保留在 `rows()`）
 - `levelAccuracy` 從**第一個有玩的關卡**開始，依關卡序號連續取到最後一關，碰到沒有題目的
-  關卡就停。一般一局從第 1 關開始；只玩後半（從第 4 關開始，見 README「當天已完成前半」）
+  關卡就停。一般一局從第 1 關開始；只玩後半（從第 4 關開始，見 README「同一個課次已完成前半」）
   時是第 4、5、6 關的 3 個值
 - `duration` 毫秒（整數）。**本場的實際遊玩時間**（2026-10-20 起），和其他四個遊戲
   的定義一致：用 `WebGameRuntime` 的遊戲時鐘（`WebGameRuntime.now()`）計算，扣掉暫停
@@ -744,7 +744,7 @@ Track 負責：關卡推進（每 `sessionSeconds / manifest.levels.length` 秒�
 判定交給 `stats.record()`、每題兩道閥都判定完後呼叫 `stats.recordTrial()`，
 並據此給分與 ✓。
 
-`startLevelIdx` 給當天已完成前半的那一局用：從第 `startLevelIdx + 1` 關開始
+`startLevelIdx` 給同一個課次已完成前半的那一局用：從第 `startLevelIdx + 1` 關開始
 （後半是 `3`，即第 4 關），`elapsed` 從 `startLevelIdx × 每關秒數` 接著算，所以 HUD
 進度條從一半開始、場次結束條件不變；超出範圍時夾到第 1 關與最後一關之間。分數與題號
 照常從 0 開始。預設照舊從第 1 關、0 秒開始。
