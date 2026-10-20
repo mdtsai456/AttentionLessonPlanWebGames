@@ -133,11 +133,19 @@ DMS 若要，需請後端加。
 排序：先 `gameType`（字母序），再 `mode`（**`single` 一定在 `double` 前**）。
 某組全部場次 `stats` 皆 null → 回一列 `sessionCount` 保留、其餘為 0。
 
+⚠️ **分兩次玩完的一天是兩列**：網頁版學生當天只打完前 3 關（`stage` 3）時，下次進同一款、同一模式的
+遊戲會從第 4 關開始，打完另送一列 `stage` 6。這一列的統計只含第 4～6 關，`levelAccuracy` 只有 3 個值
+（第 4、5、6 關）；打完整局的 `stage` 6 一定有 6 個值。`summaryByGame` 會把這兩列算成兩場，
+`totalCorrect` 等加總不會重複計算，但 `sessionCount`、`avgAccuracy` 會受影響，統計時要自己合併
+（教室後台的合併規則見 `Teacher_platform/README.md`）。
+
 ### c. `trends[]` — 折線圖用時間序列
 
 - 依 `(gameType, mode)` 分組；`stats` 為 null 的場次略過。
 - 每組固定 3 條序列：`correctCount`、`wrongCount`、`accuracy`。
 - 每條 `stats` 是 `{time, value}` 陣列，**由舊到新**，直接 X=time / Y=value。
+- 分兩次玩完的一天（見上面 `summaryByGame`）在折線上是兩個點：`stage` 3 那一點只有第 1～3 關，
+  `stage` 6 而且 `levelAccuracy` 只有 3 個值的那一點只有第 4～6 關。要畫成一天一點，請自己合併。
 
 ### 其他
 

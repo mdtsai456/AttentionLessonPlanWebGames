@@ -155,6 +155,12 @@ string pairId = System.Guid.NewGuid().ToString();   // 例："6f1c8e2a-3b7d-4e11
   `stage` 3，打完再送 `stage` 6。後端收到同一場、`stage` 比已存的高的成績時，
   更新那一列的統計欄位與 `endTime`（`startTime` 不變），報表裡一局只有一列；
   `stage` 沒有比較高（重送同一筆、晚到的第 3 關）就不動。
+- **網頁版可能一天兩列**：學生打完前 3 關就離開時，那一局停在 `stage` 3。下次進同一款、同一模式的
+  遊戲會從第 4 關開始，用**新的** `submissionId` 另開一局，打完送 `stage` 6。這一列只含第 4～6 關：
+  `correct`、`wrong`、`accuracy`、`duration`、`questionCount` 都只算後半，`levelAccuracy` 只有 3 個值
+  （第 4、5、6 關）。打完整局的 `stage` 6 一定有 6 個值，所以「`stage` 6 而且 `levelAccuracy` 只有
+  3 個值」就是後半那一列。`/report` 的 `summaryByGame`、`trends`、學生的 `sessionCount` 會把這樣的
+  一天算成兩場；目前前端沒有用到 `summaryByGame`、`trends`，這次不改，需要時請自己合併。
 - 不同學生就算剛好送了同一個 `submissionId`，也會得到不同的 `sessionId`，各自寫入，
   不會互相覆蓋或被當成重送。
 - 不是 UUID 格式回 `400` `{"detail": "submissionId 格式錯誤"}`。
