@@ -84,3 +84,31 @@ export async function stubAssetServer(page) {
     status: 404, contentType: "application/json", body: "{}", headers: { "Access-Control-Allow-Origin": "*" },
   }));
 }
+
+/**
+ * 模擬 GET /api/students/{key}/report：recordsByKey[studentKey] 是該生的 records，沒列到的學生回空陣列。
+ * 要在 recordWrites 之後呼叫：recordWrites 對 GET 用 route.continue()，會直接送到測試伺服器，
+ * 不會再交給先註冊的 route（Playwright 後註冊的 route 先處理）。
+ */
+export async function mockReport(page, recordsByKey = {}) {
+  await page.route("**/api/students/*/report*", (route) => {
+    const key = decodeURIComponent(new URL(route.request().url()).pathname.split("/")[3]);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ records: recordsByKey[key] || [] }),
+    });
+  });
+}
+
+/**
+ * 今天只完成前半的 stage 3 紀錄。day 要和登入的課次一致：STUDENT 是 3，DOUBLE 的第 2 位是 1。
+ * stats 會併進 { stage: 3 }，其他欄位（startTime 等）直接覆寫。
+ */
+export function firstHalfRecord(gameType, { mode = "single", day = 3, stats = {}, ...rest } = {}) {
+  return {
+    gameType, mode, currentDay: day, startTime: "2026-07-01 03:40:00",
+    ...rest,
+    stats: { stage: 3, ...stats },
+  };
+}
