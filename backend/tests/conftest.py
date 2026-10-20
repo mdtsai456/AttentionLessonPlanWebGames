@@ -33,6 +33,7 @@ TABLES_CHILD_FIRST = (
     "tgame_result",
     "assessment_result",
     "login_session",  # 此外鍵同時指向 teacher 與 student，須先刪除此表，再刪除兩個父表。
+    "game_lock",  # 外鍵指向 student，須先刪除此表，再刪除 student。
     "student",
     "teacher",  # teacher 的外鍵指向 school，須先刪除 teacher。
     "school",
