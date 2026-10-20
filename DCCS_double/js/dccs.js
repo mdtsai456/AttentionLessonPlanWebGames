@@ -177,10 +177,14 @@ export function mountDCCS(options) {
 
   // 起始關。當天已完成前半時傳 4：只玩第 4～6 關，統計與 duration 只算後半，
   // 不出現中場，第 4、5 關離開不送（stage 3 那一列已經在後端）。
-  const startLevel =
-    Number.isInteger(opts.startLevel) && opts.startLevel > 1
-      ? opts.startLevel
-      : 1;
+  // 也可以傳 promise（WebGameSecondHalf.startStage 的結果）：載入畫面照常顯示，
+  // 到第一個關卡提示前才等它。reject 或不是 2 以上的整數都從第 1 關開始。
+  const startLevelReady =
+    Promise.resolve(opts.startLevel).then(
+      (value) => (Number.isInteger(value) && value > 1 ? value : 1),
+      () => 1
+    );
+  let startLevel = 1;
 
   const autoStart = !!opts.autoStart;
 
@@ -749,6 +753,12 @@ export function mountDCCS(options) {
         emitPhase('playing');
 
         return true;
+      }
+
+      startLevel = await startLevelReady;
+
+      if (destroyed) {
+        return;
       }
 
       const startLevelIdx =

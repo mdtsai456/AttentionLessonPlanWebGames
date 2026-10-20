@@ -76,7 +76,7 @@ python tools/build_manifest.py
 
 ## 當天已完成前半
 
-選遊戲頁的 50% 代表後端已經有今天這個遊戲的第 3 關成績。進遊戲時 `js/main.js` 先用 `shared/second-half.js` 的 `WebGameSecondHalf.startStage('DCCS', { mode: 'single', slots: [1] })` 讀這位學生自己的報表：今天（同一個課次）、單人模式的 DCCS 紀錄裡有 stage 3、而且沒有 stage 4 以上，就從第 4 關開始，不問學生。讀取失敗、逾時（最多等 5 秒）或今天已經 100%，照舊從第 1 關開始。看的是後端成績，換裝置也成立；雙人模式玩的前半不算。
+選遊戲頁的 50% 代表後端已經有今天這個遊戲的第 3 關成績。進遊戲時 `js/main.js` 先用 `shared/second-half.js` 的 `WebGameSecondHalf.startStage('DCCS', { mode: 'single', slots: [1] })` 讀這位學生自己的報表：今天（同一個課次）、單人模式的 DCCS 紀錄裡有 stage 3、而且沒有 stage 4 以上，就從第 4 關開始，不問學生。查詢和載入關卡資料、圖片同時進行：遊戲先掛上、顯示載入畫面，「離開」照樣能用，到第一個關卡提示前才等查詢結果。讀取失敗、逾時（最多等 5 秒）或今天已經 100%，照舊從第 1 關開始。看的是後端成績，換裝置也成立；雙人模式玩的前半不算。
 
 從第 4 關開始的那一局：
 

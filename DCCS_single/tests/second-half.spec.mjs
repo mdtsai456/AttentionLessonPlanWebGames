@@ -37,9 +37,10 @@ function firstHalf(mode, overrides = {}) {
 /**
  * 設定 student{n}_key 並模擬報表。recordsBySlot 是 { slot: records }。
  * 只回該生自己的報表（token 不對就 403），回傳收到的報表請求。
+ * 傳 gate（promise）時，報表等它 resolve 才回應，用來模擬後端很慢。
  * 要在 setup() 之後呼叫，sessionStorage 才會在它的設定之後補上 key。
  */
-async function mockReport(page, recordsBySlot) {
+async function mockReport(page, recordsBySlot, { gate } = {}) {
   const requests = [];
   await page.addInitScript((keys) => {
     for (const [slot, key] of Object.entries(keys)) {
@@ -52,6 +53,7 @@ async function mockReport(page, recordsBySlot) {
     const key = decodeURIComponent(url.pathname.split('/').at(-2));
     const token = (route.request().headers().authorization || '').replace(/^Bearer /, '');
     requests.push({ key, token, school: url.searchParams.get('school') });
+    if (gate) await gate;
     const slot = Object.keys(STUDENT_KEYS).find((n) => STUDENT_KEYS[n] === key);
     if (!slot || TOKENS[key] !== token || !recordsBySlot[slot]) {
       await route.fulfill({ status: 403, contentType: 'application/json', body: '{}' });
@@ -182,6 +184,37 @@ test.describe('單人版 當天已完成前半：從第 4 關開始', () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test('報表還沒回來：先顯示載入畫面，「離開」照樣能用，什麼都不送', async ({ page }) => {
+    const { posts, pageErrors } = await setup(page, 'single');
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const reports = await mockReport(page, { 1: [firstHalf('single')] }, { gate });
+    await page.goto(`/DCCS_single/index.html${QUERY}`);
+    await expect.poll(() => reports.length).toBe(1);
+    await expect(page.locator('.dccs-loading-detail:visible')).toHaveCount(1);
+    await expect(singleLevelMessage(page)).toHaveCount(0);
+    const dialogs = recordNativeDialogs(page);
+
+    await page.locator('#leave-btn').click();
+    await answerLeave(page, 'leave');
+    await page.waitForURL(/\/Select\/index\.html/);
+    release();
+
+    expect(posts).toHaveLength(0);
+    expect(dialogs).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('報表晚 2 秒才回來：等到結果才出關卡提示，照樣從第 4 關開始', async ({ page }) => {
+    const { pageErrors } = await setup(page, 'single');
+    await mockReport(page, { 1: [firstHalf('single')] }, {
+      gate: new Promise((resolve) => setTimeout(resolve, 2000)),
+    });
+    await page.goto(`/DCCS_single/index.html${QUERY}`);
+    await expect(singleLevelMessage(page)).toHaveText('準備開始第 4 關！', { timeout: 30_000 });
+    expect(pageErrors).toEqual([]);
+  });
+
   for (const [name, records] of [
     ['報表沒有紀錄', []],
     ['今天已有 stage 6（已經 100%）', [firstHalf('single'), firstHalf('single', { stats: { stage: 6 } })]],
@@ -236,6 +269,32 @@ test.describe('雙人版 當天已完成前半：兩人都符合才從第 4 關�
     await mockReport(page, { 1: [firstHalf('double')], 2: [firstHalf('single')] });
     await page.goto(`/DCCS_double/index.html${QUERY}`);
     await expect(page.locator('#shared-level-message')).toHaveText('準備開始第 1 關！', { timeout: 30_000 });
+    expect(pageErrors).toEqual([]);
+  });
+
+  // 雙人版載入與關卡提示時，共用遮罩本來就蓋住「離開」，這裡只看不再是空白畫面。
+  test('報表還沒回來：先顯示載入畫面，回來後從第 4 關開始', async ({ page }) => {
+    const { pageErrors } = await setup(page, 'double');
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const reports = await mockReport(page, { 1: [firstHalf('double')], 2: [firstHalf('double')] }, { gate });
+    await page.goto(`/DCCS_double/index.html${QUERY}`);
+    await expect.poll(() => reports.length).toBe(2);
+    await expect(page.locator('#shared-loading')).toBeVisible();
+    await expect(page.locator('#shared-level-message')).not.toBeVisible();
+
+    release();
+    await expect(page.locator('#shared-level-message')).toHaveText('準備開始第 4 關！', { timeout: 30_000 });
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('報表晚 2 秒才回來：照樣從第 4 關開始', async ({ page }) => {
+    const { pageErrors } = await setup(page, 'double');
+    await mockReport(page, { 1: [firstHalf('double')], 2: [firstHalf('double')] }, {
+      gate: new Promise((resolve) => setTimeout(resolve, 2000)),
+    });
+    await page.goto(`/DCCS_double/index.html${QUERY}`);
+    await expect(page.locator('#shared-level-message')).toHaveText('準備開始第 4 關！', { timeout: 30_000 });
     expect(pageErrors).toEqual([]);
   });
 

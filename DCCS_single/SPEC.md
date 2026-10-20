@@ -909,7 +909,7 @@ export function mountDCCS(options) -> DCCSHandle
 | `autoStart` | `false` | `true` 則不顯示標題畫面；每關開始提示仍會顯示 |
 | `showResultScreen` | `true` | `false` 則結束後不顯示結算畫面（由 main 自己畫） |
 | `submit` | `true` | 是否自己送出成績（**預設照舊自己送**） |
-| `startLevel` | `1` | 起始關。傳 `4`（`WebGameSecondHalf.startStage` 的結果）時只玩第 4～6 關：第一個關卡提示顯示第 4 關、統計與 `duration` 只算後半、沒有中場；第 4、5 關離開不送，打完第 6 關照常送 stage 6 |
+| `startLevel` | `1` | 起始關，數字或 resolve 成數字的 promise（直接傳 `WebGameSecondHalf.startStage` 的回傳值；載入畫面照常顯示，到第一個關卡提示前才等它，reject 視為 `1`）。是 `4` 時只玩第 4～6 關：第一個關卡提示顯示第 4 關、統計與 `duration` 只算後半、沒有中場；第 4、5 關離開不送，打完第 6 關照常送 stage 6 |
 | `submitUrl` | `resolveSubmitUrl()` | 傳給 `submitResult`，見 4.13b |
 | `showTutorial` | `true` | 開始前顯示單頁操作說明（見 4.16b）；`autoStart` 時一律不顯示 |
 | `onPhase` | `null` | `(phase) => void`，phase 為 `'loading' \| 'tutorial' \| 'title' \| 'level-prompt' \| 'playing' \| 'submitting' \| 'done' \| 'error'` |
