@@ -252,7 +252,7 @@ init();
 async function init() {
   preloadImages();
   renderBackpack();
-  const startStageReady = window.WebGameSecondHalf.startStage("InstructionGame", { mode: "single", slots: [1] });
+  const startStageReady = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("InstructionGame", { mode: "single", slots: [1] }) : Promise.resolve(1));
   const data = await fetchQuestions();
   state.questions = data.questions;
   bindEvents();

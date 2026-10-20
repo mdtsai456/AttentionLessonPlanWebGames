@@ -225,7 +225,7 @@ Promise.all([
         studentId: getPlayerIdentity(playerIndex).caseId,
         backgroundAssets: playerIndex === 0 ? ['assets/background.png'] : [],
     }))),
-    window.WebGameSecondHalf.startStage('EFT', { mode: 'double', slots: [1, 2] }),
+    (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('EFT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1)),
 ]).then(([arrowAssetsByPlayer, startStage]) => {
     players.forEach((player, playerIndex) => {
         player.setArrowAssets(arrowAssetsByPlayer[playerIndex]);

@@ -744,7 +744,7 @@ async function initGameWorkflow() {
   // 正式模式看後端當天成績決定起始關，和素材載入一起等；練習模式不查。
   const startStageReady = isPractice
     ? Promise.resolve(1)
-    : window.WebGameSecondHalf.startStage('DAT', { mode: 'single', slots: [1] });
+    : (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'single', slots: [1] }) : Promise.resolve(1));
 
   // 1. 載入前隱藏動物與準心，避免顯示預設圖片。
   const animalElem = $('animal');

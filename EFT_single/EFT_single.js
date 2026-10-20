@@ -221,7 +221,7 @@ function preloadGameAssets() {
     // 查今天的成績和載入素材同時進行；查不到或超過 5 秒都從第 1 關開始。
     Promise.all([
         preloadEftAssets({ studentId }),
-        window.WebGameSecondHalf.startStage('EFT', { mode: 'single', slots: [1] }),
+        (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('EFT', { mode: 'single', slots: [1] }) : Promise.resolve(1)),
     ]).then(([arrowAssets, startStage]) => {
         player.setArrowAssets(arrowAssets);
         startGame({ startStage });

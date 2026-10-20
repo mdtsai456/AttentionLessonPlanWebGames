@@ -263,7 +263,7 @@ async function init() {
   });
   const scenesReady = preloadSceneImages();
   // 兩位玩家都只完成前半才從第 4 關開始；查詢最多等 5 秒，與載入圖片同時進行。
-  const startStagePromise = window.WebGameSecondHalf.startStage("TGame", { mode: "double", slots: [1, 2] });
+  const startStagePromise = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("TGame", { mode: "double", slots: [1, 2] }) : Promise.resolve(1));
   const result = await loadCsvFromUrl(CSV_URL); // 自動讀取 CSV。失敗時使用預設題目。
   if (!result.ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
   // 先安排六關，再等待場景、角色與起始關物品圖片解碼完成。最多等待 8 秒後開始遊戲。

@@ -1002,7 +1002,7 @@ async function bootFromLobby() {
 
   // 兩位學生當天都已完成前半才從第 4 關開始；最多等 5 秒，不會 reject。
   const startLevel =
-    await window.WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] });
+    await (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1));
 
   await startSession(
     { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay: day1 },

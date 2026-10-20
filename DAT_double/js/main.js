@@ -140,7 +140,7 @@ function restartSession() {
 
 // 正式遊戲開始前看後端當天成績：兩人都只完成前半才回 4，否則回 1。
 function secondHalfStartStage() {
-  return window.WebGameSecondHalf.startStage('DAT', { mode: 'double', slots: [1, 2] });
+  return (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1));
 }
 
 function beginSession(startStage = 1) {

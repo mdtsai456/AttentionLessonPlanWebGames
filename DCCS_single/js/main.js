@@ -48,7 +48,7 @@ async function main() {
   if (sessionSeconds !== null) markDebugSession(sessionSeconds);
 
   // 當天已完成前半（後端有今天的 stage 3）就從第 4 關開始；最多等 5 秒，不會 reject。
-  const startLevel = await window.WebGameSecondHalf.startStage('DCCS', { mode: 'single', slots: [1] });
+  const startLevel = await (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DCCS', { mode: 'single', slots: [1] }) : Promise.resolve(1));
 
   const handle = mountDCCS({
     container: document.getElementById('game-root'),
