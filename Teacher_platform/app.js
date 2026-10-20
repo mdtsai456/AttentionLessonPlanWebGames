@@ -324,12 +324,17 @@ function renderMetrics(detail, gameId) {
 }
 
 function formatDuration(value) {
+  // Number(null) 是 0（有限數字），不能直接丟進 Number.isFinite 判斷，
+  // 否則沒有紀錄（null）會被當成「剛好是 0」，顯示「0.0 秒」而不是「—」。
+  if (value == null) return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
   return `${(number / 1000).toFixed(1)} 秒`;
 }
 
 function formatAccuracy(value) {
+  // 同 formatDuration：Number(null) 是 0，要先排除 null 才不會誤判成「剛好是 0%」。
+  if (value == null) return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
   const percent = number <= 1 ? Math.round(number * 100) : Math.round(number);
