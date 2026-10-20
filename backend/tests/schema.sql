@@ -230,3 +230,19 @@ CREATE TABLE IF NOT EXISTS `login_session` (
   CONSTRAINT `fk_login_session_student` FOREIGN KEY (`grade`, `case_id`, `school`)
     REFERENCES `student` (`grade`, `case_id`, `school`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 同一位學生、同一款遊戲，一次只能有一個分頁持有鎖，避免同帳號在兩個分頁
+-- 各自進入同一款遊戲、各自寫回成績。lock_id 是這次佔用的識別碼；heartbeat_at
+-- 供偵測分頁已關閉或當掉，逾時後鎖可以換人。見 docs/adr/0006-game-lock.md。
+CREATE TABLE IF NOT EXISTS `game_lock` (
+  `grade` varchar(20) NOT NULL,
+  `case_id` varchar(50) NOT NULL,
+  `school` varchar(100) NOT NULL,
+  `game_id` varchar(20) NOT NULL,
+  `lock_id` varchar(64) NOT NULL,
+  `acquired_at` datetime NOT NULL,
+  `heartbeat_at` datetime NOT NULL,
+  PRIMARY KEY (`grade`, `case_id`, `school`, `game_id`),
+  CONSTRAINT `fk_game_lock_student` FOREIGN KEY (`grade`, `case_id`, `school`)
+    REFERENCES `student` (`grade`, `case_id`, `school`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

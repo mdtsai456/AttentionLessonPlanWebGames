@@ -178,3 +178,78 @@ def delete_login_session(token: str) -> None:
         with connection.cursor() as cursor:
             cursor.execute("DELETE FROM login_session WHERE token = %s", [token])
         connection.commit()
+
+
+# 同帳號雙分頁玩同一款遊戲的鎖定，見 docs/adr/0006-game-lock.md。
+
+
+def acquire_game_lock(
+    grade: str,
+    case_id: str,
+    school: str,
+    game_id: str,
+    lock_id: str,
+    now: datetime,
+    stale_before: datetime,
+) -> bool:
+    """嘗試取得鎖，回傳是否成功取得。
+
+    沒有人持有鎖（第一次 INSERT），或現有持有者的心跳已經逾時（heartbeat_at
+    早於 stale_before）時才會換成這次的 lock_id；否則保留原本的持有者。
+    用 INSERT ... ON DUPLICATE KEY UPDATE 讓「檢查＋換人」在同一筆 SQL 內完成，
+    不會跟另一個分頁的 acquire 交錯出兩邊都以為自己拿到鎖。
+    """
+    sql = """
+        INSERT INTO game_lock
+            (grade, case_id, school, game_id, lock_id, acquired_at, heartbeat_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            lock_id = IF(heartbeat_at < %s, VALUES(lock_id), lock_id),
+            acquired_at = IF(heartbeat_at < %s, VALUES(acquired_at), acquired_at),
+            heartbeat_at = IF(heartbeat_at < %s, VALUES(heartbeat_at), heartbeat_at)
+    """
+    params = [
+        grade, case_id, school, game_id, lock_id, now, now,
+        stale_before, stale_before, stale_before,
+    ]
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            cursor.execute(
+                "SELECT lock_id FROM game_lock "
+                "WHERE grade = %s AND case_id = %s AND school = %s AND game_id = %s",
+                [grade, case_id, school, game_id],
+            )
+            row = cursor.fetchone()
+        connection.commit()
+    return bool(row) and row["lock_id"] == lock_id
+
+
+def heartbeat_game_lock(
+    grade: str, case_id: str, school: str, game_id: str, lock_id: str, now: datetime
+) -> bool:
+    """持有者定期刷新心跳，回傳是否仍是目前的持有者（lock_id 相符才會真的更新）。"""
+    sql = """
+        UPDATE game_lock SET heartbeat_at = %s
+        WHERE grade = %s AND case_id = %s AND school = %s AND game_id = %s AND lock_id = %s
+    """
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            updated = cursor.execute(sql, [now, grade, case_id, school, game_id, lock_id])
+        connection.commit()
+    return bool(updated)
+
+
+def release_game_lock(
+    grade: str, case_id: str, school: str, game_id: str, lock_id: str
+) -> None:
+    """離開或結算成功時釋放鎖。lock_id 不符（鎖已被別人取走）時不動，也視為成功。"""
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM game_lock "
+                "WHERE grade = %s AND case_id = %s AND school = %s "
+                "AND game_id = %s AND lock_id = %s",
+                [grade, case_id, school, game_id, lock_id],
+            )
+        connection.commit()
