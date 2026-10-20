@@ -426,6 +426,7 @@ function finishGame(reason) {
   resultScore.textContent = `${state.score} / ${Math.max(total, 1)} 分`;
   resultHint.textContent = "六關都結束了，看看這次的得分";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
   void saveCurrentRun(STAGE_COUNT);
 }
 
@@ -509,6 +510,7 @@ function levelAccuracyText(stageCount) {
 }
 
 function showFeedback(isCorrect) {
+  window.WebGameAudio?.[isCorrect ? "playCorrect" : "playWrong"]();
   feedbackEl.textContent = isCorrect ? "答對了！" : "答錯了";
   feedbackEl.classList.toggle("is-correct", isCorrect);
   feedbackEl.classList.toggle("is-wrong", !isCorrect);

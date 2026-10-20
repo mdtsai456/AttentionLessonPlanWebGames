@@ -227,6 +227,7 @@ export class Track {
       level: this._trialLevelNo,
       correct,
     });
+    window.WebGameAudio?.[correct ? 'playCorrect' : 'playWrong']();
     if (correct) {
       this._score += 1;
       this._showTick = true;
