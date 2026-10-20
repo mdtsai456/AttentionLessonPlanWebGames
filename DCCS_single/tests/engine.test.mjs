@@ -51,7 +51,7 @@ function fakeInput() {
   };
 }
 
-function makeTrack(engine, manifest, input, sessionSeconds) {
+function makeTrack(engine, manifest, input, sessionSeconds, extra = {}) {
   const stats = engine.createStats();
   const track = new engine.Track({
     manifest,
@@ -61,6 +61,7 @@ function makeTrack(engine, manifest, input, sessionSeconds) {
     rng: seededRng(12345),
     stats,
     sessionSeconds,
+    ...extra,
   });
   return { track, stats };
 }
@@ -144,5 +145,73 @@ for (const dir of GAME_DIRS) {
       // 這一下照樣排入轉動，下一幀才開始轉（刻意行為）。
       assert.equal(valve.pendingSteps, 1);
     }
+  });
+
+  // 同一個課次已完成前半：從第 4 關開始，只玩第 4～6 關。
+  test(`${dir}：Track 從第 4 關開始（startLevelIdx），時間從第 3 關結束接著算，levelAccuracy 只有第 4～6 關`, async () => {
+    const manifest = await readJson(dir, 'manifest.json');
+    const engine = await loadEngine(dir);
+    const sessionSeconds = engine.CONFIG.SESSION_SECONDS;
+    const levelSeconds = sessionSeconds / manifest.levels.length;
+    const { track, stats } = makeTrack(engine, manifest, fakeInput(), sessionSeconds, { startLevelIdx: 3 });
+
+    assert.equal(track.currentLevelNo, 4);
+    assert.equal(track.elapsed, 3 * levelSeconds);
+    assert.equal(track.score, 0);
+    assert.equal(track._trialLevelNo, 4, '第一題應該出第 4 關的題');
+    assert.equal(track._currentTrialIndex, 0, '題號從 0 開始');
+
+    const dt = engine.CONFIG.FIXED_DT;
+    while (track.elapsed < sessionSeconds) track.update(dt);
+
+    const summary = stats.summary();
+    assert.equal(summary.levelsPlayed, '4,5,6');
+    assert.equal(summary.stage, 6);
+    assert.equal(summary.levelAccuracy.length, 3);
+    for (const [index, level] of [4, 5, 6].entries()) {
+      const levelTrials = stats.trials().filter((trial) => trial.level === level);
+      assert.ok(levelTrials.length > 0, `第 ${level} 關沒有題目`);
+      const expected = levelTrials.filter((trial) => trial.correct).length / levelTrials.length;
+      assert.equal(summary.levelAccuracy[index], expected, `levelAccuracy 第 ${index + 1} 個值應該是第 ${level} 關`);
+    }
+    assert.equal(summary.questionCount, stats.trials().length);
+  });
+
+  test(`${dir}：Track 沒給 startLevelIdx 時照舊從第 1 關、時間 0 開始；超出範圍時夾到最後一關`, async () => {
+    const manifest = await readJson(dir, 'manifest.json');
+    const engine = await loadEngine(dir);
+    const sessionSeconds = engine.CONFIG.SESSION_SECONDS;
+    const { track } = makeTrack(engine, manifest, fakeInput(), sessionSeconds);
+    assert.equal(track.currentLevelNo, 1);
+    assert.equal(track.elapsed, 0);
+    assert.equal(track.score, 0);
+    assert.equal(track._currentTrialIndex, 0);
+
+    const { track: clamped } = makeTrack(engine, manifest, fakeInput(), sessionSeconds, { startLevelIdx: 99 });
+    assert.equal(clamped.currentLevelNo, manifest.levels.length);
+    const { track: negative } = makeTrack(engine, manifest, fakeInput(), sessionSeconds, { startLevelIdx: -2 });
+    assert.equal(negative.currentLevelNo, 1);
+    assert.equal(negative.elapsed, 0);
+  });
+
+  test(`${dir}：stats 的 levelAccuracy 從第一個有玩的關卡連續取到最後一關`, async () => {
+    const engine = await loadEngine(dir);
+    const stats = engine.createStats();
+    const answers = { 4: [true, false], 5: [true, true, true, false], 6: [false] };
+    let trialIndex = 0;
+    for (const [level, results] of Object.entries(answers)) {
+      for (const correct of results) {
+        stats.recordTrial({ trialIndex: trialIndex++, level: Number(level), correct });
+      }
+    }
+    assert.deepEqual(stats.summary().levelAccuracy, [0.5, 0.75, 0]);
+
+    // 中間缺一關就停在缺的那一關之前（和從第 1 關開始時一樣）。
+    const gap = engine.createStats();
+    gap.recordTrial({ trialIndex: 0, level: 4, correct: true });
+    gap.recordTrial({ trialIndex: 1, level: 6, correct: true });
+    assert.deepEqual(gap.summary().levelAccuracy, [1]);
+
+    assert.deepEqual(engine.createStats().summary().levelAccuracy, []);
   });
 }

@@ -34,9 +34,11 @@ export function getExpectedDirection(question) {
   return question.direction === 'left' ? 'right' : 'left';
 }
 
+// 只玩後半（第 4～6 關）時前面的關卡是空位（複製後變成 undefined），略過不輸出。
 export function levelAccuracyText(levelAccuracies, stageCount) {
   return levelAccuracies
     .slice(0, stageCount)
+    .filter((value) => value !== undefined && value !== null)
     .map((value) => Number(value.toFixed(4)))
     .join(',');
 }

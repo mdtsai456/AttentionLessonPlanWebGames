@@ -1,8 +1,9 @@
 // js/main.js
-import { createPlayer } from './game.js?v=12';
+import { createPlayer } from './game.js?v=13';
 
 let playerPracticeFinished = [false, false];
 let currentGamePairId = "";
+let sessionStartStage = 1; // 這一局的起始關；4 表示後半那一局（兩人同一個課次都已完成前半）
 
 const midWait = [false, false];
 const midResume = [null, null];
@@ -42,7 +43,8 @@ async function exitGame(askFirst = true) {
       safeNavigateTo('../Select/index.html');
       return;
     }
-    const stage = completed >= 3 ? 3 : 0;
+    // 後半那一局沒有前三關的成績：第 4、5 關離開什麼都不送，stage 3 那列留著，下次還是從第 4 關開始
+    const stage = completed >= 3 && sessionStartStage <= 3 ? 3 : 0;
     if (playMode === 'game' && stage) {
       // 已送過第 6 關的玩家：已儲存視為完成、結果不明或失敗則不改送第 3 關（dat-save）
       const results = await Promise.all(players.map((player) => player.saveRun(stage)));
@@ -129,26 +131,33 @@ document.getElementById('checkpoint-retry-save').addEventListener('click', () =>
   players.filter((player) => player.canRetrySave()).forEach((player) => player.retrySave());
 });
 
+// 「再玩一次」是新的一局，從第 1 關開始，不再查報表。
 function restartSession() {
   if (exitPending) return;
   if (!players.every((player) => player.canRestart())) return;
   beginSession();
 }
 
-function beginSession() {
+// 正式遊戲開始前看後端這個課次的成績：兩人都只完成前半才回 4，否則回 1。
+function secondHalfStartStage() {
+  return (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1));
+}
+
+function beginSession(startStage = 1) {
   stageWait[0] = stageWait[1] = null;
   stageResume[0] = stageResume[1] = null;
   playerPracticeFinished = [false, false];
   document.getElementById('save-notice').hidden = true;
   clearMidBreak();
   currentGamePairId = window.WebGameApi.uuid();
+  sessionStartStage = startStage;
   const formalButton = document.getElementById('enter-formal-btn');
   if (playMode === 'game') {
     if (formalButton) formalButton.hidden = true;
     document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
-    players.forEach((player) => player.startGame());
+    players.forEach((player) => player.startGame(startStage));
     return;
   }
   if (formalButton) formalButton.hidden = false;
@@ -157,14 +166,16 @@ function beginSession() {
 
 const enterFormalButton = document.getElementById('enter-formal-btn');
 if (enterFormalButton) {
-  enterFormalButton.addEventListener('click', () => {
+  enterFormalButton.addEventListener('click', async () => {
     enterFormalButton.hidden = true;
     playMode = 'game';
     document.querySelectorAll('[data-ui="pause"]').forEach((button) => {
       button.hidden = true;
     });
+    const startStage = await secondHalfStartStage();
     currentGamePairId = window.WebGameApi.uuid();
-    players.forEach((player) => player.startGame());
+    sessionStartStage = startStage;
+    players.forEach((player) => player.startGame(startStage));
   });
 }
 
@@ -270,6 +281,9 @@ async function initDoubleGameWorkflow() {
   togglePlayerVisibility(p1Elem, false);
   togglePlayerVisibility(p2Elem, false);
 
+  // 正式模式看後端這個課次的成績決定起始關，和素材載入一起等；練習模式不查。
+  const startStageReady = playMode === 'game' ? secondHalfStartStage() : Promise.resolve(1);
+
   // B. 並行取得 P1 與 P2 的素材清單。
   const [p1List, p2List] = await Promise.all([
     fetchStudentAssetList(0),
@@ -293,7 +307,7 @@ async function initDoubleGameWorkflow() {
   ]);
 
   // E. 啟動遊戲場次。
-  beginSession();
+  beginSession(await startStageReady);
 
   // F. 載入完成並計算位置後，顯示兩位玩家的動物與準心。
   togglePlayerVisibility(p1Elem, true);

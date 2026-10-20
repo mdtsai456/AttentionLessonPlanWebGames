@@ -1,7 +1,7 @@
 // 動物追擊令 E2E 測試共用工具
 // 內建靜態伺服器，不需要 Python。
 // Playwright 模擬時鐘加速遊戲時間，使每題 10 秒的流程在數百毫秒內完成。
-// 攔截所有外部請求。素材 API 回傳指定清單，成績 API 僅記錄請求，並阻止字型請求。
+// 攔截所有外部請求。素材 API 回傳指定清單，成績 API 僅記錄請求，報表 API 預設沒有紀錄，並阻止字型請求。
 // 在頁面注入觀測函式，記錄回饋文字、動物圖片、data-result 與準心的瞄準狀態。
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -195,6 +195,15 @@ export async function openGame(browser, origin, { game, mode = 'game', assetFile
     }
     if (/\/api\/sessions$/.test(pathname) && req.method() === 'POST') sessionPosts.push(req.postDataJSON());
     if (routeOverride && await routeOverride({ route, request: req, url, origin, sessionPosts, placeholderPng })) return;
+    // 後端報表（決定是否從第 4 關開始）：預設沒有紀錄，照舊從第 1 關開始。要模擬這個課次已完成前半時用 routeOverride。
+    if (/\/api\/students\/[^/]+\/report$/.test(pathname)) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ records: [] }),
+      });
+    }
     if (url.startsWith(origin)) return route.continue();
     if (url.startsWith(`${ASSET_HOST}/api/students/`)) {
       return route.fulfill({

@@ -15,13 +15,14 @@ import {
   screenshotPath,
   setup,
   stat,
+  trackModuleUrl,
   unloadGuardActive,
 } from './helpers.mjs';
 // 觀察既有的 Track 實例，保留題目、計時與判定。透過鍵盤事件作答。
 async function observeTracks(page, mode) {
   // 雙人頁載入的是 DCCS_double 自己那份引擎，要改那一份的 Track 才觀察得到。
-  await page.evaluate(async (mode) => {
-    const { Track } = await import(`/DCCS_${mode}/js/game/track.js`);
+  await page.evaluate(async (url) => {
+    const { Track } = await import(url);
     const render = Track.prototype.render;
     window.testTracks = new Set();
     window.getTestTracks = () => [...window.testTracks].sort((a, b) =>
@@ -30,7 +31,7 @@ async function observeTracks(page, mode) {
       window.testTracks.add(this);
       return render.apply(this, args);
     };
-  }, mode);
+  }, trackModuleUrl(mode));
   await expect.poll(() => page.evaluate(() => window.testTracks.size))
     .toBe(mode === 'double' ? 2 : 1);
 

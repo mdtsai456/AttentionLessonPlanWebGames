@@ -249,7 +249,7 @@ function renderRecords() {
 
   recordsBody.innerHTML = rows.map((session) => {
     const stats = session.stats || {};
-    const mode = String(session.mode || "single").toLowerCase();
+    const mode = sessionMode(session);
     return `
       <tr>
         <td><strong>${gameLabel(session.gameType)}</strong></td>
@@ -257,11 +257,15 @@ function renderRecords() {
         <td><strong>${formatAccuracy(stats.accuracy)}</strong></td>
         <td>${stats.correctCount ?? "—"} / ${stats.wrongCount ?? "—"}</td>
         <td>${formatDuration(stats.duration)}</td>
-        <td>${stats.stage ?? "—"}</td>
+        <td>${isSecondHalf(session) ? "6（第 4～6 關）" : stats.stage ?? "—"}</td>
         <td>${formatUtcTimestamp(session.startTime) || "—"}</td>
       </tr>
     `;
   }).join("");
+}
+
+function sessionMode(session) {
+  return String(session.mode || "single").toLowerCase();
 }
 
 function gameLabel(gameType) {
@@ -403,37 +407,126 @@ async function fetchTeacherStudents() {
   }
 }
 
+/**
+ * 每個遊戲一張卡片。同一個課次分兩次玩完（stage 3 加只含第 4～6 關的 stage 6）時合併兩列；
+ * 否則取關卡最高的那一列。
+ */
 function detailFromSessions(sessions, day) {
-  const detail = {};
+  const rowsByGame = {};
   sessions.forEach((session) => {
     if (Number(session.currentDay) !== Number(day)) return;
     const gameId = WebGameApi.mapGameId(session.gameType);
     if (!GAMES.some((game) => game.id === gameId)) return;
-    const stage = session.stats ? Number(session.stats.stage) : NaN;
-    const accuracy = session.stats ? Number(session.stats.accuracy) : NaN;
-    const reached = levelsReached(gameId, stage);
-    const levelAccuracy = parseLevelAccuracy(session.stats);
-    const stats = session.stats || {};
-    const next = {
-      reached,
-      accuracy: Number.isFinite(accuracy) ? accuracy : null,
-      levelAccuracy,
-      duration: finiteOrNull(stats.duration),
-      avgReactionMs: finiteOrNull(stats.avgReactionMs),
-      questionCount: finiteOrNull(stats.questionCount),
-      aimRatio: finiteOrNull(stats.aimRatio),
-      focusMs: finiteOrNull(stats.focusMs),
-      correctCount: finiteOrNull(stats.correctCount),
-      wrongCount: finiteOrNull(stats.wrongCount),
-    };
-    const current = detail[gameId];
-    const further = !current || (reached || 0) > (current.reached || 0);
-    const sameReach = current && (reached || 0) === (current.reached || 0);
-    if (further || (sameReach && levelAccuracy && !current.levelAccuracy)) {
-      detail[gameId] = next;
-    }
+    (rowsByGame[gameId] = rowsByGame[gameId] || []).push(session);
+  });
+  const detail = {};
+  Object.entries(rowsByGame).forEach(([gameId, rows]) => {
+    const pair = halvesPair(gameId, rows);
+    detail[gameId] = pair ? mergeHalves(gameId, pair.first, pair.second) : furthestRow(gameId, rows);
   });
   return detail;
+}
+
+/** 取關卡最高的那一列；同關卡時，完整的一列優先於後半，有各關正確率的優先於沒有的。 */
+function furthestRow(gameId, rows) {
+  let best = null;
+  let bestIsHalf = false;
+  rows.forEach((session) => {
+    const next = rowDetail(gameId, session);
+    const nextIsHalf = isSecondHalf(session);
+    const further = !best || (next.reached || 0) > (best.reached || 0);
+    const sameReach = best && (next.reached || 0) === (best.reached || 0);
+    const fuller = sameReach && bestIsHalf && !nextIsHalf;
+    const withLevels = sameReach && bestIsHalf === nextIsHalf && next.levelAccuracy && !best.levelAccuracy;
+    if (further || fuller || withLevels) {
+      best = next;
+      bestIsHalf = nextIsHalf;
+    }
+  });
+  // 配不到前半的後半列只有第 4～6 關的值：前面補 3 個 undefined 讓它對到第 4～6 關（不能用 null，Number(null) 是 0%）。
+  if (best && bestIsHalf && Array.isArray(best.levelAccuracy)) {
+    best.levelAccuracy = [undefined, undefined, undefined, ...best.levelAccuracy];
+  }
+  return best;
+}
+
+function rowDetail(gameId, session) {
+  const stats = session.stats || {};
+  const accuracy = Number(stats.accuracy);
+  return {
+    reached: levelsReached(gameId, Number(stats.stage)),
+    accuracy: Number.isFinite(accuracy) ? accuracy : null,
+    levelAccuracy: parseLevelAccuracy(stats),
+    duration: finiteOrNull(stats.duration),
+    avgReactionMs: finiteOrNull(stats.avgReactionMs),
+    questionCount: finiteOrNull(stats.questionCount),
+    aimRatio: finiteOrNull(stats.aimRatio),
+    focusMs: finiteOrNull(stats.focusMs),
+    correctCount: finiteOrNull(stats.correctCount),
+    wrongCount: finiteOrNull(stats.wrongCount),
+  };
+}
+
+/**
+ * 後半那一列：從第 4 關開始的一局，打完送 stage 6，各關正確率只有第 4～6 關這 3 個值。
+ * 打完整局的 stage 6 一定有 6 個值，不會認錯。
+ */
+function isSecondHalf(session) {
+  const stats = session.stats || {};
+  const levels = parseLevelAccuracy(stats);
+  return Number(stats.stage) === 6 && Boolean(levels) && levels.length === 3;
+}
+
+/**
+ * 找同一個課次要合併的前後半。後半配同模式、開始時間比它早的最後一筆 stage 3；
+ * 有多組時取後半較晚的那組。同一個課次有完整 6 關的一列時不合併，回 null。
+ */
+function halvesPair(gameId, rows) {
+  if (rows.some((row) => levelsReached(gameId, Number(row.stats && row.stats.stage)) === 6 && !isSecondHalf(row))) {
+    return null;
+  }
+  // 後端時間是固定寬度的 UTC 字串，直接比字串就是先後。
+  const byTime = rows.slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+  let pair = null;
+  byTime.forEach((second) => {
+    if (!isSecondHalf(second)) return;
+    const firsts = byTime.filter((row) =>
+      sessionMode(row) === sessionMode(second)
+      && Number(row.stats && row.stats.stage) === 3
+      && String(row.startTime) < String(second.startTime));
+    if (firsts.length) pair = { first: firsts[firsts.length - 1], second };
+  });
+  return pair;
+}
+
+/** 合併前後半兩列：次數、時長相加，正確率與平均值按題數或時長重算，各關正確率前 3 接後 3。 */
+function mergeHalves(gameId, firstRow, secondRow) {
+  const first = rowDetail(gameId, firstRow);
+  const second = rowDetail(gameId, secondRow);
+  const sum = (key) => (first[key] == null && second[key] == null ? null : (first[key] || 0) + (second[key] || 0));
+  // 指令出擊沒有 questionCount，題數改用答對加答錯。
+  const questions = (part) => (part.questionCount != null ? part.questionCount : (part.correctCount || 0) + (part.wrongCount || 0));
+  const weighted = (key, weight) => {
+    const parts = [first, second].filter((part) => part[key] != null && weight(part) > 0);
+    const total = parts.reduce((acc, part) => acc + weight(part), 0);
+    return total > 0 ? parts.reduce((acc, part) => acc + part[key] * weight(part), 0) / total : null;
+  };
+  const totalQuestions = questions(first) + questions(second);
+  const correct = sum("correctCount");
+  // 前半沒有各關正確率時留 undefined（顯示「尚無各關紀錄」）；null 會被 Number() 當成 0%。
+  const firstLevels = Array.from({ length: 3 }, (_, index) => (first.levelAccuracy || [])[index]);
+  return {
+    reached: 6,
+    accuracy: totalQuestions > 0 && correct != null ? correct / totalQuestions : null,
+    levelAccuracy: firstLevels.concat(second.levelAccuracy),
+    duration: sum("duration"),
+    avgReactionMs: weighted("avgReactionMs", questions),
+    questionCount: sum("questionCount"),
+    aimRatio: weighted("aimRatio", (part) => part.duration || 0),
+    focusMs: sum("focusMs"),
+    correctCount: correct,
+    wrongCount: sum("wrongCount"),
+  };
 }
 
 function parseLevelAccuracy(stats) {

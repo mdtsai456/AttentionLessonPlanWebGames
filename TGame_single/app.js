@@ -97,6 +97,8 @@ let customThemes = null; // 自動載入 CSV。失敗時維持 null，並使用�
 
 const state = {
   level: 1,
+  // 這一局的起始關：1，或同一個課次已完成前半時的 4（後半那一局）
+  firstLevel: 1,
   roundToken: 0,
   levelDeadline: 0,
   questionSeq: 0,
@@ -161,19 +163,22 @@ document.addEventListener("keydown", (event) => {
 async function init() {
   promptEl.textContent = "圖片載入中…";
   const scenesReady = preloadSceneImages();
+  // 同一個課次已完成前半就從第 4 關開始；查詢最多等 5 秒，與載入圖片同時進行。
+  const startStagePromise = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("TGame", { mode: "single", slots: [1] }) : Promise.resolve(1));
   const ok = await loadCsvFromUrl(CSV_URL);
   if (!ok) showToast("讀取不到 主題資料.csv，改用預設題目", true);
-  // 先安排六關，再等待場景、角色與第 1 關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
+  // 先安排六關，再等待場景、角色與起始關物品圖片解碼完成。最多等待 8 秒後開始遊戲。
   const rules = buildStageRules();
   stageRules = rules;
+  const firstLevel = await startStagePromise;
   await Promise.race([
-    Promise.all([scenesReady, preloadLevelItems(1)]),
+    Promise.all([scenesReady, preloadLevelItems(firstLevel)]),
     wait(PRELOAD_TIMEOUT_MS),
   ]);
-  startGame(rules);
+  startGame(rules, firstLevel);
 }
 
-function startGame(rules = buildStageRules()) {
+function startGame(rules = buildStageRules(), firstLevel = 1) {
   clearInterval(state.timerId);
   state.score = 0;
   state.wrong = 0;
@@ -185,9 +190,10 @@ function startGame(rules = buildStageRules()) {
   savePromise = Promise.resolve();
   playId = window.WebGameApi.uuid();
   stageRules = rules;
+  state.firstLevel = firstLevel;
   nextStageBtn.disabled = false;
   lobbyBtn.disabled = false;
-  startLevel(1);
+  startLevel(firstLevel);
 }
 
 function startLevel(level) {
@@ -453,7 +459,8 @@ async function leaveGame() {
     if (!(await window.confirmLeave())) return;
     try {
       const completed = completedStage();
-      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+      // 後半那一局沒有前三關的成績，中途離開什麼都不送，下次進來仍從第 4 關開始
+      const stage = completed >= STAGE_COUNT ? STAGE_COUNT : state.firstLevel === 1 && completed >= MID_STAGE ? MID_STAGE : 0;
       if (stage) await saveCurrentRun(stage);
       window.leaveTo('../Select/index.html');
     } catch (err) {
@@ -497,7 +504,7 @@ function average(values) {
 
 function levelAccuracyText(stageCount) {
   const values = [];
-  for (let level = 1; level <= stageCount; level += 1) {
+  for (let level = state.firstLevel; level <= stageCount; level += 1) {
     const mine = state.answers.filter((answer) => answer.level === level);
     const ratio = mine.length
       ? mine.filter((answer) => answer.correct).length / mine.length
