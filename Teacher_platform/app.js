@@ -443,6 +443,10 @@ function furthestRow(gameId, rows) {
       bestIsHalf = nextIsHalf;
     }
   });
+  // 配不到前半的後半列只有第 4～6 關的值：前面補 3 個 undefined 讓它對到第 4～6 關（不能用 null，Number(null) 是 0%）。
+  if (best && bestIsHalf && Array.isArray(best.levelAccuracy)) {
+    best.levelAccuracy = [undefined, undefined, undefined, ...best.levelAccuracy];
+  }
   return best;
 }
 

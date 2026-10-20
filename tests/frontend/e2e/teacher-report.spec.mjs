@@ -295,7 +295,7 @@ test("當天有完整 6 關的一列時，卡片顯示完整那一列，不合�
   await expect(metric(page, "漂浮泡泡", "遊玩時間")).toHaveText("360.0 秒");
 });
 
-test("後半配不到前半（前半在後、或是別的模式）：後半那一列照舊當一般候選", async ({ page }) => {
+test("後半配不到前半（前半在後、或是別的模式）：後半那一列照舊當一般候選，各關正確率顯示在第 4～6 關", async ({ page }) => {
   await openDay(page, [
     play("EFT", "2026-07-01 03:00:00", {
       stage: 3, levelAccuracy: [0.1, 0.1, 0.1], correctCount: 1, wrongCount: 9, questionCount: 10, accuracy: 0.1, duration: 1000,
@@ -307,7 +307,7 @@ test("後半配不到前半（前半在後、或是別的模式）：後半那�
       stage: 3, levelAccuracy: [0.2, 0.2, 0.2], correctCount: 2, wrongCount: 8, questionCount: 10, accuracy: 0.2, duration: 2000,
     }),
   ]);
-  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["60%", "50%", "40%", "尚無各關紀錄", "尚無各關紀錄", "尚無各關紀錄"]);
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["尚無各關紀錄", "尚無各關紀錄", "尚無各關紀錄", "60%", "50%", "40%"]);
   await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("50%");
   await expect(metric(page, "漂浮泡泡", "總題數")).toHaveText("30");
   await expect(page.locator("#records-tbody tr").nth(1).locator("td").nth(5)).toHaveText("6（第 4～6 關）");
