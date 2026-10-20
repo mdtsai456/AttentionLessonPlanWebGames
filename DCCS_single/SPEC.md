@@ -514,7 +514,7 @@ export function hasReachedZ(target, z) -> boolean
 - `hasReachedZ` 用 `target.z <= z`（由遠而近，`z` 遞減）。
 - `ageMs` 是 `settleMs` / `firstInputMs` 的共同時間基準（見 4.11）：
   `valve.noteInput()` 記下的時間戳與 `_judge()` 讀到的時間戳都取自它，
-  兩者才能直接相減。**不要改用牆上時鐘**，理由同 4.11 的 `duration`。
+  兩者才能直接相減。**不要改用牆上時鐘**：分頁切到背景或遊戲暫停的時間不能算進反應時間。
 - 純資料 + 純函式，不吃任何全域狀態，可在 Node 中單獨測試。
 
 ### 4.9 `js/game/rules.js`
@@ -624,9 +624,9 @@ export function createStats() -> {
 }
 ```
 
-`setDuration(ms)` 由呼叫端（`dccs.js`）在場次結束或 `destroy()` 時傳入
-**模擬遊玩時間**，即 `summary().duration` 的來源。`stats.js` 內部**不得**
-自行用牆上時鐘算 duration，連保底值也不行；沒設定過就回 `0`。
+`setDuration(ms)` 由呼叫端（`dccs.js`）在送出檢查點、場次結束或 `destroy()` 時傳入
+**遊玩時間**（算法見下面的 `duration`），即 `summary().duration` 的來源。
+`stats.js` 內部**不得**自行讀任何時鐘算 duration，連保底值也不行；沒設定過就回 `0`。
 
 `record()` 的參數形成內部逐題紀錄：`level` 是**關卡序號**，
 `optionCount` 是**該列這道閥的選項數**——`valveKind === 'shape'` 時填
@@ -653,12 +653,28 @@ export function createStats() -> {
 - `accuracy = correct_count / (correct_count + wrong_count)`，分母為 0 時給 `0`
 - `levelAccuracy`、`questionCount` 同樣以**題**為單位；場次結束時只通過形狀閥、
   還沒通過物件閥的題目不算入題數（它的形狀閥那一列照樣保留在 `rows()`）
-- `duration` 毫秒（整數）。**本場的模擬遊玩時間**，算式必須是
-  `Math.round(Math.min(track.elapsed, sessionSeconds) * 1000)` —— 兩個部分都
-  是必要的：**(a) 不可用牆上時鐘**（分頁切到背景的時間會被算進這個理應為常數
-  的欄位）；**(b) 不可直接用 `track.elapsed * 1000`**，要夾上限（固定步長使
-  最後一幀必定越過門檻，實測會得到 `600017` 而不是 `600000`）。
-  `startTime` / `endTime` 則仍用牆上時鐘記錄真實時間戳。
+- `levelAccuracy` 從**第一個有玩的關卡**開始，依關卡序號連續取到最後一關，碰到沒有題目的
+  關卡就停。一般一局從第 1 關開始；只玩後半（從第 4 關開始，見 README「當天已完成前半」）
+  時是第 4、5、6 關的 3 個值
+- `duration` 毫秒（整數）。**本場的實際遊玩時間**（2026-10-20 起），和其他四個遊戲
+  的定義一致：用 `WebGameRuntime` 的遊戲時鐘（`WebGameRuntime.now()`）計算，扣掉暫停
+  （離開確認框、從上一頁返回），**包含**關卡提示、過關畫面與中場休息的時間。
+  - `dccs.js` 在第一個關卡提示（一般是第 1 關，後半那一局是第 4 關）按下繼續時記下
+    遊戲時鐘作為起點；`startTime` 用 `WebGameRuntime.toWallTime(起點)` 換回真實時間。
+    所以後半那一局的 `duration` 只算第 4～6 關。
+  - 每關結束當下記下遊戲時鐘。`duration` =「最後完成那一關結束時的遊戲時鐘 − 起點」，
+    `endTime` = 同一個時鐘換回的真實時間。場次結束就是最後一關結束。
+  - 檢查點（中場先送的第 3 關、離開時送的第 3 關）的 `endTime`／`duration` 算到
+    **第 3 關結束當下**，不算之後的中場休息或第 4、5 關。
+  - 所以**沒中斷的一局 `endTime − startTime ≈ duration`**，差距只有暫停的時間。
+  - 場次何時結束仍照賽道的模擬時間 `track.elapsed >= sessionSeconds` 判斷，
+    關卡步調與玩法不變，只改回報的時長。
+
+  > **定義變更（2026-10-20）**：在這之前的 `DCCS_duration` 是賽道的模擬時間
+  > `Math.round(Math.min(track.elapsed, sessionSeconds) * 1000)`，不含關卡提示與中場
+  > 休息，完整一場固定是 `360000`。之後是上面的實際遊玩時間，完整一場會大於
+  > `360000`（多出提示與休息的時間）。**改版前後的 `duration` 不能直接比較**，
+  > 以 `start_time` 是否在 2026-10-20 之後分界；部署初期瀏覽器可能仍快取舊版程式。
 - `stage` 為本場到達的**最高關卡序號**（1–6）；玩到第六關即為 `6`
 - `levelsPlayed` 為走過的**關卡序號**由小到大排序、去重、逗號連接，
   例如 `"1,2,3,4,5,6"`
@@ -708,7 +724,9 @@ export function createStats() -> {
 export class Track {
   constructor({ manifest, images, input, viewport, rng, stats,
                 backgroundKey = 'single',
-                sessionSeconds = CONFIG.SESSION_SECONDS })
+                sessionSeconds = CONFIG.SESSION_SECONDS,
+                progressSide = 'left',
+                startLevelIdx = 0 })
   update(dt): void
   render(ctx, alpha): void
   setViewport(viewport): void
@@ -725,6 +743,11 @@ Track 負責：關卡推進（每 `sessionSeconds / manifest.levels.length` 秒�
 後停在最後一關）、出題、目標移動、兩道閥的旋轉與判定、✓ 回饋計時、把每次
 判定交給 `stats.record()`、每題兩道閥都判定完後呼叫 `stats.recordTrial()`，
 並據此給分與 ✓。
+
+`startLevelIdx` 給當天已完成前半的那一局用：從第 `startLevelIdx + 1` 關開始
+（後半是 `3`，即第 4 關），`elapsed` 從 `startLevelIdx × 每關秒數` 接著算，所以 HUD
+進度條從一半開始、場次結束條件不變；超出範圍時夾到第 1 關與最後一關之間。分數與題號
+照常從 0 開始。預設照舊從第 1 關、0 秒開始。
 
 `backgroundKey` 是要從 `images` 取哪一張背景（對應 `manifest.backgrounds` 的
 key）。單人模式一律 `'single'`；留這個參數是為了雙人版能改用 `'double'`，
@@ -886,6 +909,7 @@ export function mountDCCS(options) -> DCCSHandle
 | `autoStart` | `false` | `true` 則不顯示標題畫面；每關開始提示仍會顯示 |
 | `showResultScreen` | `true` | `false` 則結束後不顯示結算畫面（由 main 自己畫） |
 | `submit` | `true` | 是否自己送出成績（**預設照舊自己送**） |
+| `startLevel` | `1` | 起始關。傳 `4`（`WebGameSecondHalf.startStage` 的結果）時只玩第 4～6 關：第一個關卡提示顯示第 4 關、統計與 `duration` 只算後半、沒有中場；第 4、5 關離開不送，打完第 6 關照常送 stage 6 |
 | `submitUrl` | `resolveSubmitUrl()` | 傳給 `submitResult`，見 4.13b |
 | `showTutorial` | `true` | 開始前顯示單頁操作說明（見 4.16b）；`autoStart` 時一律不顯示 |
 | `onPhase` | `null` | `(phase) => void`，phase 為 `'loading' \| 'tutorial' \| 'title' \| 'level-prompt' \| 'playing' \| 'submitting' \| 'done' \| 'error'` |
@@ -926,8 +950,8 @@ DCCSResult = {
   等空白鍵的 `keydown` listener、清空 `container`。
   `destroy()` 若在結束前呼叫，`done` resolve 成 `aborted: true` 的結果
   （成績照樣算出來，但 `submitted` 為 `null`，**不送出**）。
-- `duration` 的夾制：`Math.round(Math.min(track.elapsed, sessionSeconds) * 1000)`
-  —— 上限用**這一場的** `sessionSeconds`，不是 `CONFIG.SESSION_SECONDS`（見 4.11）。
+- `duration` 用遊戲時鐘算到最後完成那一關結束（見 4.11）；場次何時結束看**這一場的**
+  `sessionSeconds`，不是 `CONFIG.SESSION_SECONDS`。
 - 例外一律讓 `done` reject 之外**同時**顯示錯誤畫面；main 兩種方式都接得到。
 
 main 端的實際用法範例見 `README.md` 第 3 節。
@@ -948,7 +972,8 @@ export function createOverlays(container) -> {
   卡片、上方藍色「第 N 關」標籤、中央「準備開始第 N 關！」文字，以及下方
   綠色「繼續」按鈕。`showLevelPrompt()` 在按鈕按下前不得 resolve。
 - 關卡提示顯示期間，loop 可以繼續 render，但不得推進 `Track.update()`；因此
-  `elapsed`、HUD 進度、目標位置與 `duration` 都不包含等待提示的時間。提示期間
+  `elapsed`、HUD 進度與目標位置都不包含等待提示的時間（`duration` 是遊戲時鐘，
+  包含提示時間，見 4.11）。提示期間
   誤觸的形狀／物件操作鍵必須清掉，不可在按下繼續後補轉。
 - 樣式由本模組注入一個 `<style>`（以 `data-dccs-style` 屬性做只注入一次的
   防護），class 一律 `dccs-` 前綴，**不得使用 id 選擇器**，
@@ -1136,7 +1161,8 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
   **六關全部 playable**、`warnings` 為空。
 - `manifest.levels` 的六項依序是（`levelNo`, `shapeCount`, `objectCount`, 規則, 素材）：
   `(1,5,2,model,"2") (2,5,3,model,"3") (3,2,4,category,[2,3,4,5]) (4,2,4,model,"4") (5,2,5,model,"5") (6,2,4,category,[2,3,4,5])`
-- 一場結束後 `duration` 為 `360000`、`stage` 為 `6`、`levelsPlayed` 為 `1,2,3,4,5,6`。
+- 一場結束後 `stage` 為 `6`、`levelsPlayed` 為 `1,2,3,4,5,6`；`duration` 大於 `360000`
+  （含關卡提示與中場休息），且沒暫停時和 `endTime − startTime` 相差不到 1 秒。
 
 ### 素材不足時要能優雅降級（不改 `assets/`，用複本驗）
 
@@ -1162,7 +1188,7 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - 切關提示出現前，上一關最後一題必須已通過兩道閥並離場；按「繼續」後畫面
   上的目標必須是新關卡第一題，且仍停在 `Z_SPAWN`、尚未被提示期間推進。
 - 提示停留時 `handle.elapsed` 不得增加，目標與閥門不得移動。
-- 提示停留多久都不得改變最終 `duration = 360000` 或各關實際遊玩秒數。
+- 提示停留多久都不得改變各關實際遊玩秒數（`track.elapsed`）；`duration` 會照實包含提示時間。
 - `autoStart: true` 只略過總標題畫面，不得略過關卡提示。
 
 ### 每一關的素材必須固定（1.7 的核心）
@@ -1226,9 +1252,9 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 5001
 - 把 `DCCS_single/` 整包放到伺服器的子路徑下（例如 `/sub/DCCS_single/index.html`）仍然
   載得到 manifest 與素材（相對路徑，見 4.4 / 第 5 節）。
   驗證用複製的方式做，**不得移動或改動 `assets/`**（第 0 節）。
-- `sessionSeconds: 60` 跑完一場，`duration` 精確為 `60000`，
+- `sessionSeconds: 60` 跑完一場，`handle.elapsed` 到 60 秒就結束，
   **且 `levelsPlayed` 為 `1,2,3,4,5`**（每關 12 秒）。
-  只驗 `duration` 是不夠的 —— 關卡步調沒跟著縮短時 `duration` 照樣正確，
+  只驗場次長度是不夠的 —— 關卡步調沒跟著縮短時場次照樣 60 秒結束，
   但 `levelsPlayed` 只有 `1`。
 
   > **不要把這一條改成 `sessionSeconds: 30`**：一題固定要 `38 / 7 ≈ 5.43` 秒，

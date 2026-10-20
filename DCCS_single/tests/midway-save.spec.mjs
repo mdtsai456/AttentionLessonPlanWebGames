@@ -5,8 +5,11 @@
 
 import { test, expect } from '@playwright/test';
 import {
+  LEVEL_SECONDS,
+  LEVEL_TIMEOUT,
   SUBMIT_PATH,
   answerLeave,
+  drive,
   pendingResults,
   reachBreak,
   setup,
@@ -42,6 +45,31 @@ test.describe('單人版 中場先送第 3 關', () => {
     await answerLeave(page, 'leave');
     await expect(page).toHaveURL(/\/Select\/index\.html/, { timeout: 15_000 });
     expect(posts).toHaveLength(1);
+    expect(pageErrors).toEqual([]);
+  });
+
+  // DCCS_duration 是遊戲時鐘算的遊玩時間（2026-10-20 起）：含關卡提示與中場休息，只扣暫停。
+  test('沒中斷的一局：endTime − startTime 和 DCCS_duration 相差 1 秒內，中場檢查點算到第 3 關結束', async ({ page }) => {
+    const { posts, pageErrors } = await setup(page, 'single');
+    await reachBreak(page, 'single');
+    const breakSeenAt = Date.now();
+    await expect.poll(() => posts.length).toBe(1);
+    const midway = posts[0];
+    expect(Math.abs(midway.data.endTime - breakSeenAt)).toBeLessThan(1000);
+    expect(Math.abs(midway.data.endTime - midway.data.startTime - stat(midway, 'duration'))).toBeLessThan(1000);
+
+    // 中場休息停留的時間也算遊玩時間。
+    await page.waitForTimeout(3000);
+    await page.locator('[data-break="continue"]').click();
+    await drive(page, 'single', 'session-end', 3 * LEVEL_TIMEOUT + 15_000);
+    await page.waitForURL(/\/Select\/index\.html/);
+
+    expect(posts).toHaveLength(2);
+    const final = posts[1];
+    expect(stat(final, 'stage')).toBe(6);
+    expect(Math.abs(final.data.endTime - final.data.startTime - stat(final, 'duration'))).toBeLessThan(1000);
+    // 賽道整場固定 6 關的時間；多出來的是關卡提示、過關畫面與中場休息。
+    expect(stat(final, 'duration')).toBeGreaterThan(6 * LEVEL_SECONDS * 1000 + 3000);
     expect(pageErrors).toEqual([]);
   });
 

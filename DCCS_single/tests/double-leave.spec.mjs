@@ -4,6 +4,7 @@
 import { test, expect } from '@playwright/test';
 import {
   FULL_SESSION_STAGE,
+  LEVEL_SECONDS,
   LEVEL_TIMEOUT,
   QUERY,
   answerLeave,
@@ -127,6 +128,20 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
     const { posts, pageErrors } = await setup(page, 'double', { delayMs: 3000 });
     const dialogs = recordNativeDialogs(page);
     await reachBreak(page, 'double');
+    const breakSeenAt = Date.now();
+
+    // DCCS_duration 是遊戲時鐘算的遊玩時間（2026-10-20 起）：沒中斷時和 endTime − startTime
+    // 相差在 1 秒內；中場檢查點算到第 3 關結束當下。
+    await expect.poll(() => posts.length).toBe(2);
+    const midway = posts.slice(0, 2);
+    for (const payload of midway) {
+      expect(stat(payload, 'stage')).toBe(3);
+      expect(Math.abs(payload.data.endTime - breakSeenAt)).toBeLessThan(1000);
+      expect(Math.abs(payload.data.endTime - payload.data.startTime - stat(payload, 'duration')))
+        .toBeLessThan(1000);
+    }
+    // 中場休息停留的時間也算遊玩時間。
+    await page.waitForTimeout(2000);
     await continueAfterBreak(page);
 
     // 最終成績一開始送就按離開（按鈕已停用，點擊不會有作用，也不會問要不要離開）。
@@ -148,6 +163,12 @@ test.describe('雙人版 離開：先確認，確定後才存檔', () => {
       T01: [3, FULL_SESSION_STAGE],
       T02: [3, FULL_SESSION_STAGE],
     });
+    for (const payload of posts.slice(2)) {
+      expect(Math.abs(payload.data.endTime - payload.data.startTime - stat(payload, 'duration')))
+        .toBeLessThan(1000);
+      // 賽道整場固定 6 關的時間；多出來的是關卡提示與中場休息。
+      expect(stat(payload, 'duration')).toBeGreaterThan(6 * LEVEL_SECONDS * 1000 + 2000);
+    }
     expect(dialogs).toEqual([]);
     expect(pageErrors).toEqual([]);
   });

@@ -16,7 +16,9 @@ export class Track {
    * @param {{manifest: object, images: Map<string, HTMLImageElement>, input: object,
    *          viewport: {x:number,y:number,w:number,h:number}, rng: () => number, stats: object,
    *          backgroundKey?: string, sessionSeconds?: number,
-   *          progressSide?: 'left'|'right'}} opts
+   *          progressSide?: 'left'|'right', startLevelIdx?: number}} opts
+   *   startLevelIdx：當天已完成前半時從第 4 關（startLevelIdx = 3）開始，
+   *   場次時間從第 3 關結束接著算；分數與題號照常從 0 開始。
    */
   constructor({
     manifest,
@@ -28,6 +30,7 @@ export class Track {
     backgroundKey = 'single',
     sessionSeconds = CONFIG.SESSION_SECONDS,
     progressSide = 'left',
+    startLevelIdx = 0,
   }) {
     this.manifest = manifest;
     this.images = images;
@@ -46,9 +49,13 @@ export class Track {
     this._levelSeconds =
       this.levels.length > 0 ? this.sessionSeconds / this.levels.length : this.sessionSeconds;
 
+    // 前面幾關視為已經玩完，場次時間從那幾關結束接著算。
+    const firstLevelIdx =
+      this.levels.length > 0 ? Math.min(Math.max(0, startLevelIdx), this.levels.length - 1) : 0;
+
     this._score = 0;
-    this._elapsed = 0;
-    this._levelIdx = 0;
+    this._elapsed = firstLevelIdx * this._levelSeconds;
+    this._levelIdx = firstLevelIdx;
     this._levelElapsed = 0;
     this._levelAdvancePending = false;
 

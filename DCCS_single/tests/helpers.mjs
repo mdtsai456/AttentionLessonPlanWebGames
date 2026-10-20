@@ -208,21 +208,30 @@ export function unloadGuardActive(page) {
 }
 
 /**
+ * 頁面上 dccs.js 載入的 track.js 網址。版號要和 dccs.js 的 import 一致，
+ * 不然瀏覽器會載入另一份模組，改它的 prototype 觀察不到遊戲裡的 Track。
+ * @param {'single' | 'double'} mode
+ */
+export function trackModuleUrl(mode) {
+  return `/DCCS_${mode}/js/game/track.js?v=2`;
+}
+
+/**
  * 開始收集頁面上的 Track 實例（雙人頁要用 DCCS_double 那份引擎），之後用 trackStates 讀進度。
  * 只包一層 render 記下實例，不改題目、計時或判定。
  * @param {import('@playwright/test').Page} page
  * @param {'single' | 'double'} mode
  */
 export async function watchTracks(page, mode) {
-  await page.evaluate(async (mode) => {
-    const { Track } = await import(`/DCCS_${mode}/js/game/track.js`);
+  await page.evaluate(async (url) => {
+    const { Track } = await import(url);
     const render = Track.prototype.render;
     window.watchedTracks = new Set();
     Track.prototype.render = function (...args) {
       window.watchedTracks.add(this);
       return render.apply(this, args);
     };
-  }, mode);
+  }, trackModuleUrl(mode));
   await expect.poll(() => page.evaluate(() => window.watchedTracks.size))
     .toBe(mode === 'double' ? 2 : 1);
 }

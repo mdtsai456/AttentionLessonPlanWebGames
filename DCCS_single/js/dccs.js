@@ -4,8 +4,8 @@ import { CONFIG } from './config.js';
 import { createLoop } from './core/loop.js';
 import { createInput } from './core/input.js?v=2';
 import { loadManifest, preloadImages } from './core/assets.js';
-import { Track } from './game/track.js';
-import { createStats } from './game/stats.js';
+import { Track } from './game/track.js?v=2';
+import { createStats } from './game/stats.js?v=2';
 import { buildPayload, submitResult, flushPendingResults } from './net/client.js?v=4';
 import { resolveSubmitUrl } from './net/apiBase.js';
 import { createOverlays } from './ui/overlays.js?v=3';
@@ -174,6 +174,13 @@ export function mountDCCS(options) {
   // 直立進度條放哪一側；雙人模式的玩家 2 傳 'right'。
   const progressSide =
     opts.progressSide === 'right' ? 'right' : 'left';
+
+  // 起始關。當天已完成前半時傳 4：只玩第 4～6 關，統計與 duration 只算後半，
+  // 不出現中場，第 4、5 關離開不送（stage 3 那一列已經在後端）。
+  const startLevel =
+    Number.isInteger(opts.startLevel) && opts.startLevel > 1
+      ? opts.startLevel
+      : 1;
 
   const autoStart = !!opts.autoStart;
 
@@ -385,6 +392,7 @@ export function mountDCCS(options) {
   const progressApi = { completedLevel: 0 };
   let manifestRef = null;
   let sessionId = '';
+  // 送出的 startTime（真實時間）。
   let startedAtMs = null;
   let destroyed = false;
   let unloadHandler = null;
@@ -459,16 +467,59 @@ export function mountDCCS(options) {
     return payload;
   }
 
-  // 第 stage 關為止的檢查點成績（中場先送、雙人版離開時用）。
+  // 遊戲時鐘（shared/game-runtime.js 的 WebGameRuntime.now()）：暫停時（離開確認框、
+  // 從上一頁返回）停住。duration 用它計算，startTime／endTime 再用 toWallTime 換回真實時間。
+  // 沒有載入 game-runtime.js 時退回 Date.now()。
+  function clockNow() {
+    const runtime = window.WebGameRuntime;
+    return runtime ? runtime.now() : Date.now();
+  }
+
+  function wallTimeOf(clock) {
+    const runtime = window.WebGameRuntime;
+    return Math.round(runtime ? runtime.toWallTime(clock) : clock);
+  }
+
+  // 第 1 關提示按下繼續、開始計時當下的遊戲時鐘。
+  let startedAtClock = null;
+  // 每關結束當下的遊戲時鐘（關卡序號 → 時鐘）。
+  const levelEndClocks = new Map();
+
+  /**
+   * 算到第 stage 關結束為止的 duration 與 endTime。duration 是遊戲時鐘的差：
+   * 包含關卡提示、過關畫面與中場休息，只扣暫停（SPEC 4.11）。
+   * 還沒有那一關的結束時間（例如場次中止）就算到現在。
+   */
+  function timingAt(stage) {
+    const endClock =
+      levelEndClocks.has(stage)
+        ? levelEndClocks.get(stage)
+        : clockNow();
+
+    return {
+      durationMs:
+        startedAtClock === null
+          ? 0
+          : Math.max(0, Math.round(endClock - startedAtClock)),
+      endedAtMs: wallTimeOf(endClock),
+    };
+  }
+
+  /** 最後完成那一關的序號；一關都還沒完成時為 0。 */
+  function lastCompletedLevel() {
+    return levelEndClocks.size > 0
+      ? Math.max(...levelEndClocks.keys())
+      : 0;
+  }
+
+  // 第 stage 關為止的檢查點成績（中場先送、雙人版離開時用）。endTime／duration 算到該關結束當下。
   function buildCheckpointPayload(stage) {
     if (!statsInstance) return null;
-    const elapsedSeconds = track ? track.elapsed : 0;
-    statsInstance.setDuration(
-      Math.round(Math.min(elapsedSeconds, sessionSeconds) * 1000)
-    );
+    const { durationMs, endedAtMs } = timingAt(stage);
+    statsInstance.setDuration(durationMs);
     const summary = statsInstance.summary();
     summary.stage = stage;
-    return buildResultPayload(summary, Date.now());
+    return buildResultPayload(summary, endedAtMs);
   }
 
   function destroy() {
@@ -480,17 +531,12 @@ export function mountDCCS(options) {
 
     cleanupRuntime();
 
-    const elapsedSeconds =
-      track ? track.elapsed : 0;
+    const timing =
+      timingAt(lastCompletedLevel());
 
     if (statsInstance) {
       statsInstance.setDuration(
-        Math.round(
-          Math.min(
-            elapsedSeconds,
-            sessionSeconds
-          ) * 1000
-        )
+        timing.durationMs
       );
     }
 
@@ -522,7 +568,7 @@ export function mountDCCS(options) {
       payload =
         buildResultPayload(
           summary,
-          Date.now()
+          timing.endedAtMs
         );
     } catch (_error) {
       // 中止時如果資料不完整，就不建立 payload。
@@ -628,7 +674,8 @@ export function mountDCCS(options) {
           return;
         }
 
-        const stage = completedLevel >= 6 ? 6 : completedLevel >= 3 ? 3 : 0;
+        // 從第 4 關開始的一局沒有自己的 stage 3，只有打完第 6 關才有檢查點。
+        const stage = completedLevel >= 6 ? 6 : completedLevel >= 3 && startLevel <= 3 ? 3 : 0;
         if (destroyed || !stage || ended) {
           // 場次已結束、成績還在送：等送完再導頁。導頁會中斷請求，失敗也來不及存到本機，
           // 成績就不見了。送出有自己的 15 秒逾時（不受遊戲暫停影響），不會一直等。
@@ -705,15 +752,20 @@ export function mountDCCS(options) {
         return true;
       }
 
+      const startLevelIdx =
+        Array.isArray(manifest.levels)
+          ? Math.min(startLevel - 1, manifest.levels.length - 1)
+          : 0;
+
       const firstLevel =
         Array.isArray(manifest.levels)
-          ? manifest.levels[0]
+          ? manifest.levels[startLevelIdx]
           : null;
 
       if (firstLevel) {
         const continued =
           await waitForLevelPrompt(
-            firstLevel.levelNo || 1
+            firstLevel.levelNo || startLevelIdx + 1
           );
 
         if (!continued) {
@@ -741,9 +793,11 @@ export function mountDCCS(options) {
         backgroundKey,
         sessionSeconds,
         progressSide,
+        startLevelIdx,
       });
 
-      startedAtMs = Date.now();
+      startedAtClock = clockNow();
+      startedAtMs = wallTimeOf(startedAtClock);
 
       let finishStarted = false;
 
@@ -760,15 +814,16 @@ export function mountDCCS(options) {
           input.destroy();
         }
 
-        const endedAtMs = Date.now();
+        // 指定檢查點（離開）就算到那一關結束；否則算到最後完成那一關結束。
+        const timing =
+          timingAt(
+            options && Number.isFinite(options.stage)
+              ? options.stage
+              : lastCompletedLevel()
+          );
 
         statsInstance.setDuration(
-          Math.round(
-            Math.min(
-              track.elapsed,
-              sessionSeconds
-            ) * 1000
-          )
+          timing.durationMs
         );
 
         const summary =
@@ -794,7 +849,7 @@ export function mountDCCS(options) {
         const payload =
           buildResultPayload(
             summary,
-            endedAtMs
+            timing.endedAtMs
           );
 
         let submitted = null;
@@ -900,6 +955,8 @@ export function mountDCCS(options) {
             track.elapsed >= sessionSeconds
           ) {
             ended = true;
+            // 場次時間到，最後這一關結束。
+            levelEndClocks.set(track.currentLevelNo, clockNow());
 
             void finish().catch(fail);
 
@@ -912,6 +969,9 @@ export function mountDCCS(options) {
           if (
             currentLevel !== previousLevel
           ) {
+            // 第 previousLevel 關結束當下。
+            levelEndClocks.set(previousLevel, clockNow());
+
             void (async () => {
               completedLevel = Math.max(completedLevel, previousLevel);
               progressApi.completedLevel = completedLevel;
