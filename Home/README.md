@@ -34,6 +34,6 @@
 | `index.html` | 登入畫面 |
 | `app.js` | 選身份、送登入、寫 session、換頁 |
 | `style.css` | 版面 |
-| `fonts/`、`img/` | 字型與圖 |
+| `img/` | 圖 |
 
 這一頁自己沒有再做一次登入守門。後面的功能頁由 `shared/require-student.js` 檢查這裡寫下的 token。
