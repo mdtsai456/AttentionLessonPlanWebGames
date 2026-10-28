@@ -17,6 +17,9 @@ const GAMES = [
 /** 雙人模式不包含指令出擊。 */
 const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
 
+/** 等待遮罩上稱呼另一位玩家。 */
+const PARTNER_NAME = { 1: "玩家二", 2: "玩家一" };
+
 const ROUTES = {
   DCCS: {
     single: "../Tutorial/DCCS_tutorial.html",
@@ -144,6 +147,13 @@ dualStage.addEventListener("click", (event) => {
   if (event.target.closest("[data-enter]")) confirmPlayer(slot);
 });
 
+// 進入說明頁後按上一頁回來（bfcache）時，清掉「準備進入遊戲…」，讓兩人重新確認。
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted || !isDouble) return;
+  cancelConfirm(1);
+  cancelConfirm(2);
+});
+
 logoutBtn.addEventListener("click", async () => {
   logoutBtn.disabled = true;
   try {
@@ -179,25 +189,46 @@ function confirmPlayer(slot) {
   }
   player.confirmed = true;
   playerError(slot).textContent = "";
-  dualStage.querySelector(`[data-wait="${slot}"]`).hidden = false;
+  showWait(slot, `已選：${gameName(player.selectedGameId)}（點此取消）\n等待${PARTNER_NAME[slot]}確認`);
   tryLaunch();
 }
 
 function cancelConfirm(slot) {
   players[slot].confirmed = false;
-  dualStage.querySelector(`[data-wait="${slot}"]`).hidden = true;
+  waitMask(slot).hidden = true;
+  waitMask(slot).disabled = false;
 }
 
 function tryLaunch() {
   if (!players[1].confirmed || !players[2].confirmed) return;
-  if (players[1].selectedGameId !== players[2].selectedGameId) {
+  const [first, second] = [players[1].selectedGameId, players[2].selectedGameId];
+  if (first !== second) {
     cancelConfirm(1);
     cancelConfirm(2);
-    playerError(1).textContent = "請選擇同一個遊戲";
-    playerError(2).textContent = "請選擇同一個遊戲";
+    const message = `玩家一選「${gameName(first)}」，玩家二選「${gameName(second)}」，請選擇同一個遊戲`;
+    playerError(1).textContent = message;
+    playerError(2).textContent = message;
     return;
   }
-  goToGame(players[1].selectedGameId, true);
+  // 導向說明頁要等登入驗證，會停留幾秒；先告訴兩人正在進入，遮罩也不能再取消。
+  [1, 2].forEach((slot) => {
+    showWait(slot, "準備進入遊戲…");
+    waitMask(slot).disabled = true;
+  });
+  goToGame(first, true);
+}
+
+function waitMask(slot) {
+  return dualStage.querySelector(`[data-wait="${slot}"]`);
+}
+
+function showWait(slot, text) {
+  waitMask(slot).textContent = text;
+  waitMask(slot).hidden = false;
+}
+
+function gameName(gameId) {
+  return GAMES.find((game) => game.id === gameId).name;
 }
 
 function playerError(slot) {
