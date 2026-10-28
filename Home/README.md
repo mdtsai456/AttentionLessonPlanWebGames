@@ -23,7 +23,7 @@
 | --- | --- |
 | 老師 | `user_role=teacher`、`token`、`teacher_id`、`teacher_name`、`teacher_school` |
 | 學生 | `user_role=student`、`game_mode`（`single` 或 `double`）、`token` |
-| 每位學生 | `student1_*`、`student2_*`：token、studentKey、case、grade、school、day |
+| 每位學生 | `student1_*`、`student2_*`：token、account（登入帳號）、studentKey、case、grade、school、day |
 
 學生 1 另外寫一份不帶編號的 `grade`、`caseId`、`school`、`current_day`、`currentDay`，給舊的讀法使用。登入到期時間由 `shared/session-timeout.js` 記錄：用登入回應的 `expiresIn`（剩餘秒數）加上本機現在時間，裝置時鐘不準也不會提早或延後登出；舊後端沒有 `expiresIn` 時才用 `expiresAt`。
 

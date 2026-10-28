@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <script src="../shared/require-student.js" data-role="student" data-mode="select"></script>
   <script type="application/x-webgame-script" data-src="../shared/game-runtime.js"></script>
+  <script type="application/x-webgame-script" data-src="../shared/leave-confirm.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Attention Lesson Plan - 選擇遊戲</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,6 +20,7 @@
     <main class="stage" id="single-stage">
       <section class="panel" aria-label="選擇遊戲">
         <h1 class="title">選擇遊戲</h1>
+        <p class="who" data-who="1"></p>
         <p class="label">請選擇要遊玩的遊戲</p>
 
         <div class="game-list" id="game-list"></div>
@@ -30,6 +32,7 @@
     <main class="stage stage-dual" id="dual-stage" hidden>
       <section class="panel player-panel" data-player="1" aria-label="玩家 1 選擇遊戲">
         <h1 class="title">玩家 1</h1>
+        <p class="who" data-who="1"></p>
         <p class="label">請選擇要遊玩的遊戲</p>
         <div class="game-list" data-game-list="1"></div>
         <p class="error" data-error="1" role="alert"></p>
@@ -38,6 +41,7 @@
       </section>
       <section class="panel player-panel" data-player="2" aria-label="玩家 2 選擇遊戲">
         <h1 class="title">玩家 2</h1>
+        <p class="who" data-who="2"></p>
         <p class="label">請選擇要遊玩的遊戲</p>
         <div class="game-list" data-game-list="2"></div>
         <p class="error" data-error="2" role="alert"></p>
