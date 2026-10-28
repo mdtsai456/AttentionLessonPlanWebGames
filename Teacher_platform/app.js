@@ -61,8 +61,10 @@ async function init() {
   document.getElementById("view-teacher-school").textContent =
     sessionStorage.getItem("teacher_school") || "--";
 
-  state.students = await fetchTeacherStudents();
+  const students = await fetchTeacherStudents();
+  state.students = students || [];
   renderStudents();
+  if (!students) showStudentsError();
   renderDays();
   renderProgress();
 }
@@ -381,14 +383,14 @@ async function fetchStudentReport(studentKey) {
   return Array.isArray(body.records) ? body.records : [];
 }
 
-/** 讀取登入老師的學生名單。 */
+/** 讀取登入老師的學生名單。讀取失敗回傳 null，和「沒有學生」分開。 */
 async function fetchTeacherStudents() {
   const token = teacherToken();
   if (!token) return [];
 
   try {
     const res = await WebGameApi.authGet("/me/students", token);
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const body = await res.json();
     return (body.students || []).map((student) => ({
       id: student.studentKey,
@@ -399,8 +401,16 @@ async function fetchTeacherStudents() {
       lastPlayedAt: student.lastPlayedAt || "",
     }));
   } catch (_err) {
-    return [];
+    return null;
   }
+}
+
+/** 名單讀不到時，在下拉選單與提示卡說明，不要看起來像是沒有學生。 */
+function showStudentsError() {
+  studentSelect.innerHTML = '<option value="">學生名單讀取失敗</option>';
+  emptyHint.querySelector("h3").textContent = "學生名單讀取失敗";
+  emptyHint.querySelector("p").textContent = "請檢查網路後重新整理頁面。";
+  emptyHint.classList.add("is-error");
 }
 
 function detailFromSessions(sessions, day) {
