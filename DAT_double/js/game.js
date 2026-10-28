@@ -142,7 +142,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   $('retry-save').addEventListener('click', () => saver.retry());
 
   function startGame() {
-    saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
+    saver = window.DatSave.create({ url: `${window.resolveApiBase()}/sessions`, onChange: showSaveStatus });
     $('save-status').textContent = '';
     $('retry-save').hidden = true;
 

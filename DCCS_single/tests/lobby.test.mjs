@@ -13,7 +13,7 @@ function freezeNow(iso) {
   };
 }
 
-globalThis.window = { API_BASE_URL: 'https://api.test/api', location: { hostname: 'example.test' } };
+globalThis.window = { resolveApiBase: () => 'https://api.test/api' };
 
 async function dayFor(mode, sessions) {
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ sessions }) });

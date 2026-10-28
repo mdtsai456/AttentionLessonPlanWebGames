@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { SITE_ROOT } from '../site.mjs';
+const API_BASE = fs.readFileSync(`${SITE_ROOT}/shared/api-base.js`, 'utf8');
 const student = { user_role: 'student', game_mode: 'single', token: 't1', grade: 'G1', caseId: 'S01', school: 'A' };
 const body = { role: 'student', grade: 'G1', caseId: 'S01', school: 'A', studentKey: 'G1_S01', expiresAt: new Date(Date.now() + 3600000).toISOString() };
 async function guard({ storage = { ...student }, mode = 'single', role = 'student', response = body, status = 200, offline = false, storageThrows = false, DateImpl = Date, apiBaseUrl } = {}) {
@@ -24,6 +25,7 @@ async function guard({ storage = { ...student }, mode = 'single', role = 'studen
   };
   if (apiBaseUrl) window.API_BASE_URL = apiBaseUrl;
   const fetch = async (url, options) => { urls.push(url); requests.push(options.headers.Authorization); if (offline) throw new Error('offline'); return { ok: status === 200, status, json: async () => response }; };
+  vm.runInNewContext(API_BASE, { window });
   vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/require-student.js`, 'utf8'), { window, document, sessionStorage, URL, Date: DateImpl, AbortController, fetch });
   await new Promise((resolve) => setImmediate(resolve));
   return { window, document, replaced, requests, urls, storage, delays, async restore() { listeners.pageshow.forEach((fn) => fn({ persisted: true })); await new Promise((resolve) => setImmediate(resolve)); } };

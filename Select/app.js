@@ -5,14 +5,7 @@
 // 進度使用後端的當日場次。DCCS 完成前 3 關為 50%，完成後段或其他遊戲為 100%。
 // =============================================================================
 
-/** 五款遊戲的固定清單。id 對應資料夾，name 用於畫面顯示。 */
-const GAMES = [
-  { id: "DCCS", name: "賽道攔截" },
-  { id: "DAT", name: "瓢蟲追擊令" },
-  { id: "EFT", name: "漂浮泡泡" },
-  { id: "TGame", name: "勇闖迷宮" },
-  { id: "InstructionGame", name: "指令出擊" },
-];
+const { GAMES, dayProgress, normalizeProgress } = WebGameApi;
 
 /** 雙人模式不包含指令出擊。 */
 const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
@@ -39,9 +32,6 @@ const ROUTES = {
     double: "../Tutorial/InstructionGame_tutorial.html",
   },
 };
-
-/** 進度只接受這三個值。其他數值轉換為最接近的值。 */
-const PROGRESS_STEPS = [0, 50, 100];
 
 const isDouble = ["double", "dual"].includes(sessionStorage.getItem("game_mode") || "single");
 
@@ -228,32 +218,10 @@ function goToGame(gameId, doubleMode) {
   location.href = doubleMode ? pages.double : pages.single;
 }
 
-function emptyProgress(games = GAMES) {
-  return games.reduce((result, game) => {
-    result[game.id] = 0;
-    return result;
-  }, {});
-}
-
-function progressFromRecords(records, day, games = GAMES) {
-  const progress = emptyProgress(games);
-  const targetDay = Number(day);
-  records.forEach((record) => {
-    if (Number(record.currentDay) !== targetDay) return;
-    const gameId = WebGameApi.mapGameId(record.gameType);
-    if (!Object.prototype.hasOwnProperty.call(progress, gameId)) return;
-    progress[gameId] = Math.max(
-      progress[gameId],
-      WebGameApi.progressFromRecord(gameId, record)
-    );
-  });
-  return progress;
-}
-
 /** 讀取學生當日的進度。slot 1 使用 student1_*，slot 2 使用 student2_*。 */
 async function fetchStudentProgress(slot) {
   const games = isDouble ? DUO_GAMES : GAMES;
-  const progress = emptyProgress(games);
+  const progress = dayProgress([], 0, games); // 讀不到成績時，各遊戲都是 0
   const token = sessionStorage.getItem(`student${slot}_token`)
     || (slot === 1 ? sessionStorage.getItem("token") : "");
   const studentKey = sessionStorage.getItem(`student${slot}_key`);
@@ -272,7 +240,7 @@ async function fetchStudentProgress(slot) {
     );
     if (!res.ok) return progress;
     const body = await res.json();
-    return progressFromRecords(body.records || [], day, games);
+    return dayProgress(body.records || [], day, games);
   } catch (_err) {
     return progress;
   }
@@ -299,15 +267,4 @@ async function celebrateAttention() {
     : "聽說這裡有專心的小朋友，原來是你！";
   sessionStorage.setItem(SHOWN_KEY, "1");
   window.showFireworks(message);
-}
-
-/**
- * 將數值轉換為最接近的 0、50 或 100。
- * 後端回傳其他數值時，畫面仍可顯示三格進度條。
- */
-function normalizeProgress(value) {
-  const number = Number(value) || 0;
-  return PROGRESS_STEPS.reduce((closest, step) =>
-    Math.abs(step - number) < Math.abs(closest - number) ? step : closest
-  );
 }

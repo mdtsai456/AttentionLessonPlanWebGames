@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { SITE_ROOT } from '../site.mjs';
+const API_BASE = fs.readFileSync(`${SITE_ROOT}/shared/api-base.js`, 'utf8');
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
 
@@ -22,6 +23,7 @@ function load({ storage = { token: 't1', user_role: 'student' }, skewMs = 0, api
     setInterval: () => 0,
   };
   const document = { currentScript: { src: 'https://example.test/shared/session-timeout.js' }, addEventListener: () => {} };
+  vm.runInNewContext(API_BASE, { window });
   vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/session-timeout.js`, 'utf8'), {
     window, document, sessionStorage, URL, Date: DateImpl, fetch: async (url) => { fetched.push(url); return {}; },
   });

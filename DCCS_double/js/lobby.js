@@ -1,8 +1,6 @@
 // 大廳資料來自同源的 sessionStorage。currentDay 暫由歷史場次推導，
 // 後續應由後端統一提供，避免各遊戲計算結果不同（見 docs/dccs-lobby-handoff.md）。
 
-import { resolveApiBase } from './net/apiBase.js';
-
 const KEY_MODE = 'game_mode';
 
 function readKey(key) {
@@ -115,7 +113,7 @@ export async function resolveCurrentDay(player) {
   }
 
   const url =
-    `${resolveApiBase()}/students/` +
+    `${window.resolveApiBase()}/students/` +
     `${encodeURIComponent(`${player.grade}_${player.caseId}`)}/sessions` +
     `?school=${encodeURIComponent(player.school)}`;
 

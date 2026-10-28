@@ -32,17 +32,8 @@
     global.location.replace(url.href);
   }
 
-  function apiBase() {
-    // 與 shared/api.js 相同：覆寫網址去掉結尾斜線，避免 //auth/...
-    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, '');
-    if (global.location.pathname.startsWith('/app/')) return global.location.origin + '/api';
-    const { hostname, protocol } = global.location;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return `${protocol}//${hostname}:5001/api`;
-    return 'https://attention-lesson-plan-data.zeabur.app/api';
-  }
-
   async function identity(token, signal) {
-    const res = await fetch(apiBase() + '/auth/me', {
+    const res = await fetch(global.resolveApiBase() + '/auth/me', {
       headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', signal,
     });
     if (!res.ok) {

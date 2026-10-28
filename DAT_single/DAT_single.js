@@ -54,7 +54,7 @@ function showSaveStatus({ status, message, retryable }) {
 
 function startGame() {
   if (phase === 'finished' && saver && !saver.canRestart()) return;
-  saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
+  saver = window.DatSave.create({ url: `${window.resolveApiBase()}/sessions`, onChange: showSaveStatus });
   $('save-status').textContent = '';
   $('retry-save').hidden = true;
   $('save-notice').hidden = true;

@@ -2,14 +2,15 @@
 
 各頁面共用的腳本與樣式。遊戲頁用相對路徑引用這裡，不要把同一份邏輯再複製進遊戲資料夾。
 
-功能頁在 `<head>` 先載入 `require-student.js`。驗證通過後，它才依序執行標成 `type="application/x-webgame-script"` 的腳本。驗證完成前頁面不可見、不可操作。
+功能頁在 `<head>` 先載入 `api-base.js` 與 `require-student.js`。驗證通過後，它才依序執行標成 `type="application/x-webgame-script"` 的腳本。驗證完成前頁面不可見、不可操作。
 
 ## 檔案
 
 | 檔案 | 誰在用 | 做什麼 |
 | --- | --- | --- |
 | `require-student.js` | 功能頁 | 用 `GET /api/auth/me` 檢查角色、模式與學生欄位。不符回 `Select/` 或 `Home/`。雙人要兩個學生 token。返回 bfcache 時重新驗證，等待期間凍結輸入與計時。 |
-| `api.js` | 登入、選關、成績 | 決定 API 位址（覆寫網址去掉結尾斜線）、登入、登出、查報告、送成績、把場次換成 0／50／100 進度。`uuid()` 產生成績的 `submissionId` 與雙人局的 `pairId`。 |
+| `api-base.js` | 所有頁面 | 決定後端 API 位址（`window.resolveApiBase()`），規則見下方。在 `<head>` 最先同步載入，其他腳本都用它。 |
+| `api.js` | 登入、選關、成績 | 登入、登出、查報告、送成績。五款遊戲清單 `GAMES`，`dayProgress` 把某一天的場次換成各遊戲 0／50／100 進度（`Select/`、`Teacher_platform/` 共用）。`uuid()` 產生成績的 `submissionId` 與雙人局的 `pairId`。 |
 | `session-timeout.js` | 已登入頁面 | 依登入回傳的剩餘秒數 `expiresIn` 加上本機收到回應的時間計算到期（不受裝置時鐘快慢影響；舊後端沒有 `expiresIn` 時改用 `expiresAt`），到期後清掉本機登入並回 `Home/`。計時器分段等待，超過 24.8 天也不會溢位。 |
 | `game-runtime.js` | 遊戲頁 | 驗證或離開期間暫停 `setTimeout` 與動畫幀，回來後扣掉這段時間。`pause(reason)`／`resume(reason)` 依原因計數，全部解除才恢復；`nativeSetTimeout` 給網路請求的逾時用，暫停時照常運作。 |
 | `leave-confirm.js` | 遊戲頁 | 遊戲內的離開確認。「離開」按鈕先呼叫 `confirmLeave()` 顯示頁面內的確認框（開著時暫停遊戲、攔下按鍵、Esc 等於取消），按「離開」才存檔，再用 `leaveTo(url)` 導頁；按「繼續遊戲」什麼都不送，避免取消後檢查點和打完的成績各留一筆。直接關閉分頁、重新整理或按上一頁時，遊戲呼叫 `guardUnload(isPlaying)` 掛上瀏覽器的離開詢問：`isPlaying()` 為 true 才問，透過 `leaveTo` 導頁與登入逾時登出（sessionStorage 已清空）不問。EFT、IM、TGame 使用；DAT、DCCS 另有自己的提示。 |
@@ -24,9 +25,9 @@
 
 ## API 位址
 
-`api.js` 與 `require-student.js` 用同一套規則：
+只寫在 `api-base.js`，其他檔案不要再複製一份：
 
-1. 有 `window.API_BASE_URL` 就用它。
+1. 有 `window.API_BASE_URL` 就用它（去掉結尾斜線）。
 2. 網址在 `/app/` 底下時，用同一個 origin 的 `/api`。
 3. 主機是 `localhost` 或 `127.0.0.1` 時，打到該主機的 `5001` port。
 4. 其他情況打正式後端 `https://attention-lesson-plan-data.zeabur.app/api`。

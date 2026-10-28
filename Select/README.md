@@ -22,7 +22,7 @@
 
 進頁時用該生 token 查 `GET /students/{studentKey}/report`。只算登入時填的那一天。
 
-進度來自 `shared/api.js` 的 `progressFromRecord`：成績裡的關卡 `stage` 在 3 以內是 50%，超過是 100%。沒有 `stage` 的紀錄當成 100%。畫面只顯示 0、50、100 三格。查不到或連不上時，該生進度顯示 0，不阻擋選遊戲。
+進度來自 `shared/api.js` 的 `dayProgress`（與 `Teacher_platform/` 共用）：成績裡的關卡 `stage` 在 3 以內是 50%，超過是 100%。沒有 `stage` 的紀錄當成 100%。畫面只顯示 0、50、100 三格。查不到或連不上時，該生進度顯示 0，不阻擋選遊戲。
 
 後端若把指令出擊記成 `IM`，`mapGameId` 會對回 `InstructionGame`。
 
