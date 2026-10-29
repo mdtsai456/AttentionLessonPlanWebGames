@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { SITE_ROOT } from '../site.mjs';
+const API_BASE = fs.readFileSync(`${SITE_ROOT}/shared/api-base.js`, 'utf8');
 function api({ active = true, status = 201, sameAccount = false } = {}) {
   const first = { role: 'student', grade: 'G1', caseId: 'S01', school: 'A' };
   const second = sameAccount ? first : { role: 'student', grade: 'G2', caseId: 'S02', school: 'B' };
@@ -12,6 +13,7 @@ function api({ active = true, status = 201, sameAccount = false } = {}) {
     location: { hostname: 'localhost', protocol: 'http:', pathname: '/app/Select/index.html', origin: 'http://localhost:5001' },
     WebGameAuth: { active, session: { mode: 'double', bodies: [first, second], tokens: ['one', 'two'] }, invalidate() { invalidated = true; } },
   };
+  vm.runInNewContext(API_BASE, { window });
   vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), { window, fetch: async (url, opts) => { calls.push({ url, ...opts }); return { status }; } });
   return { instance: window.WebGameApi, calls, first, second, invalidated: () => invalidated };
 }
@@ -49,12 +51,6 @@ test('損壞的待送成績無法選到學生，也不會送出', async () => {
     await assert.rejects(instance.submitSession(payload), { status: 401 });
   }
   assert.equal(calls.length, 0);
-});
-
-test('API 位址覆寫去除結尾斜線，避免送到 //sessions', () => {
-  const window = { location: {}, API_BASE_URL: 'https://override.test/api///' };
-  vm.runInNewContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), { window });
-  assert.equal(window.WebGameApi.resolveApiBase(), 'https://override.test/api');
 });
 
 test('uuid() 產生 UUID v4；沒有 randomUUID（非 https 區網）時改用 getRandomValues，不用 Math.random', () => {

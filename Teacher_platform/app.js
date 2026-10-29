@@ -4,17 +4,7 @@
 // 名單與場次來自後端。DCCS 完成前 3 關為 50%，完成後段或其他遊戲為 100%。
 // =============================================================================
 
-/** 五款遊戲的固定清單。id 對應後端欄位，name 用於畫面顯示。 */
-const GAMES = [
-  { id: "DCCS", name: "賽道攔截" },
-  { id: "DAT", name: "瓢蟲追擊令" },
-  { id: "EFT", name: "漂浮泡泡" },
-  { id: "TGame", name: "勇闖迷宮" },
-  { id: "InstructionGame", name: "指令出擊" },
-];
-
-/** 進度只接受這三個值。其他數值轉換為最接近的值。 */
-const PROGRESS_STEPS = [0, 50, 100];
+const { GAMES, dayProgress, normalizeProgress } = WebGameApi;
 
 const studentSelect = document.getElementById("student-select");
 const dayRow = document.getElementById("day-row");
@@ -126,7 +116,7 @@ async function selectStudent(studentId) {
 function selectDay(day) {
   if (!state.selectedStudentId || state.reportStatus !== "ready") return;
   state.selectedDay = day;
-  state.progressByGame = progressFromSessions(state.sessions, day);
+  state.progressByGame = dayProgress(state.sessions, day);
   state.detailByGame = detailFromSessions(state.sessions, day);
   markSelectedDay(day);
   renderProgress();
@@ -547,37 +537,4 @@ function levelsReached(gameId, stage) {
   if (stage <= 6) return stage;
   const percent = WebGameApi.progressFromRecord(gameId, { stats: { stage } });
   return percent >= 100 ? 6 : 3;
-}
-
-function progressFromSessions(sessions, day) {
-  const progress = emptyProgress();
-  sessions.forEach((session) => {
-    if (Number(session.currentDay) !== Number(day)) return;
-    const gameId = WebGameApi.mapGameId(session.gameType);
-    if (!Object.prototype.hasOwnProperty.call(progress, gameId)) return;
-    progress[gameId] = Math.max(
-      progress[gameId],
-      WebGameApi.progressFromRecord(gameId, session)
-    );
-  });
-  return progress;
-}
-
-/** 產生五個遊戲皆為 0% 的進度物件。 */
-function emptyProgress() {
-  return GAMES.reduce((result, game) => {
-    result[game.id] = 0;
-    return result;
-  }, {});
-}
-
-/**
- * 將數值轉換為最接近的 0、50 或 100。
- * 後端回傳其他數值時，畫面仍可顯示三格進度條。
- */
-function normalizeProgress(value) {
-  const number = Number(value) || 0;
-  return PROGRESS_STEPS.reduce((closest, step) =>
-    Math.abs(step - number) < Math.abs(closest - number) ? step : closest
-  );
 }

@@ -91,7 +91,7 @@ python tools/build_manifest.py
 
 預設 `lessonId` 是 `lesson_DCCS`，統計欄位前綴是 `DCCS_`。送出用 `POST /api/sessions`。
 
-送出逾時 15 秒，用 `WebGameRuntime.nativeSetTimeout`，遊戲暫停時照樣計時。網址由 `js/net/apiBase.js` 決定，優先序是 `window.DCCS_SUBMIT_URL`、`window.API_BASE_URL`，最後才是目前頁面的 API 位址。送失敗的整包暫存在 `localStorage`，鍵名以 `dccs_pending_` 開頭，下次開啟遊戲時重送。每筆成績帶一個 `submissionId`（由 `shared/api.js` 的 `WebGameApi.uuid()` 產生），重送時沿用，回應逾時但伺服器其實已存好時也不會重複寫入。伺服器永久拒絕的改存到 `dccs_rejected_`，不再重試。
+送出逾時 15 秒，用 `WebGameRuntime.nativeSetTimeout`，遊戲暫停時照樣計時。網址由 `js/net/apiBase.js` 決定：有 `window.DCCS_SUBMIT_URL` 就用它，否則用 `shared/api-base.js` 的 API 位址。送失敗的整包暫存在 `localStorage`，鍵名以 `dccs_pending_` 開頭，下次開啟遊戲時重送。每筆成績帶一個 `submissionId`（由 `shared/api.js` 的 `WebGameApi.uuid()` 產生），重送時沿用，回應逾時但伺服器其實已存好時也不會重複寫入。伺服器永久拒絕的改存到 `dccs_rejected_`，不再重試。
 
 `DCCS_levelAccuracy` 是各關的正確率（以題為單位），從這一局第一個有玩的關卡依序取到最後一關，逗號分隔。從第 1 關開始的一局是第 1 關起；從第 4 關開始的一局是第 4、5、6 關的 3 個值。
 

@@ -56,7 +56,7 @@ function showSaveStatus({ status, message, retryable }) {
 // startStage 為 4 時是後半那一局：統計從 0 開始，只算第 4～6 關。「再玩一次」不帶參數，從第 1 關開始。
 function startGame(startStage = 1) {
   if (phase === 'finished' && saver && !saver.canRestart()) return;
-  saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
+  saver = window.DatSave.create({ url: `${window.resolveApiBase()}/sessions`, onChange: showSaveStatus });
   $('save-status').textContent = '';
   $('retry-save').hidden = true;
   $('save-notice').hidden = true;

@@ -1,20 +1,19 @@
-// Home / Select / Back 共用的後端位址與登入、查詢。
+// Home / Select / Back 共用的登入、查詢與遊戲進度。後端位址見 api-base.js。
 (function (global) {
-  const DEV_HOSTS = { localhost: true, "127.0.0.1": true };
+  /** 五款遊戲的固定清單。id 對應資料夾與後端欄位，name 用於畫面顯示。 */
+  const GAMES = [
+    { id: "DCCS", name: "賽道攔截" },
+    { id: "DAT", name: "瓢蟲追擊令" },
+    { id: "EFT", name: "漂浮泡泡" },
+    { id: "TGame", name: "勇闖迷宮" },
+    { id: "InstructionGame", name: "指令出擊" },
+  ];
 
-  function resolveApiBase() {
-    // 覆寫網址結尾的斜線要去掉，否則接上 /sessions 會變成 //sessions。
-    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, "");
-    if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
-    const { hostname, protocol } = global.location;
-    if (DEV_HOSTS[hostname]) {
-      return `${protocol}//${hostname}:5001/api`;
-    }
-    return "https://attention-lesson-plan-data.zeabur.app/api";
-  }
+  /** 進度只接受這三個值。 */
+  const PROGRESS_STEPS = [0, 50, 100];
 
   async function postJson(path, body) {
-    return fetch(`${resolveApiBase()}${path}`, {
+    return fetch(`${global.resolveApiBase()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -61,7 +60,7 @@
   }
 
   async function authGet(path, token) {
-    const res = await fetch(`${resolveApiBase()}${path}`, {
+    const res = await fetch(`${global.resolveApiBase()}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (res.status === 401 && global.WebGameSession) {
@@ -74,7 +73,7 @@
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
       // keepalive 讓登出請求在導向頁面或關閉分頁後，仍可送至後端。
-      await fetch(`${resolveApiBase()}/auth/logout`, {
+      await fetch(`${global.resolveApiBase()}/auth/logout`, {
         method: "POST",
         headers,
         keepalive: true,
@@ -125,6 +124,25 @@
     return 100;
   }
 
+  /** 某一天各遊戲的進度。沒玩過的遊戲為 0，同一款取最高的一筆。 */
+  function dayProgress(records, day, games = GAMES) {
+    const progress = Object.fromEntries(games.map((game) => [game.id, 0]));
+    records.forEach((record) => {
+      if (Number(record.currentDay) !== Number(day)) return;
+      const gameId = mapGameId(record.gameType);
+      if (!(gameId in progress)) return;
+      progress[gameId] = Math.max(progress[gameId], progressFromRecord(gameId, record));
+    });
+    return progress;
+  }
+
+  /** 將數值轉換為最接近的 0、50 或 100。後端回傳其他數值時，畫面仍可顯示三格進度條。 */
+  function normalizeProgress(value) {
+    const number = Number(value) || 0;
+    return PROGRESS_STEPS.reduce((closest, step) =>
+      Math.abs(step - number) < Math.abs(closest - number) ? step : closest
+    );
+  }
 
   function sameStudent(identity, data) {
     return identity && data && identity.grade === data.grade && identity.caseId === data.caseId && identity.school === data.school;
@@ -148,7 +166,7 @@
     const session = global.WebGameAuth.session;
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.tokens[index] };
     if (payload.data.mode === 'double') headers['X-Partner-Authorization'] = 'Bearer ' + session.tokens[1 - index];
-    const res = await fetch(url || `${resolveApiBase()}/sessions`, {
+    const res = await fetch(url || `${global.resolveApiBase()}/sessions`, {
       method: 'POST', headers, body: JSON.stringify(payload), signal,
     });
     if (res.status === 401) global.WebGameAuth.invalidate();
@@ -169,7 +187,6 @@
     uuid,
     submitSession,
     sessionPlayer,
-    resolveApiBase,
     loginStudent,
     loginTeacher,
     authGet,
@@ -179,5 +196,8 @@
     fetchAttention,
     mapGameId,
     progressFromRecord,
+    GAMES,
+    dayProgress,
+    normalizeProgress,
   };
 })(window);

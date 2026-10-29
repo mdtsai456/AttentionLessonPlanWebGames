@@ -16,7 +16,7 @@ const firstHalf = (overrides = {}) => ({
 });
 
 /**
- * 載入 api.js 與 second-half.js。reports[studentKey] 是 /report 的回應：
+ * 載入 api-base.js、api.js 與 second-half.js（api.js 的網址判斷在 api-base.js）。reports[studentKey] 是 /report 的回應：
  * 陣列當成 records；物件可指定 { status }、{ body }（原樣字串）或 { hang: true }（永遠不回）。
  * timers 收集注入的 nativeSetTimeout，測試自己決定何時觸發逾時。
  */
@@ -40,6 +40,7 @@ function load({ storage = SINGLE, reports = {}, runtime = true } = {}) {
   };
   const sessionStorage = { getItem: (key) => (store.has(key) ? store.get(key) : null) };
   const context = vm.createContext({ window, fetch, sessionStorage });
+  vm.runInContext(fs.readFileSync(`${SITE_ROOT}/shared/api-base.js`, 'utf8'), context);
   vm.runInContext(fs.readFileSync(`${SITE_ROOT}/shared/api.js`, 'utf8'), context);
   vm.runInContext(fs.readFileSync(`${SITE_ROOT}/shared/second-half.js`, 'utf8'), context);
   return { SecondHalf: window.WebGameSecondHalf, calls, timers };

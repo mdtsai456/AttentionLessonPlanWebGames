@@ -79,20 +79,6 @@
     });
   }
 
-  function apiBase() {
-    // 與 shared/api.js 相同：覆寫網址去掉結尾斜線，避免 //auth/...
-    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, "");
-    if (global.WebGameApi && global.WebGameApi.resolveApiBase) {
-      return global.WebGameApi.resolveApiBase();
-    }
-    if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
-    const hostname = global.location.hostname;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return global.location.protocol + "//" + hostname + ":5001/api";
-    }
-    return "https://attention-lesson-plan-data.zeabur.app/api";
-  }
-
   function expireSession(force) {
     const expires = readExpiry();
     if (!force && isLoggedIn() && Number.isFinite(expires) && Date.now() < expires) {
@@ -105,7 +91,7 @@
     global.clearTimeout(timerId);
 
     const tokens = collectTokens();
-    const base = apiBase();
+    const base = global.resolveApiBase();
     sessionStorage.clear();
     tokens.forEach(function (token) {
       fetch(base + "/auth/logout", {

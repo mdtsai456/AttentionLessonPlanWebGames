@@ -27,7 +27,7 @@ for (const pagePath of all) {
       scripts.length = 0;
       await page.goto(pagePath);
       await expect(page).toHaveURL(HOME_URL);
-      const functional = scripts.filter((url) => !/\/Home\/|\/shared\/(?:require-student|api|session-timeout)\.js/.test(url));
+      const functional = scripts.filter((url) => !/\/Home\/|\/shared\/(?:api-base|require-student|api|session-timeout)\.js/.test(url));
       expect(functional).toEqual([]);
       expect(writes).toEqual([]);
     });
