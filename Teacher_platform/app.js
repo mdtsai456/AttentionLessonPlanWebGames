@@ -163,15 +163,17 @@ const TRAINING_DAYS = Array.from({ length: 24 }, (_, index) => index + 1);
 function renderDays() {
   const hasStudent = Boolean(state.selectedStudentId) && state.reportStatus === "ready";
   const days = TRAINING_DAYS;
+  const daysWithData = new Set(state.sessions.map((session) => Number(session.currentDay)));
 
   dayRow.innerHTML = days
     .map((day) => {
       const selected = state.selectedDay === day ? " is-selected" : "";
+      const hasData = daysWithData.has(day) ? " has-data" : "";
       const disabled = hasStudent ? "" : " disabled";
       return `
         <button
           type="button"
-          class="day-btn${selected}"
+          class="day-btn${selected}${hasData}"
           data-day="${day}"
           ${disabled}
         >
