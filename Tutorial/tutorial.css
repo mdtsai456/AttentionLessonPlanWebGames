@@ -151,6 +151,26 @@ body {
   filter: brightness(1.04);
 }
 
+/* 選錯遊戲時回到 Select，不必按瀏覽器的上一頁。比開始按鈕低調，避免誤按。 */
+.btn-back {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 0.45rem 1.4rem;
+  border: 2px solid #a9d6a0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #3f8f4e;
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.btn-back:hover {
+  background: #fff;
+}
+
 .btn-green:active {
   transform: translateY(4px);
   background: linear-gradient(#4fbe3c, #3a9a2c);
