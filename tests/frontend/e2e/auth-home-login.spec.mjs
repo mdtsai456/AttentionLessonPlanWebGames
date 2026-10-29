@@ -32,6 +32,26 @@ async function openSingleStudentForm(page) {
   await page.locator('[name="day-0"]').fill("3");
 }
 
+test("切換模式或身分後，帳號密碼欄位會清空，不殘留前一位使用者輸入的內容", async ({ page }) => {
+  await openSingleStudentForm(page);
+  await expect(page.locator('[name="username-0"]')).toHaveValue("S0001");
+
+  await page.locator('[data-mode="dual"]').click();
+  await expect(page.locator('[name="username-0"]')).toHaveValue("");
+  await expect(page.locator('[name="username-1"]')).toHaveValue("");
+  await expect(page.locator('[name="password-0"]')).toHaveValue("");
+
+  await page.locator('[name="username-0"]').fill("S0002");
+  await page.locator('[data-role="teacher"]').click();
+  await expect(page.locator('[name="username-0"]')).toHaveValue("");
+});
+
+test("帳號密碼欄位帶有防止瀏覽器自動帶入前次帳號的 autocomplete 設定", async ({ page }) => {
+  await openSingleStudentForm(page);
+  await expect(page.locator('[name="username-0"]')).toHaveAttribute("autocomplete", "off");
+  await expect(page.locator('[name="password-0"]')).toHaveAttribute("autocomplete", "new-password");
+});
+
 for (const [label, change] of [
   ["改選雙人", () => selectMode("dual")],
   ["改選老師", () => selectRole("teacher")],
