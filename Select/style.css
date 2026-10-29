@@ -257,7 +257,13 @@ body {
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: 0.04em;
+  line-height: 1.6;
+  white-space: pre-line;
   cursor: pointer;
+}
+
+.player-panel .wait-mask:disabled {
+  cursor: progress;
 }
 
 .player-panel .wait-mask[hidden] {
