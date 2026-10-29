@@ -10,6 +10,7 @@
 //        → beginCurrentStage（開始倒數與移動）
 //        → 過關或逾時 → finishOrAdvance
 // 完成第 3 關後顯示中場休息。其餘關卡進入下一關，全部完成後呼叫 finishGame。
+// 同一個課次已完成前半（後端有 stage 3）時，init 會從第 4 關開始，這一局沒有中場，也不送 stage 3。
 //
 // 目前由前端執行。檔案底部的 fetchQuestions／submitResult 預留題目讀取與成績送出介面。
 // =============================================================================
@@ -39,6 +40,8 @@ const ROOM_FADE_MS = 280;
 const GOTO_WAIT_MS = 1000;
 /** 「背包滿了」這類短提示顯示多久後自動收起。 */
 const HINT_MS = 1200;
+/** 後半那一局的起始關。 */
+const SECOND_HALF_STAGE = 4;
 /** 後端進度僅接受 0／50／100 三個值。 */
 const PROGRESS_STEPS = [0, 50, 100];
 
@@ -200,6 +203,8 @@ let savedStage = 0;
 let savePromise = Promise.resolve();
 /** 這一局的 submissionId：中場先送的第 3 關與打完的第 6 關共用，後端用較高關卡更新同一列。 */
 let playId = "";
+/** 這一局從第幾關開始：1 是整局，4 是同一個課次前半已完成的後半局（沒有中場，第 4、5 關離開不送）。 */
+let firstStage = 1;
 
 const state = {
   questions: [], // 目前題目的題庫，來源為後端或本地。
@@ -243,14 +248,15 @@ init();
 // 啟動與事件
 // -----------------------------------------------------------------------------
 
-/** 預載圖片、讀取題目並綁定操作後，開始第一場遊戲。 */
+/** 預載圖片、讀取題目並綁定操作後，開始第一場遊戲。同一個課次已完成前半時從第 4 關開始。 */
 async function init() {
   preloadImages();
   renderBackpack();
+  const startStageReady = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("InstructionGame", { mode: "single", slots: [1] }) : Promise.resolve(1));
   const data = await fetchQuestions();
   state.questions = data.questions;
   bindEvents();
-  startGame();
+  startGame(await startStageReady);
 }
 
 /** 綁定按鈕、鍵盤、點擊門／物品，並啟動移動迴圈。 */
@@ -263,7 +269,7 @@ function bindEvents() {
     await saveCurrentRun(MIDWAY_STAGE);
     window.leaveTo("../Select/index.html");
   });
-  replayBtn.addEventListener("click", startGame);
+  replayBtn.addEventListener("click", () => startGame());
   backBtn.addEventListener("click", () => {
     window.leaveTo("../Select/index.html");
   });
@@ -317,8 +323,11 @@ function bindEvents() {
 // 關卡生命週期
 // -----------------------------------------------------------------------------
 
-/** 重新開始場次時，清除分數並從第 1 關開始。每關 60 秒，只有一題。完成或逾時後進入下一關。 */
-function startGame() {
+/**
+ * 開始新的一局，清除分數。每關 60 秒，只有一題。完成或逾時後進入下一關。
+ * 預設從第 1 關開始；後半局從第 4 關開始，題目接著前半的順序（第 4 關出 P004）。
+ */
+function startGame(fromStage = 1) {
   clearInterval(state.timerId);
   state.timerId = null;
   stopWalkCycle();
@@ -332,8 +341,9 @@ function startGame() {
   state.stageResults = [];
   state.levelAccuracies = [];
   state.finishedStages = 0;
-  state.taskCursor = 0;
+  state.taskCursor = fromStage - 1;
   state.endingStage = false;
+  firstStage = fromStage;
   savedStage = 0; // 新的一局，上一局存過哪關不算數
   savePromise = Promise.resolve();
   playId = window.WebGameApi.uuid();
@@ -344,7 +354,7 @@ function startGame() {
   hideFeedback();
   renderHud();
   renderBackpack();
-  startStage(1);
+  startStage(fromStage);
 }
 
 function startStage(stageNumber) {
@@ -1051,7 +1061,9 @@ async function leaveGame() {
     return;
   }
   const completed = state.finishedStages;
-  const stage = completed >= 6 ? 6 : completed >= MIDWAY_STAGE ? MIDWAY_STAGE : 0;
+  // 後半局沒有前半的紀錄，第 4、5 關離開什麼都不送，只有打完第 6 關才送。
+  const midway = firstStage < SECOND_HALF_STAGE && completed >= MIDWAY_STAGE;
+  const stage = completed >= 6 ? 6 : midway ? MIDWAY_STAGE : 0;
   if (stage) await saveCurrentRun(stage);
   window.leaveTo("../Select/index.html");
   // 從上一頁（bfcache）回來時按鈕要能再按；已送過的檢查點不會重送。
@@ -1061,6 +1073,7 @@ async function leaveGame() {
 /**
  * 送出到第 stage 關為止的成績。每關一題，所以只取前 stage 筆紀錄：
  * 第 4–6 關中途離開存的是 stage 3，答對數、用時等都不能把第 4 關之後算進去。
+ * 後半局只有第 4–6 關的紀錄，stage 6 的成績就只含這 3 關。
  */
 function saveCurrentRun(stage) {
   if (stage <= savedStage) return savePromise;
@@ -1078,8 +1091,8 @@ function sendStageResult(stage) {
   const passed = records.filter((item) => item.passed).length;
   const answered = Math.max(records.length, 1);
   // 時長一律算到第 stage 關結束當下：不含中場畫面停留、第 6 關結束後的等待，
-  // 也不含之後關卡。只有還沒有該關紀錄時才算到現在。
-  const stageRecord = records[stage - 1];
+  // 也不含之後關卡。只有還沒有紀錄時才算到現在。後半局只有 3 筆，所以取最後一筆。
+  const stageRecord = records[records.length - 1];
   const endClock = stageRecord
     ? state.startedAt + stageRecord.elapsedMs
     : window.WebGameRuntime.now();

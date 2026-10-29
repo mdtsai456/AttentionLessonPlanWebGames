@@ -1,7 +1,7 @@
 // 統計彙整（SPEC 4.11）。level 是關卡序號；同一題兩列共用 trialIndex。
 // correct_count／accuracy 以題為單位。兩道閥皆答對才算答對。分項計數以閥為單位。
-// duration 僅使用 setDuration() 設定的模擬遊玩時間，不使用實際時間，
-// 避免將離開分頁的時間計入固定的遊玩時長。
+// duration 僅使用 dccs.js 以 setDuration() 設定的值：遊戲時鐘（WebGameRuntime）
+// 算出的遊玩時間，已扣掉暫停（SPEC 4.11）。本模組不自行讀時鐘。
 
 export function createStats() {
   const rows = [];
@@ -76,8 +76,10 @@ export function createStats() {
       if (trial.correct) bucket.correct += 1;
       byLevel.set(trial.level, bucket);
     }
+    // 從第一個有玩的關卡連續取到最後一關。只玩後半（第 4～6 關）時是 3 個值。
     const levelAccuracy = [];
-    for (let level = 1; level <= 6; level += 1) {
+    const firstLevel = byLevel.size === 0 ? 1 : Math.min(...byLevel.keys());
+    for (let level = firstLevel; level <= 6; level += 1) {
       const bucket = byLevel.get(level);
       if (!bucket || bucket.total === 0) break;
       levelAccuracy.push(bucket.correct / bucket.total);
@@ -110,7 +112,7 @@ export function createStats() {
     };
   }
 
-  /** 設定模擬遊玩時間（毫秒）；未呼叫時 duration 為 0。 */
+  /** 設定遊玩時間（毫秒）；未呼叫時 duration 為 0。 */
   function setDuration(ms) {
     durationMs = Math.round(ms);
   }

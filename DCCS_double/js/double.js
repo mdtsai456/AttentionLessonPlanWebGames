@@ -1,4 +1,4 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=7';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=9';
 import { loadManifest } from './core/assets.js';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js?v=4';
@@ -243,7 +243,10 @@ async function showSharedTutorial() {
   showSharedScreen(sharedLoading);
 }
 
-async function startSession(player1, player2) {
+// startLevel 是起始關，可以是數字或 promise（查報表的結果，不會 reject）；兩位玩家的引擎各自在第一個關卡提示前等它。
+async function startSession(player1, player2, startLevel = 1) {
+    const startLevelReady = Promise.resolve(startLevel);
+
     const sessionSecondsOverride =
       readSessionSecondsOverride();
 
@@ -665,6 +668,7 @@ async function startSession(player1, player2) {
         showResultScreen: false,
         showTutorial: false,
         autoStart: true,
+        startLevel,
         ...sessionSecondsOption,
       });
 
@@ -721,7 +725,8 @@ async function startSession(player1, player2) {
           player1Handle.completedLevel,
           player2Handle.completedLevel
         );
-        const stage = completed >= 6 ? 6 : completed >= 3 ? 3 : 0;
+        // 從第 4 關開始的一局沒有自己的 stage 3（那一列已在後端），只有打完第 6 關才有檢查點。
+        const stage = completed >= 6 ? 6 : completed >= 3 && (await startLevelReady) <= 3 ? 3 : 0;
         // 確定離開後遊戲維持暫停到導頁；這段只等送出（逾時用原生計時器），不等遊戲計時器。
         // 組不出成績也照樣導頁：學生已確定離開，不能停在暫停的畫面上。
         if (stage) {
@@ -783,6 +788,7 @@ async function startSession(player1, player2) {
         showResultScreen: false,
         showTutorial: false,
         autoStart: true,
+        startLevel,
         ...sessionSecondsOption,
       });
 
@@ -997,9 +1003,15 @@ async function bootFromLobby() {
 
   cameFromLobby = true;
 
+  // 兩位學生這個課次都已完成前半才從第 4 關開始；最多等 5 秒，不會 reject。
+  // 不在這裡等：startSession 先顯示載入畫面、綁好離開，查詢和載入關卡資料、圖片同時進行。
+  const startLevel =
+    window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DCCS', { mode: 'double', slots: [1, 2] }) : 1;
+
   await startSession(
     { grade: lobby1.grade, caseId: lobby1.caseId, school: lobby1.school, currentDay: day1 },
-    { grade: lobby2.grade, caseId: lobby2.caseId, school: lobby2.school, currentDay: day2 }
+    { grade: lobby2.grade, caseId: lobby2.caseId, school: lobby2.school, currentDay: day2 },
+    startLevel
   );
 
   return true;

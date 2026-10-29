@@ -141,7 +141,8 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
   }
   $('retry-save').addEventListener('click', () => saver.retry());
 
-  function startGame() {
+  // startStage 為 4 時是後半那一局：統計從 0 開始，只算第 4～6 關。
+  function startGame(startStage = 1) {
     saver = window.DatSave.create({ url: `${window.resolveApiBase()}/sessions`, onChange: showSaveStatus });
     $('save-status').textContent = '';
     $('retry-save').hidden = true;
@@ -149,7 +150,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     isPractice = false;
     stageCount = TOTAL_STAGES;
     questionsPerStage = GAME_QUESTIONS;
-    currentStage = 1;
+    currentStage = startStage;
     clearedMidBreak = false;
     startTimeMs = window.WebGameRuntime.now();
     
@@ -369,9 +370,11 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     };
   }
 
+  // 沒玩的關卡（後半那一局的第 1～3 關）是空位，要濾掉，否則 join 會產生 ",,,a,b,c"。
   function levelAccuracyText(stage) {
     return levelAccuracies
       .slice(0, stage)
+      .filter((value) => value != null)
       .map((value) => Number(value.toFixed(4)))
       .join(',');
   }

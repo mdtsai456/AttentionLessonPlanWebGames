@@ -50,6 +50,8 @@ let pairId = '';
 let playId = '';
 // 兩人都打完六關才開放「再玩一次」，避免先打完的人把還在玩的搭檔一起重設。
 const finished = [false, false];
+// 這一局從第 4 關開始（兩人同一個課次都只完成前半）。
+let secondHalf = false;
 
 // 漂浮泡泡的成績使用 EFT 寫入。素材 API 也使用 EFT 查詢。
 // 回傳伺服器回應。連線失敗時回傳 undefined。
@@ -90,9 +92,9 @@ function createPlayer(element, keyBindings, playerIndex) {
         }));
         return currentRun.get(stage);
     }
-    function startGame() {
+    function startGame(options) {
         submissions = new Map();
-        player.startGame();
+        player.startGame(options);
     }
     const player = createEftPlayer({
         root: element,
@@ -101,7 +103,7 @@ function createPlayer(element, keyBindings, playerIndex) {
         onStageEnd: (state) => handlePlayerStageEnd(playerIndex, state),
         onFinished: () => handlePlayerFinished(playerIndex),
     });
-    element.querySelector('[data-ui="restart"]').addEventListener('click', startSession);
+    element.querySelector('[data-ui="restart"]').addEventListener('click', () => startSession());
     return {
         startGame,
         isPlaying: () => !['intro', 'finished'].includes(player.getState().phase),
@@ -164,7 +166,9 @@ document.getElementById('mid-continue').addEventListener('click', () => {
 });
 
 // 開新的一局：兩人一起重來、換新的 pairId，並清掉過關與中場的等待狀態。
-function startSession() {
+// startStage 是起始關；兩位都只完成前半時從第 4 關開始，這一局只玩並只送後半。
+function startSession(startStage = 1) {
+    secondHalf = startStage >= MID_STAGE + 1;
     pairId = window.WebGameApi.uuid();
     playId = window.WebGameApi.uuid();
     finished.fill(false);
@@ -173,12 +177,13 @@ function startSession() {
     stageWait.fill(null);
     stageResume.fill(null);
     document.getElementById('mid-break').hidden = true;
-    players.forEach((player) => player.startGame());
+    players.forEach((player) => player.startGame({ startStage }));
 }
 
 function checkpointStage() {
     const completed = Math.min(...players.map((player) => player.completedStages()));
-    return completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE ? MID_STAGE : 0;
+    // 後半那一局沒有第 3 關可送：第 4、5 關離開什麼都不送。
+    return completed >= STAGE_COUNT ? STAGE_COUNT : completed >= MID_STAGE && !secondHalf ? MID_STAGE : 0;
 }
 
 function saveBoth(stage) {
@@ -213,15 +218,19 @@ document.getElementById('mid-lobby').addEventListener('click', async () => {
     }
 });
 
-// 預載素材後，同時開始兩位玩家的第一題。
-Promise.all(players.map((player, playerIndex) => preloadEftAssets({
-    studentId: getPlayerIdentity(playerIndex).caseId,
-    backgroundAssets: playerIndex === 0 ? ['assets/background.png'] : [],
-}))).then((arrowAssetsByPlayer) => {
+// 預載素材後，同時開始兩位玩家的第一題。查這個課次的成績和載入素材同時進行；
+// 兩位都只完成前半才從第 4 關開始，查不到或超過 5 秒都從第 1 關開始。
+Promise.all([
+    Promise.all(players.map((player, playerIndex) => preloadEftAssets({
+        studentId: getPlayerIdentity(playerIndex).caseId,
+        backgroundAssets: playerIndex === 0 ? ['assets/background.png'] : [],
+    }))),
+    (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('EFT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1)),
+]).then(([arrowAssetsByPlayer, startStage]) => {
     players.forEach((player, playerIndex) => {
         player.setArrowAssets(arrowAssetsByPlayer[playerIndex]);
     });
-    startSession();
+    startSession(startStage);
 }).catch((error) => {
     console.error('EFT 雙人載入或啟動失敗：', error);
     document.querySelectorAll('[data-ui="feedback"]').forEach((feedback) => {

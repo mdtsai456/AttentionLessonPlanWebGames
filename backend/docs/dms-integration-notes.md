@@ -86,8 +86,10 @@ school ──(fk_student_school)──▶ student ──(fk_assessment_student)�
 | `start_time` / `end_time` | `startTime` / `endTime` | `end_time` NULL = 未完成，API 回 `""` |
 
 分數細節在 5 張 `*_result` 表（每場對應一列，`game_type` 決定掛哪張）。
-**目前 API 只吐 5 個共同欄位**：`correctCount`、`wrongCount`、`accuracy`、`duration`、`stage`。
-各遊戲專屬欄位（`frameWrongCount`、`DAT_avgReactionTime`…）DB 裡有，**沒有端點回傳** ——
+**API 回傳 5 個共同欄位**：`correctCount`、`wrongCount`、`accuracy`、`duration`、`stage`，
+再加 5 個可能為 `null` 的選填欄位：`levelAccuracy`（第 1 關起每關正確率 0–1）、`avgReactionMs`、
+`questionCount`（IM 不送）、`aimRatio`、`focusMs`（後兩個只有瓢蟲追擊令）。
+其他遊戲專屬欄位（`frameWrongCount`、`DAT_avgReactionTime`…）DB 裡有，**沒有端點回傳** ——
 DMS 若要，需請後端加。
 
 ---
@@ -97,7 +99,7 @@ DMS 若要，需請後端加。
 - **5 款遊戲**：`DAT`、`DCCS`、`EFT`、`IM`、`TGame`
   （DB 存 `TGAME`，API 一律回 `TGame`；查詢參數大小寫不拘）。
 - **mode**：`single` / `double`
-  - 只有 **DAT / DCCS / EFT** 有雙人版；**IM / TGame 永遠 `single`**。
+  - **DAT / DCCS / EFT / TGame** 有雙人版；**IM 永遠 `single`**。
   - 雙人版 = 一台裝置兩個小孩，各記自己一筆，共用一個 `pair_id`。
   - **雙人版成績欄位與單人版完全一樣**，沒有合作／對戰新指標。
 - 對前端影響：凡是「一款遊戲」的地方都要多帶一個 `mode`；`/report` 的
@@ -133,11 +135,19 @@ DMS 若要，需請後端加。
 排序：先 `gameType`（字母序），再 `mode`（**`single` 一定在 `double` 前**）。
 某組全部場次 `stats` 皆 null → 回一列 `sessionCount` 保留、其餘為 0。
 
+⚠️ **分兩次玩完的一個課次是兩列**：網頁版學生在一個課次只打完前 3 關（`stage` 3）時，下次進同一款、同一模式的
+遊戲會從第 4 關開始，打完另送一列 `stage` 6。這一列的統計只含第 4～6 關，`levelAccuracy` 只有 3 個值
+（第 4、5、6 關）；打完整局的 `stage` 6 一定有 6 個值。`summaryByGame` 會把這兩列算成兩場，
+`totalCorrect` 等加總不會重複計算，但 `sessionCount`、`avgAccuracy` 會受影響，統計時要自己合併
+（教室後台的合併規則見 `Teacher_platform/README.md`）。
+
 ### c. `trends[]` — 折線圖用時間序列
 
 - 依 `(gameType, mode)` 分組；`stats` 為 null 的場次略過。
 - 每組固定 3 條序列：`correctCount`、`wrongCount`、`accuracy`。
 - 每條 `stats` 是 `{time, value}` 陣列，**由舊到新**，直接 X=time / Y=value。
+- 分兩次玩完的一個課次（見上面 `summaryByGame`）在折線上是兩個點：`stage` 3 那一點只有第 1～3 關，
+  `stage` 6 而且 `levelAccuracy` 只有 3 個值的那一點只有第 4～6 關。要畫成一個課次一點，請自己合併。
 
 ### 其他
 

@@ -54,24 +54,34 @@ const players = {
 
 init();
 
-/** 進入頁面後，先讀取進度，再繪製遊戲清單。同時查詢手錶的專心判定。 */
+/**
+ * 進入頁面後，先用骨架（進度 0%）立即畫出清單，避免等待進度資料時整塊空白，
+ * 再各自等自己的進度回來後更新畫面。雙人模式兩位玩家的進度分開等待，
+ * 其中一位回來得慢，不會拖累另一位的清單一起停在空白。
+ */
 async function init() {
   celebrateAttention();
   if (isDouble) {
     singleStage.hidden = true;
     dualStage.hidden = false;
-    const [progress1, progress2] = await Promise.all([
-      fetchStudentProgress(1),
-      fetchStudentProgress(2),
-    ]);
-    players[1].progressByGame = progress1;
-    players[2].progressByGame = progress2;
+    players[1].progressByGame = emptyProgress(DUO_GAMES);
+    players[2].progressByGame = emptyProgress(DUO_GAMES);
     renderPlayerGames(1);
     renderPlayerGames(2);
+    fetchStudentProgress(1).then((progress) => {
+      players[1].progressByGame = progress;
+      renderPlayerGames(1);
+    });
+    fetchStudentProgress(2).then((progress) => {
+      players[2].progressByGame = progress;
+      renderPlayerGames(2);
+    });
     return;
   }
 
   dualStage.hidden = true;
+  state.progressByGame = emptyProgress(GAMES);
+  renderGames();
   state.progressByGame = await fetchStudentProgress(1);
   renderGames();
 }
