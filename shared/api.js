@@ -124,9 +124,14 @@
     return 100;
   }
 
+  /** 各遊戲都是 0 的進度表。選遊戲頁在報表回來前先用它畫出骨架。 */
+  function emptyProgress(games = GAMES) {
+    return Object.fromEntries(games.map((game) => [game.id, 0]));
+  }
+
   /** 某一天各遊戲的進度。沒玩過的遊戲為 0，同一款取最高的一筆。 */
   function dayProgress(records, day, games = GAMES) {
-    const progress = Object.fromEntries(games.map((game) => [game.id, 0]));
+    const progress = emptyProgress(games);
     records.forEach((record) => {
       if (Number(record.currentDay) !== Number(day)) return;
       const gameId = mapGameId(record.gameType);
@@ -197,6 +202,7 @@
     mapGameId,
     progressFromRecord,
     GAMES,
+    emptyProgress,
     dayProgress,
     normalizeProgress,
   };

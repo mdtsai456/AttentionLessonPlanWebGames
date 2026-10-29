@@ -5,7 +5,7 @@
 // 進度使用後端的當日場次。DCCS 完成前 3 關為 50%，完成後段或其他遊戲為 100%。
 // =============================================================================
 
-const { GAMES, dayProgress, normalizeProgress } = WebGameApi;
+const { GAMES, emptyProgress, dayProgress, normalizeProgress } = WebGameApi;
 
 /** 雙人模式不包含指令出擊。 */
 const DUO_GAMES = GAMES.filter((game) => game.id !== "InstructionGame");
