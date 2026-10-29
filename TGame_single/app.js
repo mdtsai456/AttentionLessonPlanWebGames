@@ -490,8 +490,9 @@ function sendStageResult(stage) {
   });
 }
 
+/** 沒有任何作答記錄時回傳 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。 */
 function average(values) {
-  if (!values.length) return 0;
+  if (!values.length) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 

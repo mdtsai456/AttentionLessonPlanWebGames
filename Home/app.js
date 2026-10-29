@@ -68,6 +68,7 @@ function selectRole(role) {
     clearSelected("[data-mode]");
     renderCredentialSlots(1, ["老師"], false);
     loginForm.classList.remove("is-hidden");
+    clearCredentialInputs();
     return;
   }
 
@@ -94,6 +95,18 @@ function selectMode(mode) {
   }
 
   loginForm.classList.remove("is-hidden");
+  clearCredentialInputs();
+}
+
+/**
+ * 切換身分或模式後清空帳密欄位：共用電腦、多位學生輪流登入時，
+ * 瀏覽器的自動填入仍可能把新畫出來的欄位帶入前一位使用者的帳號或密碼。
+ */
+function clearCredentialInputs() {
+  loginForm.reset();
+  credentialSlots.querySelectorAll("input").forEach((input) => {
+    input.value = "";
+  });
 }
 
 /** 依玩家人數建立欄位。學生另填施測日，年級與場域由登入回應提供。老師只填帳號與密碼。 */
@@ -118,7 +131,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="text"
               name="username-${index}"
               placeholder="帳號"
-              autocomplete="username"
+              autocomplete="off"
               required
             />
           </label>
@@ -127,7 +140,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="password"
               name="password-${index}"
               placeholder="密碼"
-              autocomplete="current-password"
+              autocomplete="new-password"
               required
             />
           </label>

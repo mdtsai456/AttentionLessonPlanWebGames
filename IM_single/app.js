@@ -1096,8 +1096,9 @@ function sendStageResult(stage) {
   });
 }
 
+/** 沒有任何作答記錄時回傳 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。 */
 function averageReaction(stages) {
-  if (!stages.length) return 0;
+  if (!stages.length) return null;
   const total = stages.reduce((sum, item) => sum + Number(item.timeUsage || 0), 0);
   return (total / stages.length) * 1000;
 }
