@@ -298,10 +298,14 @@ async function fetchStudentProgress(slot) {
       `/students/${encodeURIComponent(studentKey)}/report?school=${encodeURIComponent(school)}`,
       token
     );
-    if (!res.ok) return progress;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.json();
     return dayProgress(body.records || [], day, games);
   } catch (_err) {
+    // 讀取失敗時說明，免得 0% 看起來像沒玩過；進度仍以 0 顯示，可以選遊戲。
+    const stage = isDouble ? dualStage : singleStage;
+    stage.querySelector(`[data-progress-error="${slot}"]`).textContent =
+      "進度讀取失敗，請檢查網路後重新整理頁面。";
     return progress;
   }
 }

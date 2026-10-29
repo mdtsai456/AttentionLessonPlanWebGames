@@ -104,6 +104,14 @@ body {
   color: #334155;
 }
 
+.empty-card.is-error {
+  border-color: #fca5a5;
+}
+
+.empty-card.is-error h3 {
+  color: #b91c1c;
+}
+
 .meta-card {
   background: #ffffff;
   padding: 1.25rem 1.5rem;

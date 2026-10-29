@@ -61,6 +61,7 @@ function selectRole(role) {
   state.mode = null; // 切換身分時，清除先前選擇的模式。
   setSelected("[data-role]", `[data-role="${role}"]`);
   errorMsg.textContent = "";
+  clearAuthNotice();
   panel.classList.remove("is-dual", "is-single");
 
   if (role === "teacher") {
@@ -84,6 +85,7 @@ function selectMode(mode) {
   state.mode = mode;
   setSelected("[data-mode]", `[data-mode="${mode}"]`);
   errorMsg.textContent = "";
+  clearAuthNotice();
   panel.classList.toggle("is-dual", mode === "dual");
   panel.classList.toggle("is-single", mode === "single");
 
@@ -330,13 +332,22 @@ function clearSelected(selector) {
 }
 
 // 驗證失敗時返回登入頁，在角色選擇畫面顯示提示，無須先開啟登入表單。
+let authNotice = null;
 const authReason = new URLSearchParams(location.search).get('auth');
 if (authReason === 'retry' || authReason === 'expired') {
-  const notice = document.createElement('p');
-  notice.setAttribute('role', 'alert');
-  notice.className = 'error';
-  notice.textContent = authReason === 'retry'
+  authNotice = document.createElement('p');
+  authNotice.setAttribute('role', 'alert');
+  authNotice.className = 'error';
+  authNotice.textContent = authReason === 'retry'
     ? '無法連線驗證登入，請確認網路後重新嘗試登入。'
     : '登入已失效或身分不符，請重新登入。';
-  panel.appendChild(notice);
+  panel.appendChild(authNotice);
+}
+
+/** 重新選身分或模式後，舊的提示已不適用：移除提示，網址也拿掉 ?auth=，重新整理不會再出現。 */
+function clearAuthNotice() {
+  if (!authNotice) return;
+  authNotice.remove();
+  authNotice = null;
+  history.replaceState(null, '', location.pathname);
 }
