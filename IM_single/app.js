@@ -980,6 +980,7 @@ function commitStage(passed) {
   };
   state.stageResults.push(record);
   state.stageTasks.push(record);
+  window.WebGameAudio?.[passed ? "playCorrect" : "playWrong"]();
 }
 
 /** 題目完成或 60 秒結束後，進入下一關。第 3 關後顯示中場休息，第 6 關後結算。 */
@@ -1033,6 +1034,7 @@ function finishGame(reason) {
   resultScore.textContent = `${state.score} / ${answered} 分`;
   resultHint.textContent = "六關都結束了";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
 
   // 第 6 關結束等待的空檔裡按過「離開」就已經存過了，saveCurrentRun 不會重送。
   void saveCurrentRun(6);

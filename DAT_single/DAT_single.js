@@ -345,6 +345,7 @@ function recordResult(pressed) {
   }
 
   $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
+  window.WebGameAudio?.[isSuccess ? 'playCorrect' : 'playWrong']();
   $('feedback').textContent = message;
   outcomes.push(isSuccess);
 
@@ -557,6 +558,7 @@ function finishGame() {
   }
 
   $('results').hidden = false;
+  window.WebGameAudio?.playComplete();
 }
 
 async function saveGameDataToBackend(data) {

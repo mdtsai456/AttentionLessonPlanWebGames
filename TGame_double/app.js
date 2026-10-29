@@ -634,10 +634,12 @@ function finishGame() {
   });
   resultHint.textContent = "六關都結束了，看看這次的得分";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
   void saveBoth(STAGE_COUNT);
 }
 
 function showFeedback(player, isCorrect) {
+  window.WebGameAudio?.[isCorrect ? "playCorrect" : "playWrong"]();
   player.feedbackEl.textContent = isCorrect ? "答對了！" : "答錯了";
   player.feedbackEl.classList.toggle("is-correct", isCorrect);
   player.feedbackEl.classList.toggle("is-wrong", !isCorrect);
