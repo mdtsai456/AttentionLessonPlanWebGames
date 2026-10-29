@@ -62,6 +62,13 @@ body {
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
 }
 
+.who {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #2f6f8f;
+}
+
 .label {
   margin: 0 0 0.7rem;
   font-size: 1rem;

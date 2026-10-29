@@ -43,4 +43,6 @@
 | `style.css` | 版面 |
 | `img/` | 圖 |
 
-離開這個頁面用登出按鈕時，會登出 token 並回到 `Home/`。
+標題下顯示登入帳號與第幾天（`student{n}_account`、`student{n}_day`）。舊的登入沒有存帳號時，改顯示個案編號。
+
+按登出會先跳確認框（`shared/leave-confirm.js`），雙人會提醒兩位學生都會一起登出。按「登出」才登出 token 並回到 `Home/`。

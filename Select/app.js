@@ -64,6 +64,7 @@ init();
  */
 async function init() {
   celebrateAttention();
+  renderAccounts();
   if (isDouble) {
     singleStage.hidden = true;
     dualStage.hidden = false;
@@ -87,6 +88,23 @@ async function init() {
   renderGames();
   state.progressByGame = await fetchStudentProgress(1);
   renderGames();
+}
+
+/** 學生登入時填的第幾天。slot 1 可沿用舊版的 current_day。 */
+function studentDay(slot) {
+  return sessionStorage.getItem(`student${slot}_day`)
+    || (slot === 1 ? sessionStorage.getItem("current_day") || sessionStorage.getItem("currentDay") : "")
+    || "1";
+}
+
+/** 在標題下顯示登入帳號與第幾天，讓學生確認沒有登錯。舊的登入沒有存帳號，改顯示個案編號。 */
+function renderAccounts() {
+  document.querySelectorAll("[data-who]").forEach((element) => {
+    const slot = Number(element.dataset.who);
+    const account = sessionStorage.getItem(`student${slot}_account`)
+      || sessionStorage.getItem(`student${slot}_case`) || "--";
+    element.textContent = `帳號 ${account}・第 ${studentDay(slot)} 天`;
+  });
 }
 
 function renderGames() {
@@ -155,6 +173,9 @@ window.addEventListener("pageshow", (event) => {
 });
 
 logoutBtn.addEventListener("click", async () => {
+  const message = isDouble ? "兩位學生都會一起登出，回到登入頁。" : "登出後會回到登入頁。";
+  const labels = { title: "確定要登出嗎？", stayText: "取消", leaveText: "登出" };
+  if (!(await window.confirmLeave(message, labels))) return;
   logoutBtn.disabled = true;
   try {
     await WebGameApi.logoutAll();
@@ -268,9 +289,7 @@ async function fetchStudentProgress(slot) {
   const studentKey = sessionStorage.getItem(`student${slot}_key`);
   const school = sessionStorage.getItem(`student${slot}_school`)
     || (slot === 1 ? sessionStorage.getItem("school") : "");
-  const day = sessionStorage.getItem(`student${slot}_day`)
-    || (slot === 1 ? sessionStorage.getItem("current_day") || sessionStorage.getItem("currentDay") : "")
-    || "1";
+  const day = studentDay(slot);
 
   if (!token || !studentKey || !school) return progress;
 

@@ -211,8 +211,9 @@ function storeTeacherSession(result) {
   window.WebGameSession?.stampLoginExpiry(result);
 }
 
-function storeStudentSlot(slot, result, day) {
+function storeStudentSlot(slot, result, day, account) {
   sessionStorage.setItem(`student${slot}_token`, result.token);
+  sessionStorage.setItem(`student${slot}_account`, account);
   sessionStorage.setItem(`student${slot}_key`, result.studentKey);
   sessionStorage.setItem(`student${slot}_case`, result.caseId);
   sessionStorage.setItem(`student${slot}_grade`, result.grade);
@@ -220,14 +221,14 @@ function storeStudentSlot(slot, result, day) {
   sessionStorage.setItem(`student${slot}_day`, String(day));
 }
 
-function storeStudentSession(mode, results, days) {
+function storeStudentSession(mode, results, days, accounts) {
   sessionStorage.clear();
   sessionStorage.setItem("user_role", "student");
   sessionStorage.setItem("login_role", "student");
   sessionStorage.setItem("game_mode", mode === "dual" ? "double" : "single");
   sessionStorage.setItem("token", results[0].token);
   results.forEach((result, index) => {
-    storeStudentSlot(index + 1, result, days[index]);
+    storeStudentSlot(index + 1, result, days[index], accounts[index]);
   });
   sessionStorage.setItem("grade", results[0].grade);
   sessionStorage.setItem("caseId", results[0].caseId);
@@ -293,7 +294,7 @@ async function submitLogin() {
         storeTeacherSession(results[0]);
       } else {
         const days = accounts.map((item) => item.currentDay);
-        storeStudentSession(mode, results, days);
+        storeStudentSession(mode, results, days, accounts.map((item) => item.username));
       }
     } catch (_err) {
       // 寫入登入狀態失敗時，清除已登出 token 的狀態，並避免將錯誤顯示為後端錯誤。

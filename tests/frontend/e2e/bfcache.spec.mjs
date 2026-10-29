@@ -31,6 +31,7 @@ test("學生在 Select 登出後按上一頁，不會停在還原的 Select", as
   await page.waitForTimeout(800);
 
   await page.click("#logout-btn");
+  await page.click(".webgame-leave-confirm__leave");
   await expect(page).toHaveURL(HOME_URL);
   await page.waitForTimeout(500);
 

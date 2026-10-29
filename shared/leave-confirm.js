@@ -31,11 +31,13 @@
 
   /**
    * 顯示確認框，回傳 Promise<boolean>：確定離開為 true，繼續遊戲／Esc 為 false。
+   * labels 可換標題與按鈕文字，例如選遊戲頁的登出確認。
    * 開著時暫停遊戲時鐘並攔下按鍵；取消時只解除這裡掛的暫停（例如視窗太小造成的
    * 暫停要維持）。確定時維持暫停，存檔請求的逾時要用 WebGameRuntime.nativeSetTimeout。
    */
-  window.confirmLeave = function (message = '離開後會回到選擇遊戲頁面。') {
+  window.confirmLeave = function (message = '離開後會回到選擇遊戲頁面。', labels = {}) {
     if (pending) return pending;
+    const { title = TITLE, stayText = '繼續遊戲', leaveText = '離開' } = labels;
     ensureStyle();
     const runtime = window.WebGameRuntime;
     // 用自己的暫停原因：別處的 resume() 不會解除它，關閉時也只解除自己的，
@@ -50,14 +52,16 @@
         <h2 class="webgame-leave-confirm__title" id="webgame-leave-confirm-title"></h2>
         <p class="webgame-leave-confirm__text" id="webgame-leave-confirm-text"></p>
         <div class="webgame-leave-confirm__actions">
-          <button type="button" class="webgame-leave-confirm__stay">繼續遊戲</button>
-          <button type="button" class="webgame-leave-confirm__leave">離開</button>
+          <button type="button" class="webgame-leave-confirm__stay"></button>
+          <button type="button" class="webgame-leave-confirm__leave"></button>
         </div>
       </div>`;
-    overlay.querySelector('h2').textContent = TITLE;
+    overlay.querySelector('h2').textContent = title;
     overlay.querySelector('p').textContent = message;
     const stay = overlay.querySelector('.webgame-leave-confirm__stay');
     const leave = overlay.querySelector('.webgame-leave-confirm__leave');
+    stay.textContent = stayText;
+    leave.textContent = leaveText;
     const buttons = [stay, leave];
 
     pending = new Promise((resolve) => {
