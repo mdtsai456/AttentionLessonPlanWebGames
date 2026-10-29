@@ -270,6 +270,11 @@ async function submitLogin() {
   // 雙人模式中目前登入的學生序號，用於錯誤訊息前綴。0 表示未進行登入。
   let loginSlot = 0;
 
+  // 後端會擋掉同帳號的重複登入：先登出這台瀏覽器自己舊的 token（包含按上一頁
+  // 返回後的再次登入），避免同一瀏覽器重新登入時被自己原本的 session 擋下來。
+  // 一定要等登出完成才能送出新登入，否則舊 token 可能還沒失效，新登入反而被擋。
+  await Promise.all(WebGameApi.storedTokens().map((token) => WebGameApi.logout(token)));
+
   try {
     if (teacher) {
       const result = await WebGameApi.loginTeacher(
@@ -299,8 +304,6 @@ async function submitLogin() {
       loginSlot = 0;
     }
 
-    // 清除 sessionStorage 前，先登出舊 token，包含按上一頁返回後的再次登入。
-    WebGameApi.storedTokens().forEach((token) => WebGameApi.logout(token));
     try {
       if (teacher) {
         storeTeacherSession(results[0]);
