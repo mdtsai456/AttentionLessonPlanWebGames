@@ -117,6 +117,7 @@
   /** 已確認要離開：直接導頁，不再跳出瀏覽器的離開詢問。 */
   window.leaveTo = function (url) {
     leaving = true;
+    window.WebGameLock?.release();
     window.location.href = url;
   };
 
