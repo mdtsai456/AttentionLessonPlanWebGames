@@ -1,4 +1,4 @@
-// 老師後台：切換學生時的成績回應順序、載入中選天、讀取失敗，以及 UTC 時間顯示。
+// 老師後台：切換學生時的成績回應順序、載入中選天、讀取失敗、UTC 時間顯示，以及分兩次玩完的合併顯示。
 import { test, expect } from "@playwright/test";
 import { TEACHER, loginAs } from "./helpers.mjs";
 
@@ -191,4 +191,162 @@ test.describe("裝置時區不是台灣（例如美東）", () => {
     await dayButton(page, 1).click();
     await expect(page.locator("#records-tbody tr").first().locator("td").last()).toHaveText("2026-07-01 11:40:00");
   });
+});
+
+// ---- 同一個課次分兩次玩完：stage 3（第 1～3 關）＋只含第 4～6 關的 stage 6，卡片合併兩列 ----
+
+const play = (gameType, startTime, stats, mode = "single") =>
+  ({ gameType, mode, currentDay: 1, startTime, stats });
+const levelTexts = (page, name) => card(page, name).locator(".level-list strong");
+const metric = (page, name, label) =>
+  card(page, name).locator(".metric-list > div").filter({ has: page.getByText(label, { exact: true }) }).locator("dd");
+
+async function openDay(page, rows) {
+  await openTeacher(page, { records: { G9_A01: rows } });
+  await page.selectOption("#student-select", "G9_A01");
+  await dayButton(page, 1).click();
+}
+
+test("前半 stage 3 加後半 stage 6（3 個值）：卡片合併成第 1～6 關，合計數字正確", async ({ page }) => {
+  await openDay(page, [
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 3, levelAccuracy: [0.9, 0.8, 0.7], correctCount: 9, wrongCount: 1, questionCount: 10,
+      accuracy: 0.9, duration: 180000, avgReactionMs: 400,
+    }),
+    play("EFT", "2026-07-01 05:00:00", {
+      stage: 6, levelAccuracy: [0.6, 0.5, 0.4], correctCount: 15, wrongCount: 15, questionCount: 30,
+      accuracy: 0.5, duration: 170000, avgReactionMs: 800,
+    }),
+    // 瓢蟲追擊令：準心對準時長比依兩列時長加權，專心時間相加。
+    play("DAT", "2026-07-01 03:10:00", {
+      stage: 3, levelAccuracy: [1, 1, 1], correctCount: 10, wrongCount: 0, questionCount: 10,
+      accuracy: 1, duration: 100000, avgReactionMs: 500, aimRatio: 0.5, focusMs: 50000,
+    }),
+    play("DAT", "2026-07-01 05:10:00", {
+      stage: 6, levelAccuracy: [0.5, 0.5, 0.5], correctCount: 5, wrongCount: 5, questionCount: 10,
+      accuracy: 0.5, duration: 300000, avgReactionMs: 500, aimRatio: 0.9, focusMs: 270000,
+    }),
+    // 指令出擊沒有 questionCount：題數改用答對加答錯。
+    play("IM", "2026-07-01 03:20:00", {
+      stage: 3, levelAccuracy: [1, 0.9, 0.8], correctCount: 9, wrongCount: 1,
+      accuracy: 0.9, duration: 60000, avgReactionMs: 400,
+    }),
+    play("IM", "2026-07-01 05:20:00", {
+      stage: 6, levelAccuracy: [0.7, 0.6, 0.5], correctCount: 15, wrongCount: 15,
+      accuracy: 0.5, duration: 90000, avgReactionMs: 800,
+    }),
+  ]);
+
+  await expect(card(page, "漂浮泡泡").locator(".card-percent")).toHaveText("100%");
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["90%", "80%", "70%", "60%", "50%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "遊玩時間")).toHaveText("350.0 秒");
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("60%"); // 24 ÷ 40
+  await expect(metric(page, "漂浮泡泡", "錯誤率")).toHaveText("40%");
+  await expect(metric(page, "漂浮泡泡", "總題數")).toHaveText("40");
+  await expect(metric(page, "漂浮泡泡", "平均反應時間")).toHaveText("0.7 秒"); // (400×10 + 800×30) ÷ 40
+  await expect(card(page, "漂浮泡泡").locator(".level-note")).toHaveCount(0);
+
+  await expect(levelTexts(page, "瓢蟲追擊令")).toHaveText(["100%", "100%", "100%", "50%", "50%", "50%"]);
+  await expect(metric(page, "瓢蟲追擊令", "正確率")).toHaveText("75%");
+  await expect(metric(page, "瓢蟲追擊令", "準心對準時長比")).toHaveText("80%"); // (0.5×100 + 0.9×300) ÷ 400
+  await expect(metric(page, "瓢蟲追擊令", "專心時間")).toHaveText("320.0 秒");
+
+  await expect(levelTexts(page, "指令出擊")).toHaveText(["100%", "90%", "80%", "70%", "60%", "50%"]);
+  await expect(metric(page, "指令出擊", "正確率")).toHaveText("60%");
+  await expect(metric(page, "指令出擊", "平均反應時間")).toHaveText("0.7 秒");
+  await expect(metric(page, "指令出擊", "遊玩時間")).toHaveText("150.0 秒");
+
+  // 明細表照舊一列一場，後半那一列標出只含第 4～6 關。
+  const rows = page.locator("#records-tbody tr");
+  await expect(rows).toHaveCount(6);
+  await expect(rows.nth(0).locator("td").nth(5)).toHaveText("3");
+  await expect(rows.nth(3).locator("td").nth(5)).toHaveText("6（第 4～6 關）");
+});
+
+test("一列完整 6 關的 stage 6：照舊顯示，不標成後半", async ({ page }) => {
+  await openDay(page, [
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 6, levelAccuracy: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4], correctCount: 30, wrongCount: 10, questionCount: 40,
+      accuracy: 0.75, duration: 360000, avgReactionMs: 600,
+    }),
+  ]);
+  await expect(card(page, "漂浮泡泡").locator(".card-percent")).toHaveText("100%");
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["90%", "80%", "70%", "60%", "50%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("75%");
+  await expect(metric(page, "漂浮泡泡", "遊玩時間")).toHaveText("360.0 秒");
+  await expect(page.locator("#records-tbody tr").first().locator("td").nth(5)).toHaveText("6");
+});
+
+test("同一個課次有完整 6 關的一列時，卡片顯示完整那一列，不合併前後半", async ({ page }) => {
+  await openDay(page, [
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 3, levelAccuracy: [0.1, 0.1, 0.1], correctCount: 1, wrongCount: 9, questionCount: 10, accuracy: 0.1, duration: 1000,
+    }),
+    play("EFT", "2026-07-01 04:00:00", {
+      stage: 6, levelAccuracy: [0.2, 0.2, 0.2], correctCount: 2, wrongCount: 8, questionCount: 10, accuracy: 0.2, duration: 2000,
+    }),
+    play("EFT", "2026-07-01 02:00:00", {
+      stage: 6, levelAccuracy: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4], correctCount: 30, wrongCount: 10, questionCount: 40,
+      accuracy: 0.75, duration: 360000,
+    }),
+  ]);
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["90%", "80%", "70%", "60%", "50%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("75%");
+  await expect(metric(page, "漂浮泡泡", "遊玩時間")).toHaveText("360.0 秒");
+});
+
+test("後半配不到前半（前半在後、或是別的模式）：後半那一列照舊當一般候選，各關正確率顯示在第 4～6 關", async ({ page }) => {
+  await openDay(page, [
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 3, levelAccuracy: [0.1, 0.1, 0.1], correctCount: 1, wrongCount: 9, questionCount: 10, accuracy: 0.1, duration: 1000,
+    }, "double"),
+    play("EFT", "2026-07-01 04:00:00", {
+      stage: 6, levelAccuracy: [0.6, 0.5, 0.4], correctCount: 15, wrongCount: 15, questionCount: 30, accuracy: 0.5, duration: 170000,
+    }),
+    play("EFT", "2026-07-01 05:00:00", {
+      stage: 3, levelAccuracy: [0.2, 0.2, 0.2], correctCount: 2, wrongCount: 8, questionCount: 10, accuracy: 0.2, duration: 2000,
+    }),
+  ]);
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["尚無各關紀錄", "尚無各關紀錄", "尚無各關紀錄", "60%", "50%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("50%");
+  await expect(metric(page, "漂浮泡泡", "總題數")).toHaveText("30");
+  await expect(page.locator("#records-tbody tr").nth(1).locator("td").nth(5)).toHaveText("6（第 4～6 關）");
+});
+
+test("前半沒有各關正確率：第 1～3 關顯示「尚無各關紀錄」，不是 0%", async ({ page }) => {
+  await openDay(page, [
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 3, correctCount: 9, wrongCount: 1, questionCount: 10, accuracy: 0.9, duration: 180000,
+    }),
+    play("EFT", "2026-07-01 05:00:00", {
+      stage: 6, levelAccuracy: [0.6, 0.5, 0.4], correctCount: 15, wrongCount: 15, questionCount: 30, accuracy: 0.5, duration: 170000,
+    }),
+  ]);
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["尚無各關紀錄", "尚無各關紀錄", "尚無各關紀錄", "60%", "50%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("60%");
+});
+
+test("前半玩了兩次、單人雙人各有一組：配最近的前半，取後半較晚的那一組", async ({ page }) => {
+  await openDay(page, [
+    // 單人：兩次前半，後半配較晚的那次（0.3）。
+    play("EFT", "2026-07-01 01:00:00", {
+      stage: 3, levelAccuracy: [0.1, 0.1, 0.1], correctCount: 1, wrongCount: 9, questionCount: 10, accuracy: 0.1, duration: 1000,
+    }),
+    play("EFT", "2026-07-01 02:00:00", {
+      stage: 3, levelAccuracy: [0.3, 0.3, 0.3], correctCount: 3, wrongCount: 7, questionCount: 10, accuracy: 0.3, duration: 1000,
+    }),
+    play("EFT", "2026-07-01 06:00:00", {
+      stage: 6, levelAccuracy: [0.4, 0.4, 0.4], correctCount: 4, wrongCount: 6, questionCount: 10, accuracy: 0.4, duration: 1000,
+    }),
+    // 雙人那一組的後半比較早，不採用。
+    play("EFT", "2026-07-01 03:00:00", {
+      stage: 3, levelAccuracy: [0.7, 0.7, 0.7], correctCount: 7, wrongCount: 3, questionCount: 10, accuracy: 0.7, duration: 1000,
+    }, "double"),
+    play("EFT", "2026-07-01 04:00:00", {
+      stage: 6, levelAccuracy: [0.8, 0.8, 0.8], correctCount: 8, wrongCount: 2, questionCount: 10, accuracy: 0.8, duration: 1000,
+    }, "double"),
+  ]);
+  await expect(levelTexts(page, "漂浮泡泡")).toHaveText(["30%", "30%", "30%", "40%", "40%", "40%"]);
+  await expect(metric(page, "漂浮泡泡", "正確率")).toHaveText("35%");
+  await expect(metric(page, "漂浮泡泡", "總題數")).toHaveText("20");
 });

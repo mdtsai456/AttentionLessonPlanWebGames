@@ -1,6 +1,6 @@
 // 獨立執行的入口。學生資料來自 Home 登入，此處不顯示選單。
 
-import { mountDCCS } from './dccs.js?v=7';
+import { mountDCCS } from './dccs.js?v=9';
 import { readLobbySession, returnToLobby } from './lobby.js?v=2';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 
@@ -47,9 +47,14 @@ async function main() {
   const sessionSeconds = readSessionSecondsOverride();
   if (sessionSeconds !== null) markDebugSession(sessionSeconds);
 
+  // 同一個課次已完成前半（後端有這個課次的 stage 3）就從第 4 關開始；最多等 5 秒，不會 reject。
+  // 不在這裡等：先掛上遊戲顯示載入畫面、綁好離開，查詢和載入關卡資料、圖片同時進行。
+  const startLevel = window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DCCS', { mode: 'single', slots: [1] }) : 1;
+
   const handle = mountDCCS({
     container: document.getElementById('game-root'),
     student,
+    startLevel,
     seed: parseSeed(),
     showTutorial: false,
     autoStart: true,

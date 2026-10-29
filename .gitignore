@@ -10,6 +10,7 @@ __pycache__/
 student_login.json
 *.db
 .vscode/
-**/node_modules/
+# 不加結尾斜線：連到別處的 node_modules 符號連結也要擋（斜線只比對資料夾）。
+**/node_modules
 tests/frontend/test-results/
 tests/frontend/playwright-report/

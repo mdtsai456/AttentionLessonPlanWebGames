@@ -35,6 +35,7 @@ const STAGE_COUNT = isPractice ? 1 : 6;
 const QUESTIONS_PER_STAGE = 2;
 const MID_STAGE = 3;
 let stage = 1;
+let firstStage = 1; // 這一局的起始關；4 表示後半那一局（這個課次已完成前半）
 let stageDeadline = 0;
 let stageQuestionNo = 0;
 let levelOutcomes = [[]];
@@ -52,7 +53,8 @@ function showSaveStatus({ status, message, retryable }) {
   $('save-notice').hidden = phase === 'finished' || status === 'idle' || status === 'saved';
 }
 
-function startGame() {
+// startStage 為 4 時是後半那一局：統計從 0 開始，只算第 4～6 關。「再玩一次」不帶參數，從第 1 關開始。
+function startGame(startStage = 1) {
   if (phase === 'finished' && saver && !saver.canRestart()) return;
   saver = window.DatSave.create({ url: `${window.WebGameApi.resolveApiBase()}/sessions`, onChange: showSaveStatus });
   $('save-status').textContent = '';
@@ -61,7 +63,7 @@ function startGame() {
   $('restart').disabled = false;
   $('btn-start-game').disabled = false;
   gameStartTime = window.WebGameRuntime.now();
-  stage = 1;
+  stage = firstStage = startStage;
   stageDeadline = 0;
   stageQuestionNo = 0;
   levelOutcomes = [[]];
@@ -502,7 +504,8 @@ function checkpointStage() {
   if (isPractice) return 0;
   const completed = phase === 'finished' || phase === 'stage_clear' ? stage : Math.max(0, stage - 1);
   if (completed >= STAGE_COUNT) return STAGE_COUNT;
-  if (completed >= MID_STAGE) return MID_STAGE;
+  // 後半那一局沒有前三關的成績：第 4、5 關離開什麼都不送，stage 3 那列留著，下次還是從第 4 關開始
+  if (completed >= MID_STAGE && firstStage <= MID_STAGE) return MID_STAGE;
   return 0;
 }
 
@@ -738,6 +741,11 @@ async function fetchStudentAssets() {
 async function initGameWorkflow() {
   console.log('🎮 遊戲開始，執行素材載入流程...');
 
+  // 正式模式看後端這個課次的成績決定起始關，和素材載入一起等；練習模式不查。
+  const startStageReady = isPractice
+    ? Promise.resolve(1)
+    : (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('DAT', { mode: 'single', slots: [1] }) : Promise.resolve(1));
+
   // 1. 載入前隱藏動物與準心，避免顯示預設圖片。
   const animalElem = $('animal');
   const crosshairElem = $('crosshair');
@@ -761,7 +769,7 @@ async function initGameWorkflow() {
   }
 
   // 3. 啟動遊戲，並計算初始位置。
-  startGame();
+  startGame(await startStageReady);
 
   // 4. 所有圖片下載並繪製完成後，顯示動物與準心。
   if (animalElem) animalElem.style.visibility = 'visible';
