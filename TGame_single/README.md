@@ -33,6 +33,5 @@ CSV 每一列是一個主題，分成正確項目與錯誤項目。畫面上的�
 | `style.css` | 版面 |
 | `asset/主題資料.csv` | 主題與正確／錯誤項目 |
 | `img/` | 場景、角色、物品 |
-| `fonts/` | 字型 |
 
 說明頁在 `Tutorial/TGame_tutorial.html`。瀏覽器回歸測試在 `tools/tgame-tests/`。

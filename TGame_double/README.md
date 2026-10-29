@@ -34,6 +34,5 @@
 | `style.css` | 版面 |
 | `asset/主題資料.csv` | 主題與正確／錯誤項目 |
 | `img/` | 場景，以及玩家 1、玩家 2 的角色與物品 |
-| `fonts/` | 字型 |
 
 說明頁在 `Tutorial/TGame_double_tutorial.html`。

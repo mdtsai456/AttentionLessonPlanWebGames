@@ -40,6 +40,6 @@
 | `index.html` | 後台畫面 |
 | `app.js` | 讀名單、選天、畫進度與明細、登出 |
 | `style.css` | 版面 |
-| `fonts/`、`img/` | 字型與圖 |
+| `img/` | 圖 |
 
 頁首的登入守門是 `shared/require-student.js`，這頁要求 `data-role="teacher"`。登出會清掉 session 並回到 `Home/`。

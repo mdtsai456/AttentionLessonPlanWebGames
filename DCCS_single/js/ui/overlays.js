@@ -5,7 +5,7 @@ const STYLE_ATTR = 'data-dccs-style';
 const CSS = `
 @font-face {
   font-family: "MaokenAssortedSans";
-  src: url("fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  src: url("../shared/fonts/MaokenAssortedSans-TC.woff2") format("woff2");
   font-weight: 400 800;
   font-display: swap;
   size-adjust: 120%;

@@ -40,6 +40,5 @@
 | `EFT_double.js` | 建立兩個玩家、等待過關、分別送成績 |
 | `EFT_double.css` | 版面 |
 | `assets/arrow/` | 這頁用的預設泡泡與箭頭 |
-| `fonts/` | 字型 |
 
 說明頁在 `Tutorial/EFT_double_tutorial.html`。出題與預載不在這個資料夾，而在 `shared/eft-game-logic.js`、`shared/eft-player.js`、`shared/eft-assets.js`。

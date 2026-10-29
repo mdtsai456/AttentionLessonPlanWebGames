@@ -1,4 +1,4 @@
-// HUD 繪製（SPEC 4.7）。使用 DCCS/fonts 的 MaokenAssortedSans 字型。
+// HUD 繪製（SPEC 4.7）。使用 shared/fonts 的 MaokenAssortedSans 字型。
 
 import { CONFIG } from '../config.js';
 

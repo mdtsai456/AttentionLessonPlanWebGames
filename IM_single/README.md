@@ -33,6 +33,5 @@
 | `app.js` | 地圖、指令、移動、背包與成績 |
 | `style.css` | 版面 |
 | `img/` | 角色、房間與物品 |
-| `fonts/` | 字型 |
 
 說明頁在 `Tutorial/InstructionGame_tutorial.html`。

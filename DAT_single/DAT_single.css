@@ -1,6 +1,6 @@
 @font-face {
   font-family: "MaokenAssortedSans";
-  src: url("../Home/fonts/MaokenAssortedSans-TC.ttf") format("truetype");
+  src: url("../shared/fonts/MaokenAssortedSans-TC.woff2") format("woff2");
   font-weight: 400 800;
   font-display: swap;
   size-adjust: 120%;
