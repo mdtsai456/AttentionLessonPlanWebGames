@@ -432,6 +432,7 @@ function finishGame(reason) {
   resultScore.textContent = `${state.score} / ${Math.max(total, 1)} 分`;
   resultHint.textContent = "六關都結束了，看看這次的得分";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
   void saveCurrentRun(STAGE_COUNT);
 }
 
@@ -497,8 +498,9 @@ function sendStageResult(stage) {
   });
 }
 
+/** 沒有任何作答記錄時回傳 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。 */
 function average(values) {
-  if (!values.length) return 0;
+  if (!values.length) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
@@ -515,6 +517,7 @@ function levelAccuracyText(stageCount) {
 }
 
 function showFeedback(isCorrect) {
+  window.WebGameAudio?.[isCorrect ? "playCorrect" : "playWrong"]();
   feedbackEl.textContent = isCorrect ? "答對了！" : "答錯了";
   feedbackEl.classList.toggle("is-correct", isCorrect);
   feedbackEl.classList.toggle("is-wrong", !isCorrect);

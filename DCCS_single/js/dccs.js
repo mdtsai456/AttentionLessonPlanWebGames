@@ -865,6 +865,7 @@ export function mountDCCS(options) {
         let submitted = null;
         const shouldShowResult =
           showResultScreen && !skipResult;
+        if (shouldShowResult) window.WebGameAudio?.playComplete();
 
         if (destroyed) {
           return;

@@ -242,3 +242,36 @@ def fetch_login_session(token: str) -> dict[str, Any] | None:
                 [token],
             )
             return cursor.fetchone()
+
+
+def fetch_login_sessions_for_teacher(teacher_id: int) -> list[dict[str, Any]]:
+    """查詢該老師目前所有的登入憑證，可能包含已過期但還沒被登出清掉的紀錄。
+
+    是否視為「已登入」交給呼叫端依 expires_at 判斷（見 get_current_identity 的慣例），
+    不在 SQL 裡用 NOW() 比較：expires_at 是以 Python 的 UTC 時間寫入，但 MariaDB 的
+    NOW() 會依資料庫連線的時區設定，不一定等於 UTC，比較結果可能因伺服器時區而偏移。
+    """
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT expires_at FROM login_session WHERE teacher_id = %s",
+                [teacher_id],
+            )
+            return list(cursor.fetchall())
+
+
+def fetch_login_sessions_for_student(
+    grade: str, case_id: str, school: str
+) -> list[dict[str, Any]]:
+    """查詢該學生目前所有的登入憑證，可能包含已過期但還沒被登出清掉的紀錄。
+
+    是否視為「已登入」交給呼叫端依 expires_at 判斷，原因同 fetch_login_sessions_for_teacher。
+    """
+    with get_read_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT expires_at FROM login_session "
+                "WHERE grade = %s AND case_id = %s AND school = %s",
+                [grade, case_id, school],
+            )
+            return list(cursor.fetchall())

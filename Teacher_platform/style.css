@@ -162,6 +162,7 @@ body {
 }
 
 .day-btn {
+  position: relative;
   min-width: 4.4rem;
   padding: 0.4rem 0.55rem;
   border: 1px solid #cbd5e1;
@@ -178,10 +179,26 @@ body {
   color: #1e3a8a;
 }
 
+/* 有這天的評測紀錄：右上角加個綠點，不用逐天點開才知道哪天有資料。 */
+.day-btn.has-data::after {
+  content: "";
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
 .day-btn.is-selected {
   background: #1e3a8a;
   border-color: #1e3a8a;
   color: #ffffff;
+}
+
+.day-btn.is-selected.has-data::after {
+  background: #4ade80;
 }
 
 .day-prompt {
