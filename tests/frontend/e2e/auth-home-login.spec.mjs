@@ -32,6 +32,64 @@ async function openSingleStudentForm(page) {
   await page.locator('[name="day-0"]').fill("3");
 }
 
+test("切換模式或身分後，帳號密碼欄位會清空，不殘留前一位使用者輸入的內容", async ({ page }) => {
+  await openSingleStudentForm(page);
+  await expect(page.locator('[name="username-0"]')).toHaveValue("S0001");
+
+  await page.locator('[data-mode="dual"]').click();
+  await expect(page.locator('[name="username-0"]')).toHaveValue("");
+  await expect(page.locator('[name="username-1"]')).toHaveValue("");
+  await expect(page.locator('[name="password-0"]')).toHaveValue("");
+
+  await page.locator('[name="username-0"]').fill("S0002");
+  await page.locator('[data-role="teacher"]').click();
+  await expect(page.locator('[name="username-0"]')).toHaveValue("");
+});
+
+test("帳號密碼欄位帶有防止瀏覽器自動帶入前次帳號的 autocomplete 設定", async ({ page }) => {
+  await openSingleStudentForm(page);
+  await expect(page.locator('[name="username-0"]')).toHaveAttribute("autocomplete", "off");
+  await expect(page.locator('[name="password-0"]')).toHaveAttribute("autocomplete", "new-password");
+});
+
+test("後端擋掉同帳號重複登入（409）時，顯示後端給的訊息", async ({ page }) => {
+  await page.route("**/api/auth/student/login", (route) => route.fulfill({
+    status: 409, contentType: "application/json",
+    body: JSON.stringify({ detail: "此帳號已在別處登入中，請先登出" }),
+  }));
+  await openSingleStudentForm(page);
+
+  await page.locator('#login-form [type="submit"]').click();
+
+  await expect(page.locator("#error-msg")).toHaveText("此帳號已在別處登入中，請先登出");
+});
+
+test("送出新登入前，先登出這台瀏覽器已存的舊 token，避免被自己的舊 session 擋下來", async ({ page }) => {
+  const calls = [];
+  await page.route("**/api/auth/logout", (route) => {
+    calls.push("logout");
+    return route.fulfill({ status: 204, body: "" });
+  });
+  await page.route("**/api/auth/student/login", (route) => {
+    calls.push("login");
+    return route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({
+        token: "student-token." + crypto.randomUUID(),
+        studentKey: "G9_S99", grade: "G9", caseId: "S99", school: "TEST",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(), expiresIn: 3600,
+      }),
+    });
+  });
+  await openSingleStudentForm(page);
+  await page.evaluate(() => sessionStorage.setItem("token", "stale-token"));
+
+  await page.locator('#login-form [type="submit"]').click();
+  await page.waitForURL(/\/Select\/index\.html/);
+
+  expect(calls).toEqual(["logout", "login"]);
+});
+
 for (const [label, change] of [
   ["改選雙人", () => selectMode("dual")],
   ["改選老師", () => selectRole("teacher")],

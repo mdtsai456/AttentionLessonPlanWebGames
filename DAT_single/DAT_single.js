@@ -347,6 +347,7 @@ function recordResult(pressed) {
   }
 
   $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
+  window.WebGameAudio?.[isSuccess ? 'playCorrect' : 'playWrong']();
   $('feedback').textContent = message;
   outcomes.push(isSuccess);
 
@@ -451,9 +452,10 @@ function statsSnapshot() {
 function sessionMetrics(stats) {
   const { score, wrong, offTarget, reactionSamples, activeMs, focusMs } = stats;
   const questionCount = score + wrong + offTarget;
+  // 沒有任何作答記錄時是 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。
   const avgReactionMs = reactionSamples.length
     ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
-    : 0;
+    : null;
   return {
     questionCount,
     avgReactionMs,
@@ -559,6 +561,7 @@ function finishGame() {
   }
 
   $('results').hidden = false;
+  window.WebGameAudio?.playComplete();
 }
 
 async function saveGameDataToBackend(data) {

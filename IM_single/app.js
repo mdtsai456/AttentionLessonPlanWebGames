@@ -990,6 +990,7 @@ function commitStage(passed) {
   };
   state.stageResults.push(record);
   state.stageTasks.push(record);
+  window.WebGameAudio?.[passed ? "playCorrect" : "playWrong"]();
 }
 
 /** 題目完成或 60 秒結束後，進入下一關。第 3 關後顯示中場休息，第 6 關後結算。 */
@@ -1043,6 +1044,7 @@ function finishGame(reason) {
   resultScore.textContent = `${state.score} / ${answered} 分`;
   resultHint.textContent = "六關都結束了";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
 
   // 第 6 關結束等待的空檔裡按過「離開」就已經存過了，saveCurrentRun 不會重送。
   void saveCurrentRun(6);
@@ -1109,8 +1111,9 @@ function sendStageResult(stage) {
   });
 }
 
+/** 沒有任何作答記錄時回傳 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。 */
 function averageReaction(stages) {
-  if (!stages.length) return 0;
+  if (!stages.length) return null;
   const total = stages.reduce((sum, item) => sum + Number(item.timeUsage || 0), 0);
   return (total / stages.length) * 1000;
 }

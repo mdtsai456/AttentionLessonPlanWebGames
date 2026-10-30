@@ -227,6 +227,10 @@ def test_login_response_includes_relative_lifetime(monkeypatch, path, fetch_name
     """expiresIn（秒）讓前端用自己的時鐘算到期時間，裝置時鐘快慢不影響登入長度。"""
     stored = hash_password("right-password")
     monkeypatch.setattr(queries, fetch_name, lambda account: {**row, "password_hash": stored})
+    monkeypatch.setattr(queries, "fetch_login_sessions_for_teacher", lambda teacher_id: [])
+    monkeypatch.setattr(
+        queries, "fetch_login_sessions_for_student", lambda grade, case_id, school: []
+    )
     monkeypatch.setattr(writes, "insert_login_session", lambda *args, **kwargs: None)
 
     with TestClient(main.app) as client:
@@ -369,6 +373,108 @@ def test_teacher_and_student_login_expire_after_one_hour(client, db):
         )
         stored = _as_utc(rows[0]["expires_at"])
         assert abs((stored - expires_at).total_seconds()) < 2
+
+
+def test_teacher_login_rejects_when_already_logged_in(client, db):
+    """同帳號已有未過期的登入憑證時，擋掉新登入，原本的登入不受影響。"""
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 409
+    assert second.json() == {"detail": "此帳號已在別處登入中，請先登出"}
+    # 原本的登入仍然有效。
+    me = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {first.json()['token']}"},
+    )
+    assert me.status_code == 200
+
+
+def test_teacher_login_succeeds_again_after_logout(client, db):
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {first.json()['token']}"},
+    )
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+
+
+def test_teacher_login_succeeds_when_previous_session_already_expired(client, db):
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    db.execute(
+        "UPDATE login_session SET expires_at = '2000-01-01 00:00:00' WHERE token = %s",
+        [first.json()["token"]],
+    )
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+
+
+def test_student_login_rejects_when_already_logged_in(client, db):
+    """雙人模式同帳號重複登入時擋掉新登入，見 docs/adr/0005-block-duplicate-login.md。"""
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    first = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+
+    assert second.status_code == 409
+    assert second.json() == {"detail": "此帳號已在別處登入中，請先登出"}
+
+
+def test_student_login_succeeds_again_after_logout(client, db):
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    first = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {first.json()['token']}"},
+    )
+
+    second = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
 
 
 def test_student_login_rejects_wrong_password(client, db):

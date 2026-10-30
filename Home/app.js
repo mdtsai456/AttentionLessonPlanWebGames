@@ -69,6 +69,7 @@ function selectRole(role) {
     clearSelected("[data-mode]");
     renderCredentialSlots(1, ["老師"], false);
     loginForm.classList.remove("is-hidden");
+    clearCredentialInputs();
     return;
   }
 
@@ -96,6 +97,18 @@ function selectMode(mode) {
   }
 
   loginForm.classList.remove("is-hidden");
+  clearCredentialInputs();
+}
+
+/**
+ * 切換身分或模式後清空帳密欄位：共用電腦、多位學生輪流登入時，
+ * 瀏覽器的自動填入仍可能把新畫出來的欄位帶入前一位使用者的帳號或密碼。
+ */
+function clearCredentialInputs() {
+  loginForm.reset();
+  credentialSlots.querySelectorAll("input").forEach((input) => {
+    input.value = "";
+  });
 }
 
 /** 依玩家人數建立欄位。學生另填施測日，年級與場域由登入回應提供。老師只填帳號與密碼。 */
@@ -120,7 +133,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="text"
               name="username-${index}"
               placeholder="帳號"
-              autocomplete="username"
+              autocomplete="off"
               required
             />
           </label>
@@ -129,7 +142,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="password"
               name="password-${index}"
               placeholder="密碼"
-              autocomplete="current-password"
+              autocomplete="new-password"
               required
             />
           </label>
@@ -260,6 +273,11 @@ async function submitLogin() {
   // 雙人模式中目前登入的學生序號，用於錯誤訊息前綴。0 表示未進行登入。
   let loginSlot = 0;
 
+  // 後端會擋掉同帳號的重複登入：先登出這台瀏覽器自己舊的 token（包含按上一頁
+  // 返回後的再次登入），避免同一瀏覽器重新登入時被自己原本的 session 擋下來。
+  // 一定要等登出完成才能送出新登入，否則舊 token 可能還沒失效，新登入反而被擋。
+  await Promise.all(WebGameApi.storedTokens().map((token) => WebGameApi.logout(token)));
+
   try {
     if (teacher) {
       const result = await WebGameApi.loginTeacher(
@@ -289,8 +307,6 @@ async function submitLogin() {
       loginSlot = 0;
     }
 
-    // 清除 sessionStorage 前，先登出舊 token，包含按上一頁返回後的再次登入。
-    WebGameApi.storedTokens().forEach((token) => WebGameApi.logout(token));
     try {
       if (teacher) {
         storeTeacherSession(results[0]);
