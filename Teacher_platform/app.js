@@ -26,7 +26,7 @@ const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重試。";
 let reportRequestId = 0;
 
 const state = {
-  students: [], // [{ id, name, username }]
+  students: [], // [{ id, name, grade, username, school, sessionCount, lastPlayedAt }]
   days: [], // 固定第 1～24 天
   sessions: [], // 目前學生的場次資料。選擇施測日時，用於計算進度。
   reportStatus: "idle", // "idle" | "loading" | "ready" | "error"。目前學生的場次讀取狀態。
@@ -130,18 +130,35 @@ function markSelectedDay(day) {
   });
 }
 
-/** 將學生名單加入下拉選單。第一個 option 顯示提示文字。 */
+/**
+ * 將學生名單加入下拉選單。第一個 option 顯示提示文字。
+ * 依年級分組（<optgroup>）；同一年級內，有施測紀錄的學生排前面，已測 0 場的排最後，
+ * 其餘維持後端給的順序。
+ */
 function renderStudents() {
-  const options = state.students
-    .map(
-      (student) =>
-        `<option value="${student.id}">個案 ${student.name}（已測 ${student.sessionCount || 0} 場）</option>`
-    )
+  const studentsByGrade = new Map();
+  for (const student of state.students) {
+    if (!studentsByGrade.has(student.grade)) studentsByGrade.set(student.grade, []);
+    studentsByGrade.get(student.grade).push(student);
+  }
+
+  const groups = [...studentsByGrade]
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([grade, students]) => {
+      const options = students
+        .sort((a, b) => Number(b.sessionCount > 0) - Number(a.sessionCount > 0))
+        .map(
+          (student) =>
+            `<option value="${student.id}">個案 ${student.name}（已測 ${student.sessionCount} 場）</option>`
+        )
+        .join("");
+      return `<optgroup label="${grade}">${options}</optgroup>`;
+    })
     .join("");
 
   studentSelect.innerHTML = `
     <option value="">請選擇學生</option>
-    ${options}
+    ${groups}
   `;
 }
 
@@ -389,6 +406,7 @@ async function fetchTeacherStudents() {
     return (body.students || []).map((student) => ({
       id: student.studentKey,
       name: student.studentKey,
+      grade: student.grade || "未分年級",
       username: student.caseId,
       school: student.school,
       sessionCount: student.sessionCount || 0,
