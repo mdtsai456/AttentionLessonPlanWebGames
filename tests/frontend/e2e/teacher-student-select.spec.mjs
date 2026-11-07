@@ -1,27 +1,6 @@
 // 老師後台的學生選單：依年級分組，同一年級內有施測紀錄的學生排前面，已測 0 場的排最後。
 import { test, expect } from '@playwright/test';
-import { TEACHER, loginAs } from './helpers.mjs';
-
-/**
- * 回傳假的學生名單。每位學生寫成 [grade, caseId, sessionCount, school]；
- * sessionCount 給 undefined 表示後端沒送這個欄位。
- */
-function routeStudents(page, students) {
-  return page.route('**/api/me/students', (route) => route.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({
-      students: students.map(([grade, caseId, sessionCount, school = 'TEST']) => ({
-        studentKey: `${grade}_${caseId}`, grade, caseId, school, sessionCount,
-      })),
-    }),
-  }));
-}
-
-/** 讀出選單結構：[{ label, options: [文字…] }]，不含第一個提示 option。 */
-function readGroups(page) {
-  return page.locator('#student-select').evaluate((select) => [...select.querySelectorAll('optgroup')]
-    .map((group) => ({ label: group.label, options: [...group.children].map((option) => option.textContent) })));
-}
+import { TEACHER, loginAs, routeStudents, readStudentGroups } from './helpers.mjs';
 
 async function openTeacherPage(page) {
   await loginAs(page, TEACHER);
@@ -36,7 +15,7 @@ test('依年級分組，同年級內已測 0 場的學生排到最後，其餘�
   await openTeacherPage(page);
 
   await expect(page.locator('#student-select option').first()).toHaveText('請選擇學生');
-  await expect.poll(() => readGroups(page)).toEqual([
+  await expect.poll(() => readStudentGroups(page)).toEqual([
     { label: 'G1', options: ['個案 G1_S002（已測 3 場）', '個案 G1_S004（已測 1 場）', '個案 G1_S001（已測 0 場）', '個案 G1_S003（已測 0 場）'] },
     { label: 'G2', options: ['個案 G2_S006（已測 2 場）', '個案 G2_S005（已測 0 場）'] },
   ]);
@@ -46,7 +25,7 @@ test('多個場域時同年級併成一組，年級依數字排序（G2 在 G10 
   await routeStudents(page, [['G10', 'S01', 1, 'A'], ['G2', 'S01', 0, 'A'], ['G2', 'S02', 4, 'B']]);
   await openTeacherPage(page);
 
-  await expect.poll(() => readGroups(page)).toEqual([
+  await expect.poll(() => readStudentGroups(page)).toEqual([
     { label: 'G2', options: ['個案 G2_S02（已測 4 場）', '個案 G2_S01（已測 0 場）'] },
     { label: 'G10', options: ['個案 G10_S01（已測 1 場）'] },
   ]);
@@ -56,7 +35,7 @@ test('後端沒給 sessionCount 時顯示「已測 0 場」並排在最後', asy
   await routeStudents(page, [['G1', 'S01', undefined], ['G1', 'S02', 2]]);
   await openTeacherPage(page);
 
-  await expect.poll(() => readGroups(page)).toEqual([
+  await expect.poll(() => readStudentGroups(page)).toEqual([
     { label: 'G1', options: ['個案 G1_S02（已測 2 場）', '個案 G1_S01（已測 0 場）'] },
   ]);
 });

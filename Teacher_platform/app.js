@@ -7,6 +7,7 @@
 const { GAMES, dayProgress, normalizeProgress } = WebGameApi;
 
 const studentSelect = document.getElementById("student-select");
+const studentSearch = document.getElementById("student-search");
 const dayRow = document.getElementById("day-row");
 const gameList = document.getElementById("game-list");
 const emptyHint = document.getElementById("empty-hint");
@@ -61,6 +62,10 @@ async function init() {
 
 studentSelect.addEventListener("change", () => {
   selectStudent(studentSelect.value);
+});
+
+studentSearch.addEventListener("input", () => {
+  renderStudents();
 });
 
 logoutBtn.addEventListener("click", async () => {
@@ -134,10 +139,17 @@ function markSelectedDay(day) {
  * 將學生名單加入下拉選單。第一個 option 顯示提示文字。
  * 依年級分組（<optgroup>）；同一年級內，有施測紀錄的學生排前面，已測 0 場的排最後，
  * 其餘維持後端給的順序。
+ * 搜尋框有字時只列出 ID 含該字的學生（不分大小寫）；目前選中的學生一律保留，
+ * 否則選單會被清回「請選擇學生」，跟下方顯示的報表對不起來。
  */
 function renderStudents() {
+  const keyword = studentSearch.value.trim().toUpperCase();
+  const matched = state.students.filter(
+    (student) => student.id === state.selectedStudentId || student.name.toUpperCase().includes(keyword)
+  );
+
   const studentsByGrade = new Map();
-  for (const student of state.students) {
+  for (const student of matched) {
     if (!studentsByGrade.has(student.grade)) studentsByGrade.set(student.grade, []);
     studentsByGrade.get(student.grade).push(student);
   }
@@ -156,10 +168,12 @@ function renderStudents() {
     })
     .join("");
 
+  const placeholder = keyword && !matched.length ? "找不到符合的學生" : "請選擇學生";
   studentSelect.innerHTML = `
-    <option value="">請選擇學生</option>
+    <option value="">${placeholder}</option>
     ${groups}
   `;
+  studentSelect.value = state.selectedStudentId;
 }
 
 /** 每位玩家最多 24 個施測日，天數固定為第 1～24 天。 */
@@ -419,6 +433,7 @@ async function fetchTeacherStudents() {
 
 /** 名單讀不到時，在下拉選單與提示卡說明，不要看起來像是沒有學生。 */
 function showStudentsError() {
+  studentSearch.disabled = true;
   studentSelect.innerHTML = '<option value="">學生名單讀取失敗</option>';
   emptyHint.querySelector("h3").textContent = "學生名單讀取失敗";
   emptyHint.querySelector("p").textContent = "請檢查網路後重新整理頁面。";

@@ -61,6 +61,12 @@ body {
   font-weight: 600;
 }
 
+.select-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.select-group input,
 .select-group select {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
@@ -71,6 +77,11 @@ body {
   outline: none;
 }
 
+.select-group input {
+  width: 9rem;
+}
+
+.select-group input:focus,
 .select-group select:focus {
   border-color: #2563eb;
 }
