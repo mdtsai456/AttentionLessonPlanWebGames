@@ -339,7 +339,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     };
   }
 
-  // 瓢蟲追擊令的成績使用 DAT 寫入。素材 API 也使用 DAT 查詢。
+  // 動物追擊令的成績使用 DAT 寫入。素材 API 也使用 DAT 查詢。
   function datStats(stage, stats, durationMs) {
     const metrics = sessionMetrics(stats);
     return [

@@ -33,8 +33,8 @@ class GameStats(BaseModel):
     levelAccuracy: list[float] | None = None  # 第 1 關起，每一關的正確率（0–1）
     avgReactionMs: float | None = None
     questionCount: int | None = None  # 指令出擊不送出此欄位。
-    aimRatio: float | None = None  # 瓢蟲追擊令：準心瞄準時間 ÷ 有效遊戲時間。
-    focusMs: float | None = None  # 瓢蟲追擊令：準心與目標重疊的累計時間。
+    aimRatio: float | None = None  # 動物追擊令：準心瞄準時間 ÷ 有效遊戲時間。
+    focusMs: float | None = None  # 動物追擊令：準心與目標重疊的累計時間。
 
 
 class PlayRecord(SessionItem):

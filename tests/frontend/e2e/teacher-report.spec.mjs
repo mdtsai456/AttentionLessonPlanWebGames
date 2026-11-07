@@ -217,7 +217,7 @@ test("前半 stage 3 加後半 stage 6（3 個值）：卡片合併成第 1～6 
       stage: 6, levelAccuracy: [0.6, 0.5, 0.4], correctCount: 15, wrongCount: 15, questionCount: 30,
       accuracy: 0.5, duration: 170000, avgReactionMs: 800,
     }),
-    // 瓢蟲追擊令：準心對準時長比依兩列時長加權，專心時間相加。
+    // 動物追擊令：準心對準時長比依兩列時長加權，專心時間相加。
     play("DAT", "2026-07-01 03:10:00", {
       stage: 3, levelAccuracy: [1, 1, 1], correctCount: 10, wrongCount: 0, questionCount: 10,
       accuracy: 1, duration: 100000, avgReactionMs: 500, aimRatio: 0.5, focusMs: 50000,
@@ -246,10 +246,10 @@ test("前半 stage 3 加後半 stage 6（3 個值）：卡片合併成第 1～6 
   await expect(metric(page, "漂浮泡泡", "平均反應時間")).toHaveText("0.7 秒"); // (400×10 + 800×30) ÷ 40
   await expect(card(page, "漂浮泡泡").locator(".level-note")).toHaveCount(0);
 
-  await expect(levelTexts(page, "瓢蟲追擊令")).toHaveText(["100%", "100%", "100%", "50%", "50%", "50%"]);
-  await expect(metric(page, "瓢蟲追擊令", "正確率")).toHaveText("75%");
-  await expect(metric(page, "瓢蟲追擊令", "準心對準時長比")).toHaveText("80%"); // (0.5×100 + 0.9×300) ÷ 400
-  await expect(metric(page, "瓢蟲追擊令", "專心時間")).toHaveText("320.0 秒");
+  await expect(levelTexts(page, "動物追擊令")).toHaveText(["100%", "100%", "100%", "50%", "50%", "50%"]);
+  await expect(metric(page, "動物追擊令", "正確率")).toHaveText("75%");
+  await expect(metric(page, "動物追擊令", "準心對準時長比")).toHaveText("80%"); // (0.5×100 + 0.9×300) ÷ 400
+  await expect(metric(page, "動物追擊令", "專心時間")).toHaveText("320.0 秒");
 
   await expect(levelTexts(page, "指令出擊")).toHaveText(["100%", "90%", "80%", "70%", "60%", "50%"]);
   await expect(metric(page, "指令出擊", "正確率")).toHaveText("60%");

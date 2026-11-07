@@ -13,7 +13,7 @@
 | 代號 | 畫面 | 單人說明頁 | 雙人說明頁 |
 | --- | --- | --- | --- |
 | `DCCS` | 賽道攔截 | `Tutorial/DCCS_tutorial.html` | `Tutorial/DCCS_double_tutorial.html` |
-| `DAT` | 瓢蟲追擊令 | `Tutorial/DAT_tutorial.html` | `Tutorial/DAT_double_tutorial.html` |
+| `DAT` | 動物追擊令 | `Tutorial/DAT_tutorial.html` | `Tutorial/DAT_double_tutorial.html` |
 | `EFT` | 漂浮泡泡 | `Tutorial/EFT_tutorial.html` | `Tutorial/EFT_double_tutorial.html` |
 | `TGame` | 勇闖迷宮 | `Tutorial/TGame_tutorial.html` | `Tutorial/TGame_double_tutorial.html` |
 | `InstructionGame` | 指令出擊 | `Tutorial/InstructionGame_tutorial.html` | 雙人沒有這個遊戲 |

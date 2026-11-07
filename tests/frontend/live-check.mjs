@@ -7,7 +7,7 @@ const browser = await chromium.launch();
 const result = { flows: [], sessions: [] };
 const games = [
   ['DCCS', '賽道攔截', 'DCCS_single/index.html', 'DCCS_double/index.html'],
-  ['DAT', '瓢蟲追擊令', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html'],
+  ['DAT', '動物追擊令', 'DAT_single/DAT_single.html', 'DAT_double/DAT_double.html'],
   ['EFT', '漂浮泡泡', 'EFT_single/EFT_single.html', 'EFT_double/EFT_double.html'],
   ['TGame', '勇闖迷宮', 'TGame_single/index.html', 'TGame_double/index.html'],
   ['InstructionGame', '指令出擊', 'IM_single/index.html', null],

@@ -67,7 +67,7 @@ function assertPayloads(all, game) {
   assert.equal(posts.length, game === 'double' ? 2 : 1, '每位玩家同局只送一次第 6 關');
   assert.deepEqual(posts.map((post) => post.data.caseId).sort(), game === 'double' ? ['S01', 'S02'] : ['S03']);
   for (const post of posts) {
-    assert.equal(post.lessonId, '1140908_DAT', '瓢蟲追擊令成績代號為 DAT');
+    assert.equal(post.lessonId, '1140908_DAT', '動物追擊令成績代號為 DAT');
     assert.equal(post.data.mode, game);
     assert.ok(post.data.endTime >= post.data.startTime);
     const stats = Object.fromEntries(post.data.stats.map(({ apiname, value }) => [apiname, value]));

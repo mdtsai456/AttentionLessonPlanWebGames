@@ -10,15 +10,15 @@
 | --- | --- | --- |
 | `DCCS_tutorial.html` | 賽道攔截・單人 | `DCCS_single/index.html` |
 | `DCCS_double_tutorial.html` | 賽道攔截・雙人 | `DCCS_double/index.html` |
-| `DAT_tutorial.html` | 瓢蟲追擊令・單人 | `DAT_single/DAT_single.html` |
-| `DAT_double_tutorial.html` | 瓢蟲追擊令・雙人 | `DAT_double/DAT_double.html` |
+| `DAT_tutorial.html` | 動物追擊令・單人 | `DAT_single/DAT_single.html` |
+| `DAT_double_tutorial.html` | 動物追擊令・雙人 | `DAT_double/DAT_double.html` |
 | `EFT_tutorial.html` | 漂浮泡泡・單人 | `EFT_single/EFT_single.html` |
 | `EFT_double_tutorial.html` | 漂浮泡泡・雙人 | `EFT_double/EFT_double.html` |
 | `TGame_tutorial.html` | 勇闖迷宮・單人 | `TGame_single/index.html` |
 | `TGame_double_tutorial.html` | 勇闖迷宮・雙人 | `TGame_double/index.html` |
 | `InstructionGame_tutorial.html` | 指令出擊 | `IM_single/index.html` |
 
-瓢蟲追擊令的兩個說明頁可以選「進入練習模式」（`?mode=practice`）或「不練習，直接挑戰」（`?mode=game`）。其餘遊戲從說明頁直接開始。
+動物追擊令的兩個說明頁可以選「進入練習模式」（`?mode=practice`）或「不練習，直接挑戰」（`?mode=game`）。其餘遊戲從說明頁直接開始。
 
 每個說明頁最下方都有「返回選遊戲」，回到 `Select/index.html` 重選，不必按瀏覽器的上一頁。
 
