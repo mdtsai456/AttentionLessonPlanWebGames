@@ -14,3 +14,5 @@ student_login.json
 **/node_modules
 tests/frontend/test-results/
 tests/frontend/playwright-report/
+# DCCS 測試的操作截圖（DCCS_single/tests/helpers.mjs 的 screenshotPath）。
+.context/
