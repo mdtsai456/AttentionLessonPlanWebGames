@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -159,17 +159,45 @@ def insert_login_session(
     case_id: str | None = None,
     school: str | None = None,
 ) -> None:
-    """建立一筆登入憑證。老師只填 teacher_id；學生只填 grade/case_id/school。"""
+    """建立一筆登入憑證。老師只填 teacher_id；學生只填 grade/case_id/school。
+
+    created_at 跟 expires_at 一樣存 Python 算的 UTC 時間，不用 SQL 的 NOW()：
+    NOW() 依資料庫時區而定，extend_login_session 拿兩欄一起算 8 小時上限時才不會差好幾小時。
+    """
+    created_at = datetime.now(timezone.utc)
     with get_write_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO login_session "
                 "(token, subject_type, teacher_id, grade, case_id, school, "
                 " created_at, expires_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)",
-                [token, subject_type, teacher_id, grade, case_id, school, expires_at],
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                [token, subject_type, teacher_id, grade, case_id, school,
+                 created_at, expires_at],
             )
         connection.commit()
+
+
+def extend_login_session(
+    token: str, now: datetime, idle_timeout: timedelta, max_lifetime: timedelta
+) -> bool:
+    """把尚未過期的登入憑證延到 now + idle_timeout，但不超過 created_at + max_lifetime。
+
+    GREATEST 保留原本較晚的到期時間，所以不會把登入縮短。
+    CAST 讓參數以 DATETIME 比較，不依賴字串與 DATETIME 混用時的隱性轉型。
+    已過期或不存在的 token 不更新，回傳 False。
+    """
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            updated = cursor.execute(
+                "UPDATE login_session "
+                "SET expires_at = LEAST(GREATEST(expires_at, CAST(%s AS DATETIME)), "
+                "                       created_at + INTERVAL %s SECOND) "
+                "WHERE token = %s AND expires_at > %s",
+                [now + idle_timeout, int(max_lifetime.total_seconds()), token, now],
+            )
+        connection.commit()
+    return bool(updated)
 
 
 def delete_login_session(token: str) -> None:
