@@ -74,8 +74,11 @@ def test_heartbeat_extends_to_idle_timeout_from_now(client, db, login_as_student
 
 
 def test_heartbeat_never_shortens_login(client, db, login_as_student):
-    """剛登入時到期時間是 1 小時後，比 30 分鐘晚；heartbeat 要保留 1 小時。"""
+    """到期時間本來就比「現在 + 30 分鐘」晚時，heartbeat 要保留原本較晚的時間。"""
     _, headers = login_as_student()
+    now = datetime.now(timezone.utc)
+    later = (now + timedelta(minutes=50)).replace(microsecond=0)
+    set_times(db, headers, created_at=now - timedelta(minutes=10), expires_at=later)
     before = stored_session(db, headers)["expires_at"]
 
     response = client.post("/api/auth/heartbeat", headers=headers)

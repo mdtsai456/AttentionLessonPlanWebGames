@@ -41,7 +41,7 @@
   這次特地加 `account` 欄位的原因（見 ADR 0004）。姓名／`studentKey`/`school`
   是登入**成功後**回應裡的顯示資訊，不是登入時要輸入的東西。
 - 密碼（和帳號）由後端/管理者預先指派，不是自助註冊。
-- 登入成功會拿到一組 `token`（不透明字串，1 小時後過期）。**之後所有會回傳學生
+- 登入成功會拿到一組 `token`（不透明字串，閒置 30 分鐘後過期，持續操作最多 8 小時）。**之後所有會回傳學生
   資料的 API，都要在 header 帶 `Authorization: Bearer <token>`**，否則回 `401`。
 - 後端會**強制**做場域隔離，不是只有前端 UI 藏起來：老師 token 查別場域一律
   `403`；學生 token 只能查自己，查別人也是 `403`。就算你手動用 curl 帶著自己的
@@ -146,12 +146,12 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 **Response 200**
 ```json
-{ "token": "…", "teacherId": 1, "teacherName": "吳老師", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 3600 }
+{ "token": "…", "teacherId": 1, "teacherName": "吳老師", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 1800 }
 ```
 
 `expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數。前端算自動登出時間請用
 **「收到回應時的 `Date.now()` + `expiresIn` × 1000」**，不要拿 `expiresAt` 直接跟裝置時鐘比：
-裝置時鐘快 N 分鐘，登入就會少 N 分鐘，快超過 1 小時會一登入就被登出。只有舊後端沒有
+裝置時鐘快 N 分鐘，登入就會少 N 分鐘，快超過效期會一登入就被登出。只有舊後端沒有
 `expiresIn` 時才退回用 `expiresAt`。
 
 `teacherName`／`school` 是**顯示用**的資訊，登入成功才知道，不是登入輸入。
@@ -170,7 +170,7 @@ GET  /api/students/{studentKey}/report?school={school}  （帶 Authorization）
 
 **Response 200**
 ```json
-{ "token": "…", "studentKey": "G1_S01", "grade": "G1", "caseId": "S01", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 3600 }
+{ "token": "…", "studentKey": "G1_S01", "grade": "G1", "caseId": "S01", "school": "KMU", "expiresAt": "2026-09-29T09:00:00+00:00", "expiresIn": 1800 }
 ```
 
 `studentKey`／`school` 同樣是顯示用資訊。
@@ -586,7 +586,7 @@ const url = `${BASE}/api/schools/${encodeURIComponent(school)}/teachers`;
 ```
 
 - `token` 是之後每支受保護 API 都要帶的東西，`sessionStorage` 存最合理——重新整理
-  頁面後還在，關掉分頁/瀏覽器就消失，跟 1 小時的伺服器端過期時間搭配剛好。
+  頁面後還在，關掉分頁/瀏覽器就消失，跟伺服器端的閒置過期時間搭配剛好。
 - 收到 `401` → 清掉 `sessionStorage` 裡的登入狀態、導回 `index.html`（token 過期了）。
 - 「登出」＝呼叫 `POST /api/auth/logout`（best-effort，失敗也沒關係）＋清掉
   `sessionStorage`＋導回登入頁。
