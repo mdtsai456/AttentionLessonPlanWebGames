@@ -3,12 +3,12 @@
 import { CONFIG } from './config.js';
 import { createLoop } from './core/loop.js';
 import { createInput } from './core/input.js?v=2';
-import { loadManifest, preloadImages } from './core/assets.js';
+import { AssetLoadError, loadManifest, preloadImages } from './core/assets.js?v=2';
 import { Track } from './game/track.js?v=2';
 import { createStats } from './game/stats.js?v=2';
 import { buildPayload, submitResult, flushPendingResults } from './net/client.js?v=4';
 import { resolveSubmitUrl } from './net/apiBase.js';
-import { createOverlays } from './ui/overlays.js?v=3';
+import { createOverlays } from './ui/overlays.js?v=4';
 
 // 雙人頁面只允許一個實例重送暫存成績。
 let pendingFlushStarted = false;
@@ -417,7 +417,10 @@ export function mountDCCS(options) {
         : new Error(String(errorValue));
 
     if (!destroyed) {
-      overlays.showError(error.message);
+      // 素材載入失敗多半是網路問題，給學生重新載入的按鈕；詳細檔名只記在主控台。
+      const canRetry = error instanceof AssetLoadError;
+      if (canRetry) console.error(error.detail);
+      overlays.showError(error.message, { retry: canRetry });
       emitPhase('error');
       rejectDone(error);
     }
@@ -613,14 +616,15 @@ export function mountDCCS(options) {
 
       manifestRef = manifest;
 
-      overlays.showLoading(
-        '正在載入圖片…'
-      );
-
       const images =
         await preloadImages(
           manifest,
-          assetBase
+          assetBase,
+          {
+            onProgress: (loaded, total) => {
+              overlays.showLoading(`正在載入圖片…（${loaded}／${total}）`);
+            },
+          }
         );
 
       if (destroyed) {
