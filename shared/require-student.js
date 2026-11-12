@@ -26,7 +26,11 @@
 
   function home(reason, clear) {
     hide();
-    if (clear) sessionStorage.clear();
+    if (clear) {
+      // 登入已失效：刪掉共用的登入副本，其他分頁也一起回登入頁。
+      if (global.WebGameLogin) global.WebGameLogin.forget();
+      sessionStorage.clear();
+    }
     const url = new URL('Home/index.html', root);
     if (reason) url.searchParams.set('auth', reason);
     global.location.replace(url.href);

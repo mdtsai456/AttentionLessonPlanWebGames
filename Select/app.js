@@ -180,6 +180,8 @@ logoutBtn.addEventListener("click", async () => {
   try {
     await WebGameApi.logoutAll();
   } finally {
+    // 刪掉共用的登入副本，其他分頁也一起回登入頁。
+    window.WebGameLogin?.forget();
     sessionStorage.clear();
     location.href = "../Home/index.html";
   }
