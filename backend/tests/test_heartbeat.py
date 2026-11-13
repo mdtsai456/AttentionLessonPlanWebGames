@@ -268,8 +268,11 @@ def test_get_method_is_not_allowed():
 
 
 class RecordingCursor:
-    def __init__(self, rowcount):
+    """rowcount 是 UPDATE 回傳的「值有改變」列數；alive 是之後 SELECT 查到的 token 是否仍有效。"""
+
+    def __init__(self, rowcount, alive=True):
         self.rowcount = rowcount
+        self.alive = alive
         self.calls = []
 
     def __enter__(self):
@@ -281,6 +284,9 @@ class RecordingCursor:
     def execute(self, sql, params):
         self.calls.append((sql, params))
         return self.rowcount
+
+    def fetchone(self):
+        return {"1": 1} if self.alive else None
 
 
 class RecordingConnection:
@@ -295,10 +301,10 @@ class RecordingConnection:
         self.committed = True
 
 
-def install_connection(monkeypatch, rowcount):
+def install_connection(monkeypatch, rowcount, alive=True):
     from contextlib import contextmanager
 
-    cursor = RecordingCursor(rowcount)
+    cursor = RecordingCursor(rowcount, alive)
     connection = RecordingConnection(cursor)
 
     @contextmanager
@@ -326,13 +332,27 @@ def test_extend_sql_uses_idle_deadline_cap_and_only_live_tokens(monkeypatch):
     assert params == [now + timedelta(minutes=30), 8 * 3600, "tok", now]
 
 
-def test_extend_returns_false_when_no_row_updated(monkeypatch):
-    install_connection(monkeypatch, rowcount=0)
+def test_extend_returns_false_when_token_is_not_alive(monkeypatch):
+    install_connection(monkeypatch, rowcount=0, alive=False)
     now = datetime.now(timezone.utc)
 
     assert writes.extend_login_session(
         "tok", now, timedelta(minutes=30), timedelta(hours=8)
     ) is False
+
+
+def test_extend_returns_true_when_update_changes_nothing_but_token_is_alive(monkeypatch):
+    """同一秒送兩次、已到 8 小時上限時，UPDATE 算出的值不變、影響列數是 0，登入仍有效。"""
+    cursor, _ = install_connection(monkeypatch, rowcount=0, alive=True)
+    now = datetime(2026, 11, 12, 8, 0, tzinfo=timezone.utc)
+
+    assert writes.extend_login_session(
+        "tok", now, timedelta(minutes=30), timedelta(hours=8)
+    ) is True
+    sql, params = cursor.calls[1]
+    assert sql.startswith("SELECT 1 FROM login_session")
+    assert "expires_at > %s" in sql
+    assert params == ["tok", now]
 
 
 def test_insert_login_session_writes_utc_created_at(monkeypatch):

@@ -98,6 +98,32 @@ def test_heartbeat_stops_at_eight_hours_after_login(client, db, login_as_student
     assert response.json()["expiresIn"] <= 10 * 60
 
 
+def test_heartbeat_at_the_cap_keeps_login_until_the_cap(client, db, login_as_student):
+    """已到 8 小時上限後再送一次：UPDATE 算出的值不變（影響 0 列），登入仍有效，要回 200。"""
+    _, headers = login_as_student()
+    now = datetime.now(timezone.utc)
+    created_at = now - timedelta(hours=7, minutes=50)
+    set_times(db, headers, created_at=created_at, expires_at=created_at + SESSION_MAX_LIFETIME)
+
+    for _ in range(2):
+        response = client.post("/api/auth/heartbeat", headers=headers)
+        assert response.status_code == 200
+    assert_close(stored_session(db, headers)["expires_at"], created_at + SESSION_MAX_LIFETIME)
+
+
+def test_back_to_back_heartbeats_both_succeed(client, db, login_as_student):
+    """同一秒內送兩次（例如換頁後第一次操作）：第二次算出的值和第一次一樣，仍要回 200。"""
+    _, headers = login_as_student()
+    now = datetime.now(timezone.utc)
+    set_times(db, headers, created_at=now - timedelta(hours=1), expires_at=now + timedelta(minutes=5))
+
+    first = client.post("/api/auth/heartbeat", headers=headers)
+    second = client.post("/api/auth/heartbeat", headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+
 def test_heartbeat_after_eight_hours_ends_login(client, db, login_as_student):
     """超過 8 小時上限：heartbeat 回 401，之後所有 API 也都 401。"""
     _, headers = login_as_student()

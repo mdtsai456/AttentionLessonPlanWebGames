@@ -186,18 +186,27 @@ def extend_login_session(
     GREATEST 保留原本較晚的到期時間，所以不會把登入縮短。
     CAST 讓參數以 DATETIME 比較，不依賴字串與 DATETIME 混用時的隱性轉型。
     已過期或不存在的 token 不更新，回傳 False。
+
+    是否有效要在 UPDATE 之後另外查，不能看 UPDATE 的影響列數：pymysql 預設回傳
+    「值有改變」的列數，算出的到期時間和原本相同時（同一秒送兩次、已到 8 小時上限、
+    原本的到期時間比 now + idle_timeout 晚）會回 0，有效的登入會被誤判成失效。
     """
     with get_write_connection() as connection:
         with connection.cursor() as cursor:
-            updated = cursor.execute(
+            cursor.execute(
                 "UPDATE login_session "
                 "SET expires_at = LEAST(GREATEST(expires_at, CAST(%s AS DATETIME)), "
                 "                       created_at + INTERVAL %s SECOND) "
                 "WHERE token = %s AND expires_at > %s",
                 [now + idle_timeout, int(max_lifetime.total_seconds()), token, now],
             )
+            cursor.execute(
+                "SELECT 1 FROM login_session WHERE token = %s AND expires_at > %s",
+                [token, now],
+            )
+            alive = cursor.fetchone() is not None
         connection.commit()
-    return bool(updated)
+    return alive
 
 
 def delete_login_session(token: str) -> None:
