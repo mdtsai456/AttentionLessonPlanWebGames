@@ -242,3 +242,5 @@ def fetch_login_session(token: str) -> dict[str, Any] | None:
                 [token],
             )
             return cursor.fetchone()
+
+

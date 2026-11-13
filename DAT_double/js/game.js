@@ -318,6 +318,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     }
 
     $('animal').dataset.result = isSuccess ? 'correct' : 'wrong';
+    window.WebGameAudio?.[isSuccess ? 'playCorrect' : 'playWrong']();
     $('feedback').textContent = message;
     stageHits.push(Boolean(isSuccess));
     updateProgress();
@@ -358,9 +359,10 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
 
   function sessionMetrics({ score, wrong, offTarget, reactionSamples, activeMs, focusMs }) {
     const questionCount = score + wrong + offTarget;
+    // 沒有任何作答記錄時是 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。
     const avgReactionMs = reactionSamples.length
       ? reactionSamples.reduce((sum, value) => sum + value, 0) / reactionSamples.length
-      : 0;
+      : null;
     return {
       questionCount,
       avgReactionMs,
@@ -469,6 +471,7 @@ export function createPlayer(element, bindings, answerCodes, answerLabel, player
     $('summary').textContent = `累計誤按 ${wrong} 題・未瞄準 ${offTarget} 題・漏答 ${timedOut} 題`;
     $('accuracy').textContent = `總得分率 ${Math.round(accuracyValue * 100)}%`;
     $('results').hidden = false;
+    window.WebGameAudio?.playComplete();
 
     await saveRun(stageCount);
   }

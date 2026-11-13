@@ -44,7 +44,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from db import validate_db_settings
-from routers import attention, auth, directory, sessions, students
+from routers import attention, auth, directory, game_lock, sessions, students
 
 load_dotenv()
 
@@ -104,6 +104,7 @@ app.include_router(students.router)
 app.include_router(directory.router)
 app.include_router(auth.router)
 app.include_router(attention.router)
+app.include_router(game_lock.router)
 
 
 @app.get("/")

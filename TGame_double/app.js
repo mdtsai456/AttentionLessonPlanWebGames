@@ -211,10 +211,11 @@ async function savePlayer(player, index, stage) {
           { apiname: "TGame_stage", value: stage },
           { apiname: "TGame_levelAccuracy", value: levelAccuracyText(player, stage) },
           {
+            // 沒有任何作答記錄時送 null（而不是 0），讓老師後台顯示「—」而非「0.0秒」。
             apiname: "TGame_avgReactionMs",
             value: player.reactionSamples.length
               ? player.reactionSamples.reduce((sum, value) => sum + value, 0) / player.reactionSamples.length
-              : 0,
+              : null,
           },
           { apiname: "TGame_questionCount", value: player.answers.length },
         ],
@@ -640,10 +641,12 @@ function finishGame() {
   });
   resultHint.textContent = "六關都結束了，看看這次的得分";
   resultEl.classList.remove("is-hidden");
+  window.WebGameAudio?.playComplete();
   void saveBoth(STAGE_COUNT);
 }
 
 function showFeedback(player, isCorrect) {
+  window.WebGameAudio?.[isCorrect ? "playCorrect" : "playWrong"]();
   player.feedbackEl.textContent = isCorrect ? "答對了！" : "答錯了";
   player.feedbackEl.classList.toggle("is-correct", isCorrect);
   player.feedbackEl.classList.toggle("is-wrong", !isCorrect);

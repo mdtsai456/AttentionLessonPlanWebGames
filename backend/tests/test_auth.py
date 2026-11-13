@@ -227,7 +227,7 @@ def test_login_response_includes_relative_lifetime(monkeypatch, path, fetch_name
     """expiresIn（秒）讓前端用自己的時鐘算到期時間，裝置時鐘快慢不影響登入長度。"""
     stored = hash_password("right-password")
     monkeypatch.setattr(queries, fetch_name, lambda account: {**row, "password_hash": stored})
-    monkeypatch.setattr(writes, "insert_login_session", lambda *args, **kwargs: None)
+    monkeypatch.setattr(writes, "replace_login_session", lambda *args, **kwargs: None)
 
     with TestClient(main.app) as client:
         before = datetime.now(timezone.utc)
@@ -369,6 +369,147 @@ def test_teacher_and_student_login_expire_after_one_hour(client, db):
         )
         stored = _as_utc(rows[0]["expires_at"])
         assert abs((stored - expires_at).total_seconds()) < 2
+
+
+def test_teacher_login_takes_over_previous_login(client, db):
+    """同帳號再登入一次：新登入成功，原本的 token 失效（見 docs/adr/0005-block-duplicate-login.md）。"""
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+    old = client.get("/api/auth/me", headers={"Authorization": f"Bearer {first.json()['token']}"})
+    new = client.get("/api/auth/me", headers={"Authorization": f"Bearer {second.json()['token']}"})
+    assert old.status_code == 401
+    assert new.status_code == 200
+
+
+def test_teacher_login_succeeds_again_after_logout(client, db):
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {first.json()['token']}"},
+    )
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+
+
+def test_teacher_login_succeeds_when_previous_session_already_expired(client, db):
+    db.insert_school("A")
+    db.insert_teacher("吳老師", "A", password="right-password", account="T001")
+    first = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+    db.execute(
+        "UPDATE login_session SET expires_at = '2000-01-01 00:00:00' WHERE token = %s",
+        [first.json()["token"]],
+    )
+
+    second = client.post(
+        "/api/auth/teacher/login",
+        json={"account": "T001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+
+
+def test_student_login_takes_over_previous_login(client, db):
+    """沒按登出就關掉分頁的學生可以再登入；原本的 token 失效，不會兩邊同時寫成績。"""
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    first = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
+    old = client.get("/api/auth/me", headers={"Authorization": f"Bearer {first.json()['token']}"})
+    assert old.status_code == 401
+    rows = db.query(
+        "SELECT token FROM login_session WHERE grade = 'G1' AND case_id = 'S01' AND school = 'A'"
+    )
+    assert [row["token"] for row in rows] == [second.json()["token"]]
+
+
+def test_student_takeover_clears_game_locks(client, db):
+    """新裝置登入後不用等舊分頁的遊戲鎖逾時；舊分頁的鎖心跳會拿到 409。"""
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    first = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    old_headers = {"Authorization": f"Bearer {first.json()['token']}"}
+    acquired = client.post("/api/game-lock/acquire", json={"gameId": "DAT"}, headers=old_headers)
+    assert acquired.status_code == 200
+
+    second = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    new_headers = {"Authorization": f"Bearer {second.json()['token']}"}
+
+    assert client.post(
+        "/api/game-lock/acquire", json={"gameId": "DAT"}, headers=new_headers
+    ).status_code == 200
+
+
+def test_student_login_with_other_student_logged_in_does_not_affect_them(client, db):
+    """接手只作用在同一個帳號，別的學生的登入不受影響。"""
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    db.insert_student("G1", "S02", "A", password="right-password", account="S002")
+    other = client.post(
+        "/api/auth/student/login",
+        json={"account": "S002", "password": "right-password"},
+    )
+
+    client.post("/api/auth/student/login", json={"account": "S001", "password": "right-password"})
+
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {other.json()['token']}"})
+    assert me.status_code == 200
+
+
+def test_student_login_succeeds_again_after_logout(client, db):
+    db.insert_student("G1", "S01", "A", password="right-password", account="S001")
+    first = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+    client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {first.json()['token']}"},
+    )
+
+    second = client.post(
+        "/api/auth/student/login",
+        json={"account": "S001", "password": "right-password"},
+    )
+
+    assert second.status_code == 200
 
 
 def test_student_login_rejects_wrong_password(client, db):

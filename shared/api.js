@@ -21,11 +21,21 @@
   }
 
   /**
-   * 401 回應表示帳號或密碼錯誤，回傳 null。其他失敗拋出 Error，供畫面顯示伺服器錯誤。
+   * 401 回應表示帳號或密碼錯誤，回傳 null。409 表示該帳號已在別處登入中，
+   * 直接顯示後端給的訊息。其他失敗拋出 Error，供畫面顯示伺服器錯誤。
    * contact 指定非 5xx 錯誤時的聯絡對象。老師登入失敗時，不提示聯絡老師。
    */
   async function readLoginResponse(res, contact) {
     if (res.status === 401) return null;
+    if (res.status === 409) {
+      let detail = null;
+      try {
+        detail = (await res.json()).detail;
+      } catch (_err) {
+        // 讀不到 body 時，仍顯示下面的預設訊息。
+      }
+      throw new Error(detail || "此帳號已在別處登入中，請先登出");
+    }
     if (!res.ok) {
       throw new Error(
         res.status >= 500

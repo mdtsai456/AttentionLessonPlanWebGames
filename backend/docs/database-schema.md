@@ -1,9 +1,11 @@
 # 資料庫結構（中介平台 `AttentionLessonPlan`）
 
-MariaDB。10 張表：3 張「參照 / 名冊」+ 1 張「登入憑證」+ 1 張「場次索引」+
-5 張「各遊戲細部成績」。
+MariaDB。11 張表：3 張「參照 / 名冊」+ 1 張「登入憑證」+ 1 張「遊戲鎖」+
+1 張「場次索引」+ 5 張「各遊戲細部成績」。
 
 - 精確 DDL：[`tests/schema.sql`](../tests/schema.sql)（正式庫與測試庫都照這份建）
+- 2026-11-13：新增 `game_lock`（同帳號兩個分頁不能同時玩同一款遊戲）。**正式庫要手動建表**，
+  SQL 見下方「2026-11-13：新增 `game_lock`」；決策脈絡見 [`adr/0006`](adr/0006-game-lock.md)。
 - API 層的濃縮總覽（含端點）：[`backend-reference.md`](backend-reference.md)
 - 2026-09-11：`teacher`/`student` 各加 `account`（全域唯一登入帳號）/
   `password_hash`；`student` 另加代理鍵 `student_id`；新增 `login_session`
@@ -30,6 +32,7 @@ erDiagram
     assessment_result ||--o| tgame_result      : "game_type=TGAME"
     teacher           ||--o{ login_session     : "老師登入的 token（0 或多筆）"
     student           ||--o{ login_session     : "學生登入的 token（0 或多筆）"
+    student           ||--o{ game_lock         : "每款遊戲最多一個持有中的分頁"
 
     school {
         varchar school PK "場域代碼 KMU NTHU-01..07"
@@ -122,6 +125,33 @@ erDiagram
 > 「某老師的學生」= 該老師 `teacher.school` 所對應的全部 `student`（同場域兩位老師看同一批）。
 > 老師與學生之間**不需要**中介表：這層關係完全由兩邊的 `school` 值決定，可推導、無額外資訊。
 > 若日後要「每位老師各帶一部分學生」，才需要 `student.teacher_id` 或 `teacher_student` 表。
+
+---
+
+## 2026-11-13：新增 `game_lock`
+
+同一位學生在兩個分頁玩同一款遊戲時，只有先進入的那個分頁能繼續（見
+[`adr/0006`](adr/0006-game-lock.md)）。主鍵 `(grade, case_id, school, game_id)`：每位學生每款遊戲
+最多一列；`lock_id` 是持有中分頁的隨機代碼，`heartbeat_at` 超過 30 秒沒更新就可被別的分頁接手。
+學生被刪除時一併刪除（`ON DELETE CASCADE`）。
+
+**正式庫要手動執行一次**（後端不會自己建表；沒建表時遊戲鎖的 API 回 500，前端會略過、遊戲照常，
+但同帳號雙分頁不會被擋）：
+
+```sql
+CREATE TABLE IF NOT EXISTS `game_lock` (
+  `grade` varchar(20) NOT NULL,
+  `case_id` varchar(50) NOT NULL,
+  `school` varchar(100) NOT NULL,
+  `game_id` varchar(20) NOT NULL,
+  `lock_id` varchar(64) NOT NULL,
+  `acquired_at` datetime NOT NULL,
+  `heartbeat_at` datetime NOT NULL,
+  PRIMARY KEY (`grade`, `case_id`, `school`, `game_id`),
+  CONSTRAINT `fk_game_lock_student` FOREIGN KEY (`grade`, `case_id`, `school`)
+    REFERENCES `student` (`grade`, `case_id`, `school`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
 ---
 

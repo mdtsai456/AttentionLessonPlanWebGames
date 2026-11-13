@@ -51,6 +51,34 @@ async function openTeacher(page, { handlers = {}, students = STUDENTS, records =
 const dayButton = (page, day) => page.locator(`#day-row [data-day="${day}"]`);
 const card = (page, name) => page.locator(".game-card", { hasText: name });
 
+/** 讀取某張遊戲卡片裡，某個欄位標籤旁邊顯示的值（dt/dd 配對）。 */
+const metricValue = (page, gameName, label) =>
+  card(page, gameName).evaluate((el, label) => {
+    const dt = [...el.querySelectorAll("dt")].find((item) => item.textContent === label);
+    return dt ? dt.nextElementSibling.textContent : null;
+  }, label);
+
+test("沒有平均反應時間/正確率紀錄（null）時顯示「—」，不是「0.0秒」或「0%」", async ({ page }) => {
+  const students = [{ studentKey: "G9_C03", caseId: "C03", school: "TEST", sessionCount: 1, lastPlayedAt: "2026-07-03 03:40:00" }];
+  const records = {
+    G9_C03: [
+      {
+        // accuracy 刻意不給（undefined），對應「這款沒有正確率紀錄」；
+        // avgReactionMs 刻意給 null，對應「沒有反應時間紀錄」，兩種來源路徑都測到。
+        gameType: "DCCS", mode: "single", currentDay: 1, startTime: "2026-07-03 03:40:00",
+        stats: { stage: 6, avgReactionMs: null },
+      },
+    ],
+  };
+  await openTeacher(page, { students, records });
+
+  await page.selectOption("#student-select", "G9_C03");
+  await dayButton(page, 1).click();
+
+  expect(await metricValue(page, "賽道攔截", "平均反應時間")).toBe("—");
+  expect(await metricValue(page, "賽道攔截", "正確率")).toBe("—");
+});
+
 test("先選 A 再選 B，A 的成績較晚回來也不會蓋掉 B", async ({ page }) => {
   const gateA = deferred();
   const requestedA = deferred();
@@ -76,6 +104,14 @@ test("先選 A 再選 B，A 的成績較晚回來也不會蓋掉 B", async ({ pa
   await expect(page.locator("#records-tbody")).not.toContainText("賽道攔截");
   await expect(card(page, "漂浮泡泡").locator(".card-percent")).toHaveText("100%");
   await expect(card(page, "賽道攔截").locator(".card-percent")).toHaveText("0%");
+});
+
+test("有場次紀錄的天數按鈕標示 has-data，沒有紀錄的天數不標示", async ({ page }) => {
+  await openTeacher(page);
+
+  await page.selectOption("#student-select", "G9_A01");
+  await expect(dayButton(page, 1)).toHaveClass(/has-data/);
+  await expect(dayButton(page, 2)).not.toHaveClass(/has-data/);
 });
 
 test("換學生、成績還在載入時，天數不能選，也不會拿上一位學生的成績畫卡片", async ({ page }) => {

@@ -69,6 +69,7 @@ function selectRole(role) {
     clearSelected("[data-mode]");
     renderCredentialSlots(1, ["老師"], false);
     loginForm.classList.remove("is-hidden");
+    clearCredentialInputs();
     return;
   }
 
@@ -96,6 +97,18 @@ function selectMode(mode) {
   }
 
   loginForm.classList.remove("is-hidden");
+  clearCredentialInputs();
+}
+
+/**
+ * 切換身分或模式後清空帳密欄位：共用電腦、多位學生輪流登入時，
+ * 瀏覽器的自動填入仍可能把新畫出來的欄位帶入前一位使用者的帳號或密碼。
+ */
+function clearCredentialInputs() {
+  loginForm.reset();
+  credentialSlots.querySelectorAll("input").forEach((input) => {
+    input.value = "";
+  });
 }
 
 /** 依玩家人數建立欄位。學生另填施測日，年級與場域由登入回應提供。老師只填帳號與密碼。 */
@@ -120,7 +133,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="text"
               name="username-${index}"
               placeholder="帳號"
-              autocomplete="username"
+              autocomplete="off"
               required
             />
           </label>
@@ -129,7 +142,7 @@ function renderCredentialSlots(count, titles, includeSession) {
               type="password"
               name="password-${index}"
               placeholder="密碼"
-              autocomplete="current-password"
+              autocomplete="new-password"
               required
             />
           </label>
@@ -176,6 +189,10 @@ function validate(accounts) {
         ? `請輸入學生 ${missing + 1} 的第幾天`
         : "請輸入第幾天";
     }
+    // 後端是「新登入接手」：兩格填同一個帳號時，第二格會讓第一格的登入失效。
+    if (expected === 2 && sameAccount(accounts[0].username, accounts[1].username)) {
+      return "兩位學生要使用不同的帳號";
+    }
     const outOfRange = accounts.findIndex((item) => {
       const day = Number(item.currentDay);
       return !Number.isInteger(day) || day < 1 || day > 24;
@@ -188,6 +205,11 @@ function validate(accounts) {
   }
 
   return "";
+}
+
+/** 帳號比對不分大小寫、忽略前後空白，和後端查帳號的方式一致。 */
+function sameAccount(a, b) {
+  return String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 }
 
 function backendErrorMessage(err) {
@@ -289,8 +311,14 @@ async function submitLogin() {
       loginSlot = 0;
     }
 
-    // 清除 sessionStorage 前，先登出舊 token，包含按上一頁返回後的再次登入。
-    WebGameApi.storedTokens().forEach((token) => WebGameApi.logout(token));
+    // 新登入成功後，才登出這台瀏覽器原本的 token（包含按上一頁返回後的再次登入）。
+    // 不在登入前先登出：密碼打錯時，同一瀏覽器另一個分頁正在進行的遊戲會被作廢。
+    // 同帳號的舊登入後端已經接手作廢（見 backend/docs/adr/0005-block-duplicate-login.md）。
+    const newTokens = results.map((result) => result.token);
+    WebGameApi.storedTokens()
+      .filter((token) => !newTokens.includes(token))
+      .forEach((token) => WebGameApi.logout(token));
+
     try {
       if (teacher) {
         storeTeacherSession(results[0]);

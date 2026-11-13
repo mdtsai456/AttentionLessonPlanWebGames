@@ -71,7 +71,8 @@ def teacher_login(payload: TeacherLoginRequest) -> TeacherLoginResponse:
     token = generate_token()
     expires_at = datetime.now(timezone.utc) + TOKEN_TTL
     try:
-        writes.insert_login_session(
+        # 新登入接手：同帳號原本的登入失效（見 docs/adr/0005-block-duplicate-login.md）。
+        writes.replace_login_session(
             token, "teacher", expires_at, teacher_id=teacher["teacher_id"]
         )
     except Exception as exc:
@@ -98,10 +99,12 @@ def student_login(payload: StudentLoginRequest) -> StudentLoginResponse:
         raise _login_failed()
 
     grade, case_id, school = student["grade"], student["case_id"], student["school"]
+
     token = generate_token()
     expires_at = datetime.now(timezone.utc) + TOKEN_TTL
     try:
-        writes.insert_login_session(
+        # 新登入接手：同帳號原本的登入失效（見 docs/adr/0005-block-duplicate-login.md）。
+        writes.replace_login_session(
             token, "student", expires_at, grade=grade, case_id=case_id, school=school
         )
     except Exception as exc:
