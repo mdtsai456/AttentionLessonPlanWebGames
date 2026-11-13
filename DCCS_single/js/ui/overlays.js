@@ -495,7 +495,9 @@ const CSS = `
   text-align: center;
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
 }
-.dccs-level-continue {
+/* 錯誤畫面的「重新載入」與「繼續」同樣式，但用自己的 class，免得被當成關卡的「繼續」。 */
+.dccs-level-continue,
+.dccs-error-retry {
   width: clamp(160px, 42%, 240px);
   margin: 0;
   padding: clamp(10px, 1.8vh, 14px) 28px;
@@ -511,11 +513,14 @@ const CSS = `
   box-shadow: 0 6px 0 #4aa43a, 0 10px 14px rgba(70, 140, 60, 0.28);
 }
 .dccs-level-continue:hover,
-.dccs-level-continue:focus-visible {
+.dccs-level-continue:focus-visible,
+.dccs-error-retry:hover,
+.dccs-error-retry:focus-visible {
   filter: brightness(1.04);
   outline: none;
 }
-.dccs-level-continue:active {
+.dccs-level-continue:active,
+.dccs-error-retry:active {
   transform: translateY(4px);
   background: linear-gradient(#4fbe3c, #3a9a2c);
   box-shadow: none;
@@ -767,8 +772,12 @@ export function createOverlays(container) {
   );
   const errorEl = buildOverlay(
     'dccs-overlay-error',
-    '<h1>發生錯誤</h1><p class="dccs-hint dccs-error-detail"></p>'
+    '<h1>發生錯誤</h1><p class="dccs-hint dccs-error-detail"></p>' +
+      '<button class="dccs-error-retry" type="button" hidden>重新載入</button>'
   );
+  const errorRetryButton = errorEl.querySelector('.dccs-error-retry');
+  // 重新整理整頁：從頭載入素材，也重新驗證登入，不必處理載入到一半的狀態。
+  errorRetryButton.addEventListener('click', () => window.location.reload());
   // SPEC 1.4：教學只說明操作，不揭露受試者要自行推導的答題規則。
   const tutorialEl = buildOverlay(
     'dccs-overlay-tutorial',
@@ -959,9 +968,12 @@ export function createOverlays(container) {
     });
   }
 
-  function showError(message) {
+  /** retry 為 true 時顯示「重新載入」按鈕（素材載入失敗時使用）。 */
+  function showError(message, { retry = false } = {}) {
     errorEl.querySelector('.dccs-error-detail').textContent = message || '';
+    errorRetryButton.hidden = !retry;
     showOnly(errorEl);
+    if (retry) errorRetryButton.focus();
   }
 
   function destroy() {

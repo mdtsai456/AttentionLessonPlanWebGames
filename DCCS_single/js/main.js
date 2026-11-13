@@ -1,6 +1,6 @@
 // 獨立執行的入口。學生資料來自 Home 登入，此處不顯示選單。
 
-import { mountDCCS } from './dccs.js?v=9';
+import { mountDCCS } from './dccs.js?v=10';
 import { readLobbySession, returnToLobby } from './lobby.js?v=2';
 import { readSessionSecondsOverride, markDebugSession } from './debugParams.js';
 

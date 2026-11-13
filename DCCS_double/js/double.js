@@ -1,5 +1,5 @@
-import { mountDCCS, buildTutorialContent } from './dccs.js?v=9';
-import { loadManifest } from './core/assets.js';
+import { mountDCCS, buildTutorialContent } from './dccs.js?v=10';
+import { AssetLoadError, loadManifest } from './core/assets.js?v=2';
 import { ensureOverlayStyles, renderTutorialInto } from './ui/overlays.js';
 import { submitResult } from './net/client.js?v=4';
 import { readLobbySession, resolveCurrentDay, returnToLobby } from './lobby.js?v=2';
@@ -58,6 +58,12 @@ const sharedContinue =
 
 const sharedErrorMessage =
   document.getElementById('shared-error-message');
+
+const sharedErrorRetry =
+  document.getElementById('shared-error-retry');
+
+// 重新整理整頁：兩位玩家都從頭載入素材，也重新驗證登入。
+sharedErrorRetry.addEventListener('click', () => window.location.reload());
 
 function showSharedScreen(target) {
   const screens = [
@@ -482,7 +488,8 @@ async function startSession(player1, player2, startLevel = 1) {
         return;
       }
 
-      if (phase === 'error') {
+      // 已顯示「重新載入」時（圖片載入失敗）不覆蓋訊息：兩位玩家載入同一批圖，常會先後都失敗。
+      if (phase === 'error' && sharedErrorRetry.hidden) {
         sharedErrorMessage.textContent =
           '其中一位玩家載入失敗，請重新整理後再試一次。';
 
@@ -968,6 +975,16 @@ async function startSession(player1, player2, startLevel = 1) {
       removeSharedEvents();
 
       console.error(error);
+
+      // 圖片載入失敗多半是網路問題：留在共用的錯誤畫面，給「重新載入」按鈕，
+      // 不換成沒有按鈕的「遊戲發生錯誤」文字。
+      if (error instanceof AssetLoadError) {
+        sharedErrorMessage.textContent = error.message;
+        sharedErrorRetry.hidden = false;
+        showSharedScreen(sharedError);
+        sharedErrorRetry.focus();
+        return;
+      }
 
       doubleGame.hidden = true;
       hideSharedOverlay();

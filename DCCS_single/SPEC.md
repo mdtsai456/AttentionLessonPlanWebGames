@@ -378,16 +378,26 @@ export function createInput(bindings) -> {
 ### 4.4 `js/core/assets.js`
 
 ```js
-export async function loadManifest(url) -> Manifest
-export async function preloadImages(manifest, assetBase) -> Map<string, HTMLImageElement>
+export async function loadManifest(url, { timeoutMs?, retries? }?) -> Manifest
+export async function preloadImages(manifest, assetBase,
+  { timeoutMs?, retries?, onProgress?(loaded, total) }?) -> Map<string, HTMLImageElement>
+export class AssetLoadError extends Error  // message 給學生看，detail 記錄檔名
 ```
 
 `preloadImages` 必須載入 manifest 內所有圖片（背景、shapes、所有 categories 的
-images），全部 `decode()` 完成後才 resolve。**`load` 失敗**（`img.onerror`）
-即 reject 並指出檔名。Map 的 key 是資產的 `id`。
+images），全部 `decode()` 完成後才 resolve。Map 的 key 是資產的 `id`。
+
+**逾時與重試**：連線停住時 `onload`／`onerror` 都不會觸發，所以每張圖等
+`IMAGE_TIMEOUT_MS`（15 秒）、manifest 等 `MANIFEST_TIMEOUT_MS`（10 秒）。
+逾時或失敗自動重試 `RETRIES`（1）次，重試的圖片網址加 `?retry=1`，不沿用卡住的請求。
+重試後仍失敗才 reject `AssetLoadError`；畫面顯示錯誤與「重新載入」按鈕（重新整理整頁）。
+
+**進度**：`onProgress(loaded, total)` 開始時回報 `0／total`，每載完一張加 1；
+有一張確定失敗後不再回報，免得「載入中」蓋掉錯誤畫面。
 
 **`decode()` 本身失敗或不被支援時仍視為載入成功**（以 `onload` 為準）：
-`decode()` 在分頁不可見時可能永遠不 settle，當成必要條件會卡在載入畫面。
+`decode()` 在分頁不可見時可能永遠不 settle，當成必要條件會卡在載入畫面；
+`onload` 之後逾時仍未 settle，也視為載入成功。
 
 **`assetBase`**：manifest 裡的 `src` 是**相對路徑**（`assets/...`，見第 5 節），
 實際網址是 `new URL(src, assetBase).href`。`assetBase` 由呼叫端（`js/dccs.js`）
