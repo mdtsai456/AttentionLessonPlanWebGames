@@ -112,3 +112,24 @@ export function firstHalfRecord(gameType, { mode = "single", day = 3, stats = {}
     stats: { stage: 3, ...stats },
   };
 }
+
+/**
+ * 老師後台：回傳假的學生名單。每位學生寫成 [grade, caseId, sessionCount, school]；
+ * sessionCount 給 undefined 表示後端沒送這個欄位。
+ */
+export function routeStudents(page, students) {
+  return page.route('**/api/me/students', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({
+      students: students.map(([grade, caseId, sessionCount, school = 'TEST']) => ({
+        studentKey: `${grade}_${caseId}`, grade, caseId, school, sessionCount,
+      })),
+    }),
+  }));
+}
+
+/** 老師後台：讀出學生選單結構：[{ label, options: [文字…] }]，不含第一個提示 option。 */
+export function readStudentGroups(page) {
+  return page.locator('#student-select').evaluate((select) => [...select.querySelectorAll('optgroup')]
+    .map((group) => ({ label: group.label, options: [...group.children].map((option) => option.textContent) })));
+}

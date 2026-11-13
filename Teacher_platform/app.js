@@ -7,6 +7,7 @@
 const { GAMES, dayProgress, normalizeProgress } = WebGameApi;
 
 const studentSelect = document.getElementById("student-select");
+const studentSearch = document.getElementById("student-search");
 const dayRow = document.getElementById("day-row");
 const gameList = document.getElementById("game-list");
 const emptyHint = document.getElementById("empty-hint");
@@ -26,7 +27,7 @@ const DAY_PROMPT_ERROR = "成績讀取失敗，請檢查網路後重試。";
 let reportRequestId = 0;
 
 const state = {
-  students: [], // [{ id, name, username }]
+  students: [], // [{ id, name, grade, username, school, sessionCount, lastPlayedAt }]
   days: [], // 固定第 1～24 天
   sessions: [], // 目前學生的場次資料。選擇施測日時，用於計算進度。
   reportStatus: "idle", // "idle" | "loading" | "ready" | "error"。目前學生的場次讀取狀態。
@@ -61,6 +62,10 @@ async function init() {
 
 studentSelect.addEventListener("change", () => {
   selectStudent(studentSelect.value);
+});
+
+studentSearch.addEventListener("input", () => {
+  renderStudents();
 });
 
 logoutBtn.addEventListener("click", async () => {
@@ -130,19 +135,45 @@ function markSelectedDay(day) {
   });
 }
 
-/** 將學生名單加入下拉選單。第一個 option 顯示提示文字。 */
+/**
+ * 將學生名單加入下拉選單。第一個 option 顯示提示文字。
+ * 依年級分組（<optgroup>）；同一年級內，有施測紀錄的學生排前面，已測 0 場的排最後，
+ * 其餘維持後端給的順序。
+ * 搜尋框有字時只列出 ID 含該字的學生（不分大小寫）；目前選中的學生一律保留，
+ * 否則選單會被清回「請選擇學生」，跟下方顯示的報表對不起來。
+ */
 function renderStudents() {
-  const options = state.students
-    .map(
-      (student) =>
-        `<option value="${student.id}">個案 ${student.name}（已測 ${student.sessionCount || 0} 場）</option>`
-    )
+  const keyword = studentSearch.value.trim().toUpperCase();
+  const matched = state.students.filter(
+    (student) => student.id === state.selectedStudentId || student.name.toUpperCase().includes(keyword)
+  );
+
+  const studentsByGrade = new Map();
+  for (const student of matched) {
+    if (!studentsByGrade.has(student.grade)) studentsByGrade.set(student.grade, []);
+    studentsByGrade.get(student.grade).push(student);
+  }
+
+  const groups = [...studentsByGrade]
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([grade, students]) => {
+      const options = students
+        .sort((a, b) => Number(b.sessionCount > 0) - Number(a.sessionCount > 0))
+        .map(
+          (student) =>
+            `<option value="${student.id}">個案 ${student.name}（已測 ${student.sessionCount} 場）</option>`
+        )
+        .join("");
+      return `<optgroup label="${grade}">${options}</optgroup>`;
+    })
     .join("");
 
+  const placeholder = keyword && !matched.length ? "找不到符合的學生" : "請選擇學生";
   studentSelect.innerHTML = `
-    <option value="">請選擇學生</option>
-    ${options}
+    <option value="">${placeholder}</option>
+    ${groups}
   `;
+  studentSelect.value = state.selectedStudentId;
 }
 
 /** 每位玩家最多 24 個施測日，天數固定為第 1～24 天。 */
@@ -389,6 +420,7 @@ async function fetchTeacherStudents() {
     return (body.students || []).map((student) => ({
       id: student.studentKey,
       name: student.studentKey,
+      grade: student.grade || "未分年級",
       username: student.caseId,
       school: student.school,
       sessionCount: student.sessionCount || 0,
@@ -401,6 +433,7 @@ async function fetchTeacherStudents() {
 
 /** 名單讀不到時，在下拉選單與提示卡說明，不要看起來像是沒有學生。 */
 function showStudentsError() {
+  studentSearch.disabled = true;
   studentSelect.innerHTML = '<option value="">學生名單讀取失敗</option>';
   emptyHint.querySelector("h3").textContent = "學生名單讀取失敗";
   emptyHint.querySelector("p").textContent = "請檢查網路後重新整理頁面。";

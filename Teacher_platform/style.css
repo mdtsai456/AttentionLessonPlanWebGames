@@ -16,6 +16,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap; /* 寬度不夠時，右側控制項整組換到下一行，不把文字擠成直排 */
   gap: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
@@ -43,6 +44,7 @@ body {
 .nav-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1.25rem;
 }
 
@@ -61,6 +63,12 @@ body {
   font-weight: 600;
 }
 
+.select-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.select-group input,
 .select-group select {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
@@ -71,6 +79,11 @@ body {
   outline: none;
 }
 
+.select-group input {
+  width: 9rem;
+}
+
+.select-group input:focus,
 .select-group select:focus {
   border-color: #2563eb;
 }
@@ -360,6 +373,17 @@ body {
 
   .meta-stats {
     text-align: left;
+  }
+
+  .nav-controls,
+  .select-group {
+    width: 100%;
+  }
+
+  .select-group input,
+  .select-group select {
+    flex: 1;
+    min-width: 0;
   }
 
   .cards-grid {
