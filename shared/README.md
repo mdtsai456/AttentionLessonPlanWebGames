@@ -13,7 +13,7 @@
 | `api-base.js` | 所有頁面 | 決定後端 API 位址（`window.resolveApiBase()`），規則見下方。在 `<head>` 最先同步載入，其他腳本都用它。 |
 | `api.js` | 登入、選關、成績 | 登入、登出、查報告、送成績。五款遊戲清單 `GAMES`，`dayProgress` 把某一天的場次換成各遊戲 0／50／100 進度（`Select/`、`Teacher_platform/` 共用）。`uuid()` 產生成績的 `submissionId` 與雙人局的 `pairId`。 |
 | `second-half.js` | 遊戲頁 | `WebGameSecondHalf.startStage(gameId, { mode, slots })` 決定這一局從第幾關開始：每位學生（`slots` 是 `[1]` 或 `[1, 2]`）在同一個課次（登入時填的「第幾天」）、同遊戲、同模式（`single`／`double`）的後端成績都有 stage 3、沒有 stage 4 以上（沒有 stage 的紀錄當成已完成），就回 4，否則回 1。讀報表的方式與 sessionStorage 欄位同選遊戲頁；讀取失敗、缺登入資料或超過 5 秒（`WebGameRuntime.nativeSetTimeout`）都回 1。只在進場自動開始前呼叫；練習模式與「再玩一次」不呼叫。 |
-| `session-timeout.js` | 已登入頁面 | 依登入回傳的剩餘秒數 `expiresIn` 加上本機收到回應的時間計算到期（不受裝置時鐘快慢影響；舊後端沒有 `expiresIn` 時改用 `expiresAt`），到期後清掉本機登入並回 `Home/`。計時器分段等待，超過 24.8 天也不會溢位。 |
+| `session-timeout.js` | 已登入頁面 | 依登入回傳的剩餘秒數 `expiresIn` 加上本機收到回應的時間計算到期（不受裝置時鐘快慢影響；舊後端沒有 `expiresIn` 時改用 `expiresAt`），到期時先問後端，真的失效才清掉本機登入並回 `Home/`；連不上後端時不登出，30 秒後再問。有操作時最多每分鐘送一次 `/auth/heartbeat` 延長登入，每個請求 15 秒逾時。計時器分段等待，超過 24.8 天也不會溢位。 |
 | `game-runtime.js` | 遊戲頁 | 驗證或離開期間暫停 `setTimeout` 與動畫幀，回來後扣掉這段時間。`pause(reason)`／`resume(reason)` 依原因計數，全部解除才恢復；`nativeSetTimeout` 給網路請求的逾時用，暫停時照常運作。 |
 | `leave-confirm.js` | 遊戲頁、`Select/` | 遊戲內的離開確認。「離開」按鈕先呼叫 `confirmLeave()` 顯示頁面內的確認框（開著時暫停遊戲、攔下按鍵、Esc 等於取消），按「離開」才存檔，再用 `leaveTo(url)` 導頁；按「繼續遊戲」什麼都不送，避免取消後檢查點和打完的成績各留一筆。第二個參數可換標題與按鈕文字，`Select/` 的登出確認也用它。直接關閉分頁、重新整理或按上一頁時，遊戲呼叫 `guardUnload(isPlaying)` 掛上瀏覽器的離開詢問：`isPlaying()` 為 true 才問，透過 `leaveTo` 導頁與登入逾時登出（sessionStorage 已清空）不問。EFT、IM、TGame 使用；DAT、DCCS 另有自己的提示。 |
 | `stage-clear.js`、`stage-clear.css` | 過關畫面 | 共用的關卡結束面板。 |

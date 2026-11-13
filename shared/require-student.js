@@ -64,12 +64,14 @@
     return Date.parse(body.expiresAt);
   }
 
+  // 本機到期時重新向後端驗證，不直接登出：heartbeat 或別的分頁可能已經延長登入。
+  // 後端說已失效（401）時，validate 會清除登入並回 Home。
   function armExpiry(expires) {
     nativeClear(expiryTimer);
     const remaining = expires - realNow();
     expiryTimer = nativeTimeout(() => {
       if (expires - realNow() > 0) armExpiry(expires);
-      else global.WebGameAuth.invalidate();
+      else validate();
     }, Math.min(MAX_TIMEOUT, Math.max(0, remaining)));
   }
 
@@ -146,6 +148,12 @@
         get session() { return authenticated; },
         invalidate() { authenticated = null; home('expired', true); },
         revalidate: validate,
+        /** session-timeout.js 送 heartbeat 拿到新的到期時間後呼叫，重排到期計時。 */
+        extend(expires) {
+          if (!authenticated || !Number.isFinite(expires)) return;
+          sessionStorage.setItem('login_expires_at', String(expires));
+          armExpiry(expires);
+        },
       };
       const expires = Math.min(...bodies.map((body) => localExpiry.get(body)));
       sessionStorage.setItem('login_expires_at', String(expires));

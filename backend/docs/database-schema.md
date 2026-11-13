@@ -61,7 +61,7 @@ erDiagram
         varchar grade FK "學生登入才填 三欄一組"
         varchar case_id FK "學生登入才填"
         varchar school FK "學生登入才填"
-        datetime expires_at "1 小時後過期"
+        datetime expires_at "閒置 30 分鐘過期，最多 8 小時"
     }
     assessment_result {
         varchar grade PK "FK 到 student"
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS `game_lock` (
 
 ### 新增 `login_session`
 
-帳密登入後發的不透明 token，1 小時過期。故意不叫 `session`——這系統的 `session`
+帳密登入後發的不透明 token，閒置 30 分鐘過期（heartbeat 延長，最多 8 小時）。故意不叫 `session`——這系統的 `session`
 已經是「遊戲場次」（`assessment_result`）的代稱，混在一起會搞混。詳細欄位見上面
 ER 圖，關係見「關係說明」表。
 

@@ -235,7 +235,7 @@ def test_login_response_includes_relative_lifetime(monkeypatch, path, fetch_name
 
     assert response.status_code == 200
     body = response.json()
-    assert body["expiresIn"] == int(TOKEN_TTL.total_seconds())
+    assert body["expiresIn"] == int(TOKEN_TTL.total_seconds()) == 30 * 60
     expires_at = datetime.fromisoformat(body["expiresAt"])
     assert abs((expires_at - before).total_seconds() - body["expiresIn"]) < 5
 
@@ -339,8 +339,8 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def test_teacher_and_student_login_expire_after_one_hour(client, db):
-    """登入憑證 1 小時後失效。回應的 expiresAt 與 login_session 一致。"""
+def test_teacher_and_student_login_expire_after_idle_timeout(client, db):
+    """登入憑證 30 分鐘（閒置時間）後失效，之後靠 heartbeat 延長。回應的 expiresAt 與 login_session 一致。"""
     db.insert_school("A")
     db.insert_teacher("吳老師", "A", password="right-password", account="T001")
     db.insert_student("G1", "S01", "A", password="right-password", account="S001")
@@ -361,8 +361,8 @@ def test_teacher_and_student_login_expire_after_one_hour(client, db):
 
     for body in (teacher.json(), student.json()):
         expires_at = _as_utc(datetime.fromisoformat(body["expiresAt"]))
-        assert before + timedelta(hours=1) - timedelta(seconds=5) <= expires_at
-        assert expires_at <= after + timedelta(hours=1) + timedelta(seconds=5)
+        assert before + timedelta(minutes=30) - timedelta(seconds=5) <= expires_at
+        assert expires_at <= after + timedelta(minutes=30) + timedelta(seconds=5)
         rows = db.query(
             "SELECT expires_at FROM login_session WHERE token = %s",
             [body["token"]],

@@ -46,7 +46,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | GET | `/api/auth/me` | 老師或學生 | 由 token 查身分：`{role, school, expiresAt, expiresIn, …}`，`Cache-Control: no-store` |
 | POST | `/api/auth/heartbeat` | 老師或學生 | 使用者仍在操作時延長登入：到期時間延到「現在 + 30 分鐘」，最多到登入後 8 小時，不會縮短。回 `{expiresAt, expiresIn}`；無效或已過期 `401` |
 
-`expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數（登入回應固定 3600）。前端
+`expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數（登入回應固定 1800；之後靠 heartbeat 延長）。前端
 以「收到回應的本機時間 + `expiresIn`」算自動登出時間，裝置時鐘快慢不影響登入長度。
 帳號不存在，或帳號存在但 `password_hash` 是空的／NULL／格式錯誤／演算法不符／迭代次數不合法時，
 後端都會改對一組假雜湊跑一次 PBKDF2 並回登入失敗，「帳號不存在」與「密碼錯誤」回應時間相同。
@@ -144,7 +144,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | `subject_type` | enum('teacher','student') | |
 | `teacher_id` FK→`teacher` | int NULL | 老師登入才填 |
 | `grade`,`case_id`,`school` FK→`student` | varchar NULL | 學生登入才填 |
-| `created_at`／`expires_at` | datetime | 1 小時後過期 |
+| `created_at`／`expires_at` | datetime | 閒置 30 分鐘過期（heartbeat 延長，最多到 `created_at` + 8 小時） |
 
 ### 2.3 遊戲資料
 
