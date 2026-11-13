@@ -9,6 +9,7 @@ import { SITE_ROOT } from '../site.mjs';
 
 const SOURCE = fs.readFileSync(`${SITE_ROOT}/shared/login-share.js`, 'utf8');
 const SHARED_KEY = 'webgame_login';
+const ALIVE_KEY = 'webgame_login_alive';
 
 const STUDENT = {
   user_role: 'student', login_role: 'student', game_mode: 'single', token: 's-token',
@@ -159,6 +160,7 @@ test('副本內容損毀時視為沒有登入', () => {
 test('副本不會寫入登入欄位以外的 key', () => {
   const b = browser();
   b.shared.setItem(SHARED_KEY, JSON.stringify({ id: 'x', data: { ...STUDENT, evil: '1' } }));
+  b.shared.setItem(ALIVE_KEY, JSON.stringify({ id: 'x', tabs: { other: Date.now() } }));
   const tab = b.open({ page: 'Select' });
 
   assert.equal(tab.session.getItem('evil'), null);
@@ -362,4 +364,93 @@ test('localStorage 無法使用時，新分頁維持未登入且不報錯', () =
 
   assert.equal(tab.session.getItem('user_role'), null);
   assert.deepEqual(tab.replaced, []);
+});
+
+// 只在還有分頁開著時共用（瀏覽器全關後，下一位要重新登入）
+
+test('登入的分頁都關閉（pagehide）後，新分頁不沿用登入', () => {
+  const b = browser();
+  const home = b.open({ page: 'Home' });
+  loginIn(home);
+  const select = b.open({ page: 'Select' }); // 新分頁：自動沿用登入，有自己的分頁 id
+  assert.equal(select.session.getItem('user_role'), 'student');
+  home.fire('pagehide', {});
+  home.closed = true;
+  select.fire('pagehide', {});
+  select.closed = true;
+
+  const next = b.open({ page: 'Select' });
+
+  assert.equal(next.session.getItem('user_role'), null);
+  assert.equal(next.replaced.length, 0);
+});
+
+test('還有一個分頁開著時，新分頁照常沿用', () => {
+  const b = browser();
+  const home = b.open({ page: 'Home' });
+  loginIn(home);
+  const select = b.open({ page: 'Select' }); // 新分頁：自動沿用登入，有自己的分頁 id
+  assert.equal(select.session.getItem('user_role'), 'student');
+  home.fire('pagehide', {});
+  home.closed = true;
+
+  const next = b.open({ page: 'Select' });
+
+  assert.equal(next.session.getItem('user_role'), 'student');
+  assert.equal(select.replaced.length, 0);
+});
+
+test('瀏覽器當掉（沒有 pagehide）時，超過 30 秒沒回報就不再沿用', () => {
+  const b = browser();
+  const home = b.open({ page: 'Home' });
+  loginIn(home);
+  const alive = JSON.parse(b.shared.getItem(ALIVE_KEY));
+  Object.keys(alive.tabs).forEach((id) => { alive.tabs[id] = Date.now() - 31 * 1000; });
+  b.shared.setItem(ALIVE_KEY, JSON.stringify(alive));
+  home.closed = true;
+
+  const next = b.open({ page: 'Select' });
+  const login = b.open({ page: 'Home' });
+
+  assert.equal(next.session.getItem('user_role'), null);
+  assert.equal(login.login.adopt(), null);
+});
+
+test('沒人沿用的舊副本不會被刪掉：背景分頁只是暫時沒回報，不能因此被登出', () => {
+  const b = browser();
+  const home = b.open({ page: 'Home' });
+  loginIn(home);
+  const alive = JSON.parse(b.shared.getItem(ALIVE_KEY));
+  Object.keys(alive.tabs).forEach((id) => { alive.tabs[id] = Date.now() - 60 * 1000; });
+  b.shared.setItem(ALIVE_KEY, JSON.stringify(alive));
+
+  b.open({ page: 'Select' });
+
+  assert.ok(b.shared.getItem(SHARED_KEY));
+  assert.equal(home.replaced.length, 0);
+});
+
+test('localStorage 寫不進去時，換到下一頁也不會被當成已在別處登出', () => {
+  const b = browser({ localThrows: true });
+  const home = b.open({ page: 'Home' });
+  loginIn(home);
+
+  const next = b.open({ page: 'Select', session: { ...home.session.data } });
+
+  assert.equal(next.replaced.length, 0);
+  assert.equal(next.session.getItem('user_role'), 'student');
+});
+
+test('載入時發現已被換帳號：只回登入頁，不把新帳號複製進這個分頁', () => {
+  const b = browser();
+  const first = b.open({ page: 'Home' });
+  loginIn(first);
+  const oldSession = { ...first.session.data };
+  const other = b.open({ page: 'Home' });
+  loginIn(other, { ...STUDENT, token: 'other', student1_token: 'other', student1_key: 'G1_S02' });
+
+  const stale = b.open({ page: 'Select', session: oldSession });
+
+  assert.equal(stale.replaced.length, 1);
+  assert.equal(stale.session.getItem('user_role'), null);
 });

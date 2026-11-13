@@ -120,17 +120,35 @@ test('老師登入後新分頁打開登入頁，直接導向老師後台', async
   await expect(second).toHaveURL(TEACHER_URL);
 });
 
-test('關掉所有分頁後重新開啟，仍維持登入', async ({ context }) => {
+test('關掉所有分頁後重新開啟，要重新登入（共用電腦上下一位不會進到前一位的帳號）', async ({ context }) => {
   await setup(context);
   const first = await context.newPage();
   await loginStudent(first);
-  await first.close();
+  await first.close({ runBeforeUnload: true });
 
   const reopened = await context.newPage();
   await reopened.goto('Home/index.html');
 
-  await expect(reopened).toHaveURL(SELECT_URL);
-  await expectVisible(reopened);
+  await expect(reopened.locator('[data-role="student"]')).toBeVisible();
+  await expect(reopened).toHaveURL(HOME_URL);
+  const select = await context.newPage();
+  await select.goto('Select/index.html');
+  await expect(select).toHaveURL(/\/Home\/index\.html/);
+});
+
+test('還有一個登入的分頁開著時，關掉其他分頁不影響新分頁沿用', async ({ context }) => {
+  await setup(context);
+  const first = await context.newPage();
+  await loginStudent(first);
+  const second = await context.newPage();
+  await second.goto('Select/index.html');
+  await expectVisible(second);
+  await first.close({ runBeforeUnload: true });
+
+  const third = await context.newPage();
+  await third.goto('Home/index.html');
+
+  await expect(third).toHaveURL(SELECT_URL);
 });
 
 test('停在登入頁的分頁，在別的分頁登入後一起進入 Select', async ({ context }) => {

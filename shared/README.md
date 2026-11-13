@@ -9,6 +9,7 @@
 | 檔案 | 誰在用 | 做什麼 |
 | --- | --- | --- |
 | `require-student.js` | 功能頁 | 用 `GET /api/auth/me` 檢查角色、模式與學生欄位。不符回 `Select/` 或 `Home/`。雙人要兩個學生 token。返回 bfcache 時重新驗證，等待期間凍結輸入與計時。 |
+| `login-share.js` | 所有頁面（在 `require-student.js` 之前） | 同一個瀏覽器的分頁共用一組登入：登入資料另存一份副本在 localStorage，新分頁複製到自己的 sessionStorage；登出、失效或換帳號時，其他分頁回登入頁。只在還有這組登入的分頁開著時共用：每個分頁每 10 秒回報一次，關閉時移除；30 秒內沒有分頁回報就不再沿用，整個瀏覽器關掉後下一位要重新登入。登入頁加 `data-restore="manual"`，由 `Home/app.js` 決定要不要直接進入。 |
 | `api-base.js` | 所有頁面 | 決定後端 API 位址（`window.resolveApiBase()`），規則見下方。在 `<head>` 最先同步載入，其他腳本都用它。 |
 | `api.js` | 登入、選關、成績 | 登入、登出、查報告、送成績。五款遊戲清單 `GAMES`，`dayProgress` 把某一天的場次換成各遊戲 0／50／100 進度（`Select/`、`Teacher_platform/` 共用）。`uuid()` 產生成績的 `submissionId` 與雙人局的 `pairId`。 |
 | `second-half.js` | 遊戲頁 | `WebGameSecondHalf.startStage(gameId, { mode, slots })` 決定這一局從第幾關開始：每位學生（`slots` 是 `[1]` 或 `[1, 2]`）在同一個課次（登入時填的「第幾天」）、同遊戲、同模式（`single`／`double`）的後端成績都有 stage 3、沒有 stage 4 以上（沒有 stage 的紀錄當成已完成），就回 4，否則回 1。讀報表的方式與 sessionStorage 欄位同選遊戲頁；讀取失敗、缺登入資料或超過 5 秒（`WebGameRuntime.nativeSetTimeout`）都回 1。只在進場自動開始前呼叫；練習模式與「再玩一次」不呼叫。 |
