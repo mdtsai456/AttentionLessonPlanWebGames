@@ -578,7 +578,7 @@ async function saveGameDataToBackend(data) {
     10
   );
 
-  // 瓢蟲追擊令的成績使用 DAT 寫入。素材 API 也使用 DAT 查詢。
+  // 動物追擊令的成績使用 DAT 寫入。素材 API 也使用 DAT 查詢。
   const payload = {
     lessonId: "1140908_DAT",
     data: {

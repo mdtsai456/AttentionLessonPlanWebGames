@@ -18,8 +18,8 @@
 | `stage-clear.js`、`stage-clear.css` | 過關畫面 | 共用的關卡結束面板。 |
 | `fonts/MaokenAssortedSans-TC.woff2` | 所有頁面 | 全站唯一一份字型（SIL OFL）。由原本的 TTF 用 `pyftsubset 原檔.ttf --unicodes="*" --flavor=woff2` 轉成 woff2，字數不變。各頁的 `@font-face` 都指到這裡，不要再複製到各資料夾。 |
 | `fireworks.js`、`fireworks.css` | `Select/` | 手錶判定專心時的煙火。 |
-| `dat-assets.js` | 瓢蟲追擊令 | 向素材平台要 `DAT.assets.files`，失敗時用本機動物圖。跨來源圖片用 `crossOrigin="anonymous"` 載入（素材平台有回 CORS 標頭），失敗再不帶 CORS 重試一次。`isOnAnimal` 判斷準心是否在動物上：中央圓一律算，圓外照目前顯示的圖：本機兔子用 `rabbit-hit-mask.js`，其他圖讀圖片透明度；讀不到透明度時只算中央圓。 |
-| `dat-save.js` | 瓢蟲追擊令 | 送出一局成績與畫面上的儲存狀態。每筆成績第一次送出時帶 `data.submissionId`（`WebGameApi.uuid()`），重送沿用同一個內容，後端回同一個 `sessionId`、不多寫一列。網路中斷或逾時（結果未確認）不會自己重送，但玩家按重試或離開時會重送同一筆；已送過較高關卡就不再送較低的檢查點（已儲存視為完成，未確認或失敗改重送那一筆）。請求逾時用 `WebGameRuntime.nativeSetTimeout`，確認離開後遊戲暫停時仍會逾時。 |
+| `dat-assets.js` | 動物追擊令 | 向素材平台要 `DAT.assets.files`，失敗時用本機動物圖。跨來源圖片用 `crossOrigin="anonymous"` 載入（素材平台有回 CORS 標頭），失敗再不帶 CORS 重試一次。`isOnAnimal` 判斷準心是否在動物上：中央圓一律算，圓外照目前顯示的圖：本機兔子用 `rabbit-hit-mask.js`，其他圖讀圖片透明度；讀不到透明度時只算中央圓。 |
+| `dat-save.js` | 動物追擊令 | 送出一局成績與畫面上的儲存狀態。每筆成績第一次送出時帶 `data.submissionId`（`WebGameApi.uuid()`），重送沿用同一個內容，後端回同一個 `sessionId`、不多寫一列。網路中斷或逾時（結果未確認）不會自己重送，但玩家按重試或離開時會重送同一筆；已送過較高關卡就不再送較低的檢查點（已儲存視為完成，未確認或失敗改重送那一筆）。請求逾時用 `WebGameRuntime.nativeSetTimeout`，確認離開後遊戲暫停時仍會逾時。 |
 | `eft-game-logic.js` | 漂浮泡泡 | 出題、方向判定、`EFT_*` 成績欄位。 |
 | `eft-player.js` | 漂浮泡泡 | 單一玩家的記憶、作答、計時與計分。單人一個，雙人兩個。每關結束留一份成績快照，送檢查點時只算到那一關。 |
 | `eft-assets.js` | 漂浮泡泡 | 向素材平台要 `EFT.assets.files`，並預載箭頭與泡泡。API 或圖片超過 5 秒沒回應就改用本機箭頭，不會卡住開局。 |

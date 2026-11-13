@@ -3,7 +3,7 @@
   /** 五款遊戲的固定清單。id 對應資料夾與後端欄位，name 用於畫面顯示。 */
   const GAMES = [
     { id: "DCCS", name: "賽道攔截" },
-    { id: "DAT", name: "瓢蟲追擊令" },
+    { id: "DAT", name: "動物追擊令" },
     { id: "EFT", name: "漂浮泡泡" },
     { id: "TGame", name: "勇闖迷宮" },
     { id: "InstructionGame", name: "指令出擊" },

@@ -52,7 +52,7 @@
 | `shared/` | — | 各頁共用的登入檢查、後端位址、成績送出、離開確認、計時與過關畫面。說明見 `shared/README.md` |
 | `DCCS_single/` | 賽道攔截 | 單人。說明見 `DCCS_single/README.md`、`DCCS_single/SPEC.md`。 |
 | `DCCS_double/` | 賽道攔截・雙人 | 雙人。自己有一份引擎、關卡表與素材，擺法和單人相同。說明見 `DCCS_double/README.md` |
-| `DAT_single/` | 動物追擊令 | 單人。選單上的名稱是「瓢蟲追擊令」。說明見 `DAT_single/README.md`。 |
+| `DAT_single/` | 動物追擊令 | 單人。說明見 `DAT_single/README.md`。 |
 | `DAT_double/` | 動物追擊令・雙人 | 雙人。說明見 `DAT_double/README.md`。 |
 | `EFT_single/` | 漂浮泡泡 | 單人。說明見 `EFT_single/README.md`。 |
 | `EFT_double/` | 漂浮泡泡・雙人 | 雙人。與單人共用 `shared/` 裡的玩家流程。說明見 `EFT_double/README.md` |
@@ -63,12 +63,12 @@
 | `tools/` | — | `build_manifest.py` 依 DCCS 關卡表產生 `manifest.json`。`tools/tgame-tests/` 是勇闖迷宮的瀏覽器測試。 |
 | `tests/` | — | 遊戲規則與全站登入、流程、存檔的自動化測試。說明見 `tests/README.md`。 |
 
-選單代號、資料夾和成績代號一致：瓢蟲追擊令送 `DAT`，漂浮泡泡送 `EFT`。
+選單代號、資料夾和成績代號一致：動物追擊令送 `DAT`，漂浮泡泡送 `EFT`。
 
 | 選單代號 | 畫面名稱 | 資料夾 |
 | --- | --- | --- |
 | `DCCS` | 賽道攔截 | `DCCS_single/`、`DCCS_double/` |
-| `DAT` | 瓢蟲追擊令 | `DAT_single/`、`DAT_double/` |
+| `DAT` | 動物追擊令 | `DAT_single/`、`DAT_double/` |
 | `EFT` | 漂浮泡泡 | `EFT_single/`、`EFT_double/` |
 | `TGame` | 勇闖迷宮 | `TGame_single/`、`TGame_double/` |
 | `InstructionGame` | 指令出擊 | `IM_single/` |

@@ -88,7 +88,7 @@ school ──(fk_student_school)──▶ student ──(fk_assessment_student)�
 分數細節在 5 張 `*_result` 表（每場對應一列，`game_type` 決定掛哪張）。
 **API 回傳 5 個共同欄位**：`correctCount`、`wrongCount`、`accuracy`、`duration`、`stage`，
 再加 5 個可能為 `null` 的選填欄位：`levelAccuracy`（第 1 關起每關正確率 0–1）、`avgReactionMs`、
-`questionCount`（IM 不送）、`aimRatio`、`focusMs`（後兩個只有瓢蟲追擊令）。
+`questionCount`（IM 不送）、`aimRatio`、`focusMs`（後兩個只有動物追擊令）。
 其他遊戲專屬欄位（`frameWrongCount`、`DAT_avgReactionTime`…）DB 裡有，**沒有端點回傳** ——
 DMS 若要，需請後端加。
 
