@@ -93,12 +93,17 @@
     }
   }
 
-  /** 取得 sessionStorage 中的登入 token，移除空值與重複值。 */
+  /**
+   * 取得這個分頁 sessionStorage 中的登入 token，加上其他分頁共用的登入（login-share.js），
+   * 移除空值與重複值。登入新帳號前全部登出，一個瀏覽器只保留一組登入。
+   */
   function storedTokens() {
+    const shared = global.WebGameLogin ? global.WebGameLogin.sharedTokens() : [];
     return [
       sessionStorage.getItem("student1_token"),
       sessionStorage.getItem("student2_token"),
       sessionStorage.getItem("token"),
+      ...shared,
     ].filter((value, index, list) => value && list.indexOf(value) === index);
   }
 

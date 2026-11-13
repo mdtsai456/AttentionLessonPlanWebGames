@@ -233,6 +233,8 @@ function storeTeacherSession(result) {
   sessionStorage.setItem("teacher_school", result.school);
   // 傳整個登入回應：有 expiresIn 時以本機時間計算到期，避開裝置時鐘誤差。
   window.WebGameSession?.stampLoginExpiry(result);
+  // 存成共用副本：同一個瀏覽器開新分頁不用重新登入；其他分頁的舊登入會回登入頁。
+  window.WebGameLogin?.save();
 }
 
 function storeStudentSlot(slot, result, day, account) {
@@ -260,6 +262,7 @@ function storeStudentSession(mode, results, days, accounts) {
   sessionStorage.setItem("current_day", String(days[0]));
   sessionStorage.setItem("currentDay", String(days[0]));
   window.WebGameSession?.stampLoginExpiry(results);
+  window.WebGameLogin?.save();
 }
 
 async function submitLogin() {
@@ -371,6 +374,20 @@ if (authReason === 'retry' || authReason === 'expired') {
     : '登入已失效或身分不符，請重新登入。';
   panel.appendChild(authNotice);
 }
+
+// 同一個瀏覽器已經登入（例如在別的分頁）時，直接進入選遊戲頁或老師後台，不再顯示登入表單。
+// 網址帶 ?auth= 表示剛被導回來（登入失效或連線逾時），先顯示提示、不自動進入，避免來回跳轉。
+// 按上一頁回到登入頁時也不自動進入，仍可照舊重新登入、換人登入（登入時會登出原本的帳號）。
+// 從快取（bfcache）返回不會重新執行這裡；沒有快取、重新載入時，用 navigation type 判斷。
+function enterIfLoggedIn() {
+  const role = window.WebGameLogin?.adopt();
+  if (!role) return;
+  location.replace(role === "teacher" ? "../Teacher_platform/index.html" : "../Select/index.html");
+}
+const cameBack = performance.getEntriesByType?.("navigation")[0]?.type === "back_forward";
+if (!authReason && !cameBack) enterIfLoggedIn();
+// 停在登入頁時，別的分頁登入成功：一起進入，避免同一個瀏覽器又登入第二組帳號。
+window.WebGameLogin?.onSharedLogin(enterIfLoggedIn);
 
 /** 重新選身分或模式後，舊的提示已不適用：移除提示，網址也拿掉 ?auth=，重新整理不會再出現。 */
 function clearAuthNotice() {

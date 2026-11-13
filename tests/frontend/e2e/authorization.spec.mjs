@@ -27,7 +27,8 @@ for (const pagePath of all) {
       scripts.length = 0;
       await page.goto(pagePath);
       await expect(page).toHaveURL(HOME_URL);
-      const functional = scripts.filter((url) => !/\/Home\/|\/shared\/(?:api-base|require-student|api|session-timeout)\.js/.test(url));
+      // login-share.js 在驗證前載入，只負責把共用的登入帶進 sessionStorage，不含功能。
+      const functional = scripts.filter((url) => !/\/Home\/|\/shared\/(?:api-base|login-share|require-student|api|session-timeout)\.js/.test(url));
       expect(functional).toEqual([]);
       expect(writes).toEqual([]);
     });

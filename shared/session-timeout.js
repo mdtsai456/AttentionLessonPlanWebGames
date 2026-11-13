@@ -92,6 +92,8 @@
 
     const tokens = collectTokens();
     const base = global.resolveApiBase();
+    // 要在清空 sessionStorage 前：forget 用這個分頁的登入 id 確認副本是自己的。
+    if (global.WebGameLogin) global.WebGameLogin.forget();
     sessionStorage.clear();
     tokens.forEach(function (token) {
       fetch(base + "/auth/logout", {
