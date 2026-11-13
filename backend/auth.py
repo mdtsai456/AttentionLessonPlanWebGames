@@ -18,6 +18,12 @@ _SALT_BYTES = 16
 # 不直接拿 expiresAt 比對裝置時鐘，避免裝置時鐘快慢讓登入提早或延後失效。
 TOKEN_TTL = timedelta(hours=1)
 
+# 呼叫 /api/auth/heartbeat 會把到期時間延到「現在 + 30 分鐘」，所以閒置 30 分鐘就失效；
+# 但不論怎麼延長，都不會超過登入後 8 小時。
+# 前端開始送 heartbeat 之前，登入仍是 TOKEN_TTL（1 小時）；heartbeat 不會縮短到期時間。
+SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
+SESSION_MAX_LIFETIME = timedelta(hours=8)
+
 # 帳號不存在時拿這個假雜湊跑一次 verify_password，讓「帳號不存在」和「密碼錯誤」
 # 花一樣久的 PBKDF2，回應時間才不會洩漏哪些帳號存在。演算法與迭代次數必須跟
 # hash_password 相同；salt／digest 內容無所謂，呼叫端不看比對結果、一律當登入失敗。

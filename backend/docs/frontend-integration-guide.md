@@ -651,6 +651,10 @@ Windows PowerShell 環境用 curl 傳中文/JSON body 容易被殼層引號吃�
 `expiresIn`（剩餘秒數，整數；前端以收到回應的本機時間加上它當到期時間）。
 學生另有 `grade`、`caseId`、`studentKey`；老師另有 `teacherId`、`teacherName`。
 成功與失敗回應皆 `Cache-Control: no-store`。無效、過期或撤銷 token 回 401。
+
+`POST /api/auth/heartbeat` 帶 `Authorization: Bearer <token>`，把登入延到「現在 + 30 分鐘」，
+但不超過登入後 8 小時，也不會縮短原本的到期時間。回傳 `expiresAt`、`expiresIn`（意義同上）。
+雙人模式兩個 token 都要各送一次。無效或已過期 token 回 401。
 功能頁驗證成功後才載入原有腳本；雙人驗證兩個學生，老師頁僅接受老師。
 模式不符回 Select（DCCS 單人入口保留雙人轉址）。
 5 秒內無法驗證回 Home 提示重試；401 清除本機登入。bfcache 返回時重新驗證並暫停遊戲排程及輸入。

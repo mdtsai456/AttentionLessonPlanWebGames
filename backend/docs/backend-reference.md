@@ -44,6 +44,7 @@ Unity、廠商快速對照用。**精確定義以程式碼為準**——API 是 
 | POST | `/api/auth/student/login` | 公開 | body `{account, password}`。成功回 `{token, studentKey, grade, caseId, school, expiresAt, expiresIn}`；失敗 `401` |
 | POST | `/api/auth/logout` | 公開（帶 token 才有作用） | 登出當前 token；找不到 token 也回 `204`（冪等） |
 | GET | `/api/auth/me` | 老師或學生 | 由 token 查身分：`{role, school, expiresAt, expiresIn, …}`，`Cache-Control: no-store` |
+| POST | `/api/auth/heartbeat` | 老師或學生 | 使用者仍在操作時延長登入：到期時間延到「現在 + 30 分鐘」，最多到登入後 8 小時，不會縮短。回 `{expiresAt, expiresIn}`；無效或已過期 `401` |
 
 `expiresAt` 是伺服器時鐘的到期時間；`expiresIn` 是剩餘秒數（登入回應固定 3600）。前端
 以「收到回應的本機時間 + `expiresIn`」算自動登出時間，裝置時鐘快慢不影響登入長度。

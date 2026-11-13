@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -161,15 +161,21 @@ def insert_login_session(
     case_id: str | None = None,
     school: str | None = None,
 ) -> None:
-    """建立一筆登入憑證。老師只填 teacher_id；學生只填 grade/case_id/school。"""
+    """建立一筆登入憑證。老師只填 teacher_id；學生只填 grade/case_id/school。
+
+    created_at 跟 expires_at 一樣存 Python 算的 UTC 時間，不用 SQL 的 NOW()：
+    NOW() 依資料庫時區而定，extend_login_session 拿兩欄一起算 8 小時上限時才不會差好幾小時。
+    """
+    created_at = datetime.now(timezone.utc)
     with get_write_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO login_session "
                 "(token, subject_type, teacher_id, grade, case_id, school, "
                 " created_at, expires_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)",
-                [token, subject_type, teacher_id, grade, case_id, school, expires_at],
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                [token, subject_type, teacher_id, grade, case_id, school,
+                 created_at, expires_at],
             )
         connection.commit()
 
@@ -190,7 +196,9 @@ def replace_login_session(
     沒按登出就關掉分頁的學生，也不會被自己留下的舊登入擋在外面。
     學生另外清掉遊戲鎖（game_lock），新裝置不用等舊分頁的鎖逾時才能進同一款遊戲；
     舊分頁的遊戲鎖心跳會拿到 409、顯示已在別處繼續。
+    created_at 和 insert_login_session 一樣存 Python 算的 UTC 時間（8 小時上限要用）。
     """
+    created_at = datetime.now(timezone.utc)
     if subject_type == "teacher":
         where, params = "subject_type = 'teacher' AND teacher_id = %s", [teacher_id]
     else:
@@ -208,17 +216,49 @@ def replace_login_session(
                         [grade, case_id, school],
                     )
                 except pymysql.err.ProgrammingError as exc:
-                    # 1146：正式庫還沒建 game_lock（見 migrations/）。沒有鎖可清，登入照常。
+                    # 1146：正式庫還沒建 game_lock（見 docs/database-schema.md）。沒有鎖可清，登入照常。
                     if exc.args[0] != 1146:
                         raise
             cursor.execute(
                 "INSERT INTO login_session "
                 "(token, subject_type, teacher_id, grade, case_id, school, "
                 " created_at, expires_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)",
-                [token, subject_type, teacher_id, grade, case_id, school, expires_at],
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                [token, subject_type, teacher_id, grade, case_id, school,
+                 created_at, expires_at],
             )
         connection.commit()
+
+
+def extend_login_session(
+    token: str, now: datetime, idle_timeout: timedelta, max_lifetime: timedelta
+) -> bool:
+    """把尚未過期的登入憑證延到 now + idle_timeout，但不超過 created_at + max_lifetime。
+
+    GREATEST 保留原本較晚的到期時間，所以不會把登入縮短。
+    CAST 讓參數以 DATETIME 比較，不依賴字串與 DATETIME 混用時的隱性轉型。
+    已過期或不存在的 token 不更新，回傳 False。
+
+    是否有效要在 UPDATE 之後另外查，不能看 UPDATE 的影響列數：pymysql 預設回傳
+    「值有改變」的列數，算出的到期時間和原本相同時（同一秒送兩次、已到 8 小時上限、
+    原本的到期時間比 now + idle_timeout 晚）會回 0，有效的登入會被誤判成失效。
+    """
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE login_session "
+                "SET expires_at = LEAST(GREATEST(expires_at, CAST(%s AS DATETIME)), "
+                "                       created_at + INTERVAL %s SECOND) "
+                "WHERE token = %s AND expires_at > %s",
+                [now + idle_timeout, int(max_lifetime.total_seconds()), token, now],
+            )
+            cursor.execute(
+                "SELECT 1 FROM login_session WHERE token = %s AND expires_at > %s",
+                [token, now],
+            )
+            alive = cursor.fetchone() is not None
+        connection.commit()
+    return alive
 
 
 def delete_login_session(token: str) -> None:

@@ -17,6 +17,8 @@ import queries
 import writes
 from auth import (
     DUMMY_PASSWORD_HASH,
+    SESSION_IDLE_TIMEOUT,
+    SESSION_MAX_LIFETIME,
     TOKEN_TTL,
     generate_token,
     is_usable_password_hash,
@@ -148,3 +150,39 @@ def auth_me(response: Response, identity: Identity = Depends(get_current_identit
     else:
         body.update(teacherId=identity.teacher_id, teacherName=identity.teacher_name)
     return body
+
+
+def _session_expired() -> HTTPException:
+    # 訊息同 routers/identity.py 的 401，前端不必分辨是哪一支 API 回的。
+    return HTTPException(status_code=401, detail="請重新登入")
+
+
+@router.post("/api/auth/heartbeat", dependencies=[Depends(get_current_identity)])
+def heartbeat(response: Response, authorization: str | None = Header(default=None)) -> dict:
+    """使用者還在操作時由前端定期呼叫，延長登入；閒置 30 分鐘、或登入滿 8 小時就失效。
+
+    get_current_identity 先擋掉無效、過期或帳號已刪除的 token；
+    UPDATE 本身也只更新未過期的 token，檢查到更新之間剛好過期也會回 401。
+    回傳格式同 /api/auth/me 的 expiresAt／expiresIn，前端用 expiresIn 重排自動登出。
+    """
+    response.headers["Cache-Control"] = "no-store"
+    token = extract_bearer_token(authorization)
+    now = datetime.now(timezone.utc)
+    try:
+        extended = writes.extend_login_session(
+            token, now, SESSION_IDLE_TIMEOUT, SESSION_MAX_LIFETIME
+        )
+        row = queries.fetch_login_session(token) if extended else None
+    except Exception as exc:
+        raise db_error(exc) from exc
+
+    if row is None:
+        raise _session_expired()
+    expires_at = row["expires_at"]
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    remaining = int((expires_at - now).total_seconds())
+    # 防呆：資料異常（例如 created_at 被改過）時，8 小時上限可能早於現在，算出來已經過期。
+    if remaining <= 0:
+        raise _session_expired()
+    return {"expiresAt": expires_at, "expiresIn": remaining}
