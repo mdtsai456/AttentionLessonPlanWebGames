@@ -42,8 +42,8 @@ QA 回報：同一帳號可以同時在兩個分頁各自進入同一款遊戲�
 
 ## 部署
 
-`game_lock` 不會由後端自動建立。上線前要在正式庫執行一次建表 SQL，見
-[`database-schema.md` 的「2026-11-13：新增 `game_lock`」](../database-schema.md)。
+`game_lock` 不會由後端自動建立。2026-11-13 已在測試庫與正式庫建立；新開的資料庫要執行
+[`database-schema.md` 的「2026-11-13：新增 `game_lock`」](../database-schema.md) 裡的 SQL。
 沒建表時遊戲鎖的 API 回 500，前端會略過、遊戲照常，但同帳號雙分頁不會被擋。
 
 ## 風險與範圍
