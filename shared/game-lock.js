@@ -6,17 +6,9 @@
   const HEARTBEAT_MS = 10000;
   const holders = [];
 
+  /** 後端位址統一由 shared/api-base.js 決定（各頁在 <head> 最先載入），不在這裡另寫一份。 */
   function apiBase() {
-    if (global.API_BASE_URL) return String(global.API_BASE_URL).replace(/\/+$/, "");
-    if (global.WebGameApi && global.WebGameApi.resolveApiBase) {
-      return global.WebGameApi.resolveApiBase();
-    }
-    if (global.location.pathname.startsWith("/app/")) return global.location.origin + "/api";
-    const hostname = global.location.hostname;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return global.location.protocol + "//" + hostname + ":5001/api";
-    }
-    return "https://attention-lesson-plan-data.zeabur.app/api";
+    return global.resolveApiBase();
   }
 
   /** sessionStorage 中正在使用的 token。雙人模式兩位玩家的 token 各自取鎖。 */
@@ -125,7 +117,19 @@
     });
   }
 
-  global.addEventListener("pagehide", release);
+  // 離開頁面時放掉鎖；若是進了上一頁快取（bfcache），之後從快取返回時要再取一次，
+  // 否則還原的遊戲畫面沒有鎖、也沒有心跳。已結算（release 過）的遊戲不再取。
+  let resumeGameId = "";
+  global.addEventListener("pagehide", function () {
+    resumeGameId = holders.length ? holders[0].gameId : "";
+    release();
+  });
+  global.addEventListener("pageshow", function (event) {
+    if (!event.persisted || !resumeGameId) return;
+    const gameId = resumeGameId;
+    resumeGameId = "";
+    start(gameId);
+  });
 
   global.WebGameLock = { start, release };
 

@@ -234,7 +234,8 @@ export class Track {
       level: this._trialLevelNo,
       correct,
     });
-    window.WebGameAudio?.[correct ? 'playCorrect' : 'playWrong']();
+    // 用 globalThis：引擎也在 Node 單元測試裡跑，那裡沒有 window。
+    globalThis.WebGameAudio?.[correct ? 'playCorrect' : 'playWrong']?.();
     if (correct) {
       this._score += 1;
       this._showTick = true;

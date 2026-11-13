@@ -189,6 +189,10 @@ function validate(accounts) {
         ? `請輸入學生 ${missing + 1} 的第幾天`
         : "請輸入第幾天";
     }
+    // 後端是「新登入接手」：兩格填同一個帳號時，第二格會讓第一格的登入失效。
+    if (expected === 2 && sameAccount(accounts[0].username, accounts[1].username)) {
+      return "兩位學生要使用不同的帳號";
+    }
     const outOfRange = accounts.findIndex((item) => {
       const day = Number(item.currentDay);
       return !Number.isInteger(day) || day < 1 || day > 24;
@@ -201,6 +205,11 @@ function validate(accounts) {
   }
 
   return "";
+}
+
+/** 帳號比對不分大小寫、忽略前後空白，和後端查帳號的方式一致。 */
+function sameAccount(a, b) {
+  return String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 }
 
 function backendErrorMessage(err) {
@@ -273,11 +282,6 @@ async function submitLogin() {
   // 雙人模式中目前登入的學生序號，用於錯誤訊息前綴。0 表示未進行登入。
   let loginSlot = 0;
 
-  // 後端會擋掉同帳號的重複登入：先登出這台瀏覽器自己舊的 token（包含按上一頁
-  // 返回後的再次登入），避免同一瀏覽器重新登入時被自己原本的 session 擋下來。
-  // 一定要等登出完成才能送出新登入，否則舊 token 可能還沒失效，新登入反而被擋。
-  await Promise.all(WebGameApi.storedTokens().map((token) => WebGameApi.logout(token)));
-
   try {
     if (teacher) {
       const result = await WebGameApi.loginTeacher(
@@ -306,6 +310,14 @@ async function submitLogin() {
       }
       loginSlot = 0;
     }
+
+    // 新登入成功後，才登出這台瀏覽器原本的 token（包含按上一頁返回後的再次登入）。
+    // 不在登入前先登出：密碼打錯時，同一瀏覽器另一個分頁正在進行的遊戲會被作廢。
+    // 同帳號的舊登入後端已經接手作廢（見 backend/docs/adr/0005-block-duplicate-login.md）。
+    const newTokens = results.map((result) => result.token);
+    WebGameApi.storedTokens()
+      .filter((token) => !newTokens.includes(token))
+      .forEach((token) => WebGameApi.logout(token));
 
     try {
       if (teacher) {
