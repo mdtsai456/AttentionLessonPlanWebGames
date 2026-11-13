@@ -7,6 +7,10 @@
   const TTL_MS = 30 * 60 * 1000;
   // 有操作時，距離上次 heartbeat 至少隔這麼久才再送，避免每次按鍵都打後端。
   const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+  // 單次請求的上限：卡住的請求不能讓 heartbeatInFlight 一直是 true，否則之後都不會再延長登入。
+  const REQUEST_TIMEOUT_MS = 15 * 1000;
+  // 到期時連不上後端：隔這麼久再問一次，不因為暫時斷線就登出（也不去作廢其他分頁共用的登入）。
+  const OFFLINE_RETRY_MS = 30 * 1000;
   const ACTIVITY_EVENTS = ["keydown", "pointerdown", "pointermove", "touchstart", "wheel", "scroll"];
   // setTimeout 延遲上限約 24.8 天，超過會溢位成立刻觸發；到點後 expireSession 會再檢查並重新排程。
   const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -85,16 +89,26 @@
     });
   }
 
-  /** 對每個 token 呼叫後端；回傳各自的 JSON（失敗時是 { status }），連線失敗會 throw。 */
+  /**
+   * 對每個 token 呼叫後端；回傳各自的 JSON（失敗時是 { status }）。
+   * 連線失敗或超過 REQUEST_TIMEOUT_MS 會 throw。
+   */
   function callEach(path, method) {
     const base = global.resolveApiBase();
     return Promise.all(collectTokens().map(function (token) {
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      // 用原生計時器：遊戲暫停時 setTimeout 會被 game-runtime.js 一起暫停，逾時不能跟著停。
+      const setTimer = (global.WebGameRuntime && global.WebGameRuntime.nativeSetTimeout) || global.setTimeout;
+      const timer = controller ? setTimer(function () { controller.abort(); }, REQUEST_TIMEOUT_MS) : 0;
       return fetch(base + path, {
         method: method,
         headers: { Authorization: "Bearer " + token },
         cache: "no-store",
+        signal: controller ? controller.signal : undefined,
       }).then(function (res) {
         return res.ok ? res.json() : { status: res.status };
+      }).finally(function () {
+        global.clearTimeout(timer);
       });
     }));
   }
@@ -170,8 +184,12 @@
       if (bodies.every(hasLifetime)) applyServerExpiry(bodies);
       else expireSession(false);
     }, function () {
+      // 連不上後端：不能確定是否真的到期，晚點再問，不在這裡登出。
+      // 真的到期時，之後任何 API 都會回 401，也一樣會回登入頁。
       checkingServer = false;
-      expireSession(false);
+      if (loggingOut || !isLoggedIn()) return;
+      global.clearTimeout(timerId);
+      timerId = global.setTimeout(confirmThenExpire, OFFLINE_RETRY_MS);
     });
   }
 

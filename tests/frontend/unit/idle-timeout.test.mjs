@@ -39,12 +39,17 @@ function loadTimeout({ storage = { token: 't1', user_role: 'teacher' }, respond 
     calls.push({ path, token, method: options.method || 'GET' });
     const reply = respond ? respond(path, token) : { status: 204 };
     if (reply === 'offline') throw new TypeError('Failed to fetch');
-    if (reply === 'hang') return new Promise(() => {});
+    if (reply === 'hang') {
+      // 一直沒回應；被 AbortController 取消時才 reject（和瀏覽器的 fetch 一樣）。
+      return new Promise((_, reject) => {
+        options.signal?.addEventListener('abort', () => reject(new Error('AbortError')));
+      });
+    }
     return { ok: reply.status >= 200 && reply.status < 300, status: reply.status, json: async () => reply.body };
   };
   vm.runInNewContext(API_BASE, { window });
   window.API_BASE_URL = 'https://example.test/api';
-  vm.runInNewContext(read('shared/session-timeout.js'), { window, document, sessionStorage, URL, Date: DateImpl, fetch });
+  vm.runInNewContext(read('shared/session-timeout.js'), { window, document, sessionStorage, URL, Date: DateImpl, fetch, AbortController });
   return {
     window, storage, timers, replaced, calls, listeners, clock,
     act(name = 'keydown') { listeners[name].forEach(({ fn }) => fn({})); },
@@ -105,6 +110,25 @@ test('沒有操作就不送 heartbeat（閒置才會到期）', async () => {
   run.clock.now += 20 * 60 * 1000;
   await settle();
   assert.equal(run.calls.length, 0);
+});
+
+test('heartbeat 卡住超過 15 秒就放棄，之後的操作可以再送', async () => {
+  let hang = true;
+  const run = loadTimeout({ respond: () => (hang ? 'hang' : ok(1800)) });
+
+  run.act();
+  const timeout = run.timers.find((t) => t.ms === 15 * 1000);
+  assert.ok(timeout, '應該有 15 秒的請求逾時');
+  timeout.fn();
+  await settle();
+
+  hang = false;
+  run.clock.now += 61 * 1000;
+  run.act();
+  await settle();
+
+  assert.deepEqual(run.calls.map((c) => c.path), ['/auth/heartbeat', '/auth/heartbeat']);
+  assert.equal(run.expiresIn(), 1800 * 1000);
 });
 
 test('上一個 heartbeat 還沒回應時不重複送', async () => {
@@ -196,10 +220,40 @@ test('本機到期、後端也說已失效（401）才登出', async () => {
   assert.ok(run.calls.some((c) => c.path === '/auth/logout'));
 });
 
-test('本機到期時連不上後端，照原本規則登出', async () => {
-  const run = loadTimeout({ respond: (path) => (path === '/auth/me' ? 'offline' : { status: 204 }) });
+test('本機到期時連不上後端：不登出、不作廢 token，30 秒後再問一次', async () => {
+  let online = false;
+  const run = loadTimeout({
+    respond: (path) => (path === '/auth/me' ? (online ? ok(900) : 'offline') : { status: 204 }),
+  });
   run.clock.now += 31 * 60 * 1000;
 
+  run.timers.at(-1).fn();
+  await settle();
+
+  assert.deepEqual(run.replaced, []);
+  assert.ok(!run.calls.some((c) => c.path === '/auth/logout'));
+  assert.equal(run.storage.token, 't1');
+  const retry = run.timers.at(-1);
+  assert.equal(retry.ms, 30 * 1000);
+
+  online = true;
+  retry.fn();
+  await settle();
+
+  assert.deepEqual(run.replaced, []);
+  assert.equal(run.expiresIn(), 900 * 1000);
+});
+
+test('本機到期時連不上後端，之後後端說已失效（401）才登出', async () => {
+  let online = false;
+  const run = loadTimeout({
+    respond: (path) => (path === '/auth/me' ? (online ? { status: 401 } : 'offline') : { status: 204 }),
+  });
+  run.clock.now += 31 * 60 * 1000;
+
+  run.timers.at(-1).fn();
+  await settle();
+  online = true;
   run.timers.at(-1).fn();
   await settle();
 
