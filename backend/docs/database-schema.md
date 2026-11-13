@@ -4,7 +4,7 @@ MariaDB。11 張表：3 張「參照 / 名冊」+ 1 張「登入憑證」+ 1 張
 1 張「場次索引」+ 5 張「各遊戲細部成績」。
 
 - 精確 DDL：[`tests/schema.sql`](../tests/schema.sql)（正式庫與測試庫都照這份建）
-- 2026-11-13：新增 `game_lock`（同帳號兩個分頁不能同時玩同一款遊戲）。**正式庫要手動建表**，
+- 2026-11-13：新增 `game_lock`（同帳號兩個分頁不能同時玩同一款遊戲），**已在測試庫與正式庫建立**。
   SQL 見下方「2026-11-13：新增 `game_lock`」；決策脈絡見 [`adr/0006`](adr/0006-game-lock.md)。
 - API 層的濃縮總覽（含端點）：[`backend-reference.md`](backend-reference.md)
 - 2026-09-11：`teacher`/`student` 各加 `account`（全域唯一登入帳號）/
@@ -135,8 +135,11 @@ erDiagram
 最多一列；`lock_id` 是持有中分頁的隨機代碼，`heartbeat_at` 超過 30 秒沒更新就可被別的分頁接手。
 學生被刪除時一併刪除（`ON DELETE CASCADE`）。
 
-**正式庫要手動執行一次**（後端不會自己建表；沒建表時遊戲鎖的 API 回 500，前端會略過、遊戲照常，
-但同帳號雙分頁不會被擋）：
+後端不會自己建表。2026-11-13 已在 `AttentionLessonPlan_test` 與 `AttentionLessonPlan` 執行下面的 SQL。
+之後新開的資料庫要再執行一次；沒建表時遊戲鎖的 API 回 500，前端會略過、遊戲照常，但同帳號雙分頁不會被擋。
+
+兩個資料庫的預設排序規則是 `utf8mb4_unicode_ci`，`student` 的欄位是 `utf8mb4_uca1400_ai_ci`。
+外鍵兩邊的排序規則要一致，所以這裡明確寫出 `COLLATE`，結果和 `tests/schema.sql` 建出來的相同：
 
 ```sql
 CREATE TABLE IF NOT EXISTS `game_lock` (
@@ -150,7 +153,7 @@ CREATE TABLE IF NOT EXISTS `game_lock` (
   PRIMARY KEY (`grade`, `case_id`, `school`, `game_id`),
   CONSTRAINT `fk_game_lock_student` FOREIGN KEY (`grade`, `case_id`, `school`)
     REFERENCES `student` (`grade`, `case_id`, `school`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 ```
 
 ---
