@@ -163,3 +163,18 @@ def test_acquire_requires_authentication(client, db):
     response = client.post("/api/game-lock/acquire", json={"gameId": "DCCS"})
 
     assert response.status_code == 401
+
+
+def test_back_to_back_heartbeats_both_keep_the_lock(client, db, login_as_student):
+    """同一秒內兩次心跳：第二次 heartbeat_at 不變（UPDATE 影響 0 列），持有者仍是自己，要回 204。"""
+    _, headers = login_as_student()
+    lock_id = client.post(
+        "/api/game-lock/acquire", json={"gameId": "DCCS"}, headers=headers
+    ).json()["lockId"]
+    body = {"gameId": "DCCS", "lockId": lock_id}
+
+    first = client.post("/api/game-lock/heartbeat", json=body, headers=headers)
+    second = client.post("/api/game-lock/heartbeat", json=body, headers=headers)
+
+    assert first.status_code == 204
+    assert second.status_code == 204

@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+import pymysql
+
 from db import get_write_connection
 from queries import CORE_STAT_COLUMNS, GAME_RESULT_TABLES
 
@@ -172,6 +174,53 @@ def insert_login_session(
         connection.commit()
 
 
+def replace_login_session(
+    token: str,
+    subject_type: str,
+    expires_at: datetime,
+    *,
+    teacher_id: int | None = None,
+    grade: str | None = None,
+    case_id: str | None = None,
+    school: str | None = None,
+) -> None:
+    """新登入接手：刪掉同一帳號原本的登入憑證，再建立這次的，在同一個交易內完成。
+
+    見 docs/adr/0005-block-duplicate-login.md。原本的分頁下次呼叫 API 會拿到 401、回登入頁；
+    沒按登出就關掉分頁的學生，也不會被自己留下的舊登入擋在外面。
+    學生另外清掉遊戲鎖（game_lock），新裝置不用等舊分頁的鎖逾時才能進同一款遊戲；
+    舊分頁的遊戲鎖心跳會拿到 409、顯示已在別處繼續。
+    """
+    if subject_type == "teacher":
+        where, params = "subject_type = 'teacher' AND teacher_id = %s", [teacher_id]
+    else:
+        where, params = (
+            "subject_type = 'student' AND grade = %s AND case_id = %s AND school = %s",
+            [grade, case_id, school],
+        )
+    with get_write_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"DELETE FROM login_session WHERE {where}", params)
+            if subject_type == "student":
+                try:
+                    cursor.execute(
+                        "DELETE FROM game_lock WHERE grade = %s AND case_id = %s AND school = %s",
+                        [grade, case_id, school],
+                    )
+                except pymysql.err.ProgrammingError as exc:
+                    # 1146：正式庫還沒建 game_lock（見 migrations/）。沒有鎖可清，登入照常。
+                    if exc.args[0] != 1146:
+                        raise
+            cursor.execute(
+                "INSERT INTO login_session "
+                "(token, subject_type, teacher_id, grade, case_id, school, "
+                " created_at, expires_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)",
+                [token, subject_type, teacher_id, grade, case_id, school, expires_at],
+            )
+        connection.commit()
+
+
 def delete_login_session(token: str) -> None:
     """登出時，刪除登入憑證。token 不存在時，也視為成功，符合冪等行為。"""
     with get_write_connection() as connection:
@@ -235,9 +284,17 @@ def heartbeat_game_lock(
     """
     with get_write_connection() as connection:
         with connection.cursor() as cursor:
-            updated = cursor.execute(sql, [now, grade, case_id, school, game_id, lock_id])
+            cursor.execute(sql, [now, grade, case_id, school, game_id, lock_id])
+            # 不看 UPDATE 的影響列數：pymysql 預設回傳「值有改變」的列數，
+            # 同一秒內的兩次心跳 heartbeat_at 不變會回 0，持有者會被誤判成已被換掉。
+            cursor.execute(
+                "SELECT 1 FROM game_lock "
+                "WHERE grade = %s AND case_id = %s AND school = %s AND game_id = %s AND lock_id = %s",
+                [grade, case_id, school, game_id, lock_id],
+            )
+            still_holder = cursor.fetchone() is not None
         connection.commit()
-    return bool(updated)
+    return still_holder
 
 
 def release_game_lock(
