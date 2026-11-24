@@ -3,7 +3,7 @@
 import { test, expect } from '@playwright/test';
 import { DOUBLE, loginAs, recordWrites } from './helpers.mjs';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app/**';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app/**';
 // 一關 60 秒，最後一題回饋最晚 60.5 秒結束；多留幾秒確保兩人都停在過關畫面。
 const STAGE_RUN_MS = 65_000;
 

@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT, loginAs, recordWrites } from './helpers.mjs';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app/**';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app/**';
 const STAGE_RUN_MS = 65_000;
 const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 

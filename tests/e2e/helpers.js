@@ -13,7 +13,7 @@ export const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 // SITE_ROOT 可指定其他版本的程式碼，用於回歸比對。
 export const SITE_ROOT = process.env.SITE_ROOT ? path.resolve(process.env.SITE_ROOT) : REPO_ROOT;
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app';
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

@@ -2,7 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT, loginAs, recordWrites } from './helpers.mjs';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app/**';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app/**';
 const STAGE_RUN_MS = 65_000;
 
 // 按「離開」先在頁面內確認（第 41 項）：取消什麼都不送，確定才存檔並回大廳。

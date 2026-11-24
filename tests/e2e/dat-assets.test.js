@@ -2,7 +2,7 @@ import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startStaticServer, launchBrowser, openGame } from './helpers.js';
 
-const assetHost = 'https://attention-lesson-plan-assets.zeabur.app';
+const assetHost = 'https://attentionlessonplan-production.up.railway.app';
 const files = ['/uploads/initial.png', '/uploads/evolved.png'];
 
 async function expectAnimal(session, game, expectedPath = '/assets/animals/rabbit.png') {

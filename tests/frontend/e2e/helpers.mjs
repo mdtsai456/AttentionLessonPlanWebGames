@@ -80,7 +80,7 @@ export const DOUBLE = {
  * 要在 recordWrites 之後呼叫（Playwright 後註冊的 route 先處理）。
  */
 export async function stubAssetServer(page) {
-  await page.route("https://attention-lesson-plan-assets.zeabur.app/**", (route) => route.fulfill({
+  await page.route("https://attentionlessonplan-production.up.railway.app/**", (route) => route.fulfill({
     status: 404, contentType: "application/json", body: "{}", headers: { "Access-Control-Allow-Origin": "*" },
   }));
 }

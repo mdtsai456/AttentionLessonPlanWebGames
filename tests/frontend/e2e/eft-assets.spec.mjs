@@ -2,7 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { DOUBLE, STUDENT, loginAs } from './helpers.mjs';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app';
 
 // 不呼叫 fulfill / continue，請求就一直懸著。
 const hang = () => {};

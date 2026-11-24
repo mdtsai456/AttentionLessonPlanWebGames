@@ -228,7 +228,7 @@ if (btnConfirmLeave) {
 
 
 // 雙人模式的動態素材與動物升級清單載入流程
-const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_SERVER_HOST = 'https://attentionlessonplan-production.up.railway.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 
 // 預設的動物升級備用圖片清單。未取得素材時，依序切換此清單的圖片。

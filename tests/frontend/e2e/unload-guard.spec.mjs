@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT, DOUBLE, loginAs, recordWrites } from './helpers.mjs';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app/**';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app/**';
 const leaveDialog = (page) => page.getByRole('dialog', { name: '確定要離開嗎？' });
 
 // 瀏覽器要有使用者互動過，才會顯示離開詢問；點一下畫面角落（不會按到按鈕）。

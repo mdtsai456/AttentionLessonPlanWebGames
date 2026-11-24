@@ -9,7 +9,7 @@ export const DEFAULT_ARROW_STYLE = Object.freeze([
     'assets/arrow/箭頭03.png',
 ]);
 
-const ASSET_API_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_API_HOST = 'https://attentionlessonplan-production.up.railway.app';
 // 素材 API 或圖片卡住時最多等 5 秒（同 shared/dat-assets.js），之後改用內建箭頭。
 const ASSET_TIMEOUT_MS = 5000;
 const arrowAssetRequests = new Map();
@@ -50,7 +50,15 @@ export function getArrowAssets(studentId = 'S001') {
             const jsonData = await response.json();
             const files = jsonData?.EFT?.assets?.files;
             const arrowAssets = Array.isArray(files)
-                ? files.filter((file) => typeof file === 'string' && file.trim()).map((file) => file.trim())
+                ? files.flatMap((file) => {
+                    if (typeof file !== 'string' || !file.trim()) return [];
+                    try {
+                        const url = new URL(file.trim(), ASSET_API_HOST);
+                        return ['https:', 'http:'].includes(url.protocol) ? [url.href] : [];
+                    } catch {
+                        return [];
+                    }
+                })
                 : [];
             return arrowAssets.length
                 ? [DEFAULT_ARROW_STYLE[0], ...arrowAssets]

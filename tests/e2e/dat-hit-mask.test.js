@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { startStaticServer, launchBrowser, openGame } from './helpers.js';
 
-const ASSET_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_HOST = 'https://attentionlessonplan-production.up.railway.app';
 
 // 在頁面中：換上指定圖片並等待解碼完成
 async function showImage(page, selector, src) {

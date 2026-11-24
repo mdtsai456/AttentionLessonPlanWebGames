@@ -709,7 +709,7 @@ document.querySelectorAll('[data-move]').forEach((button) => {
 });
 
 // 動態載入學生素材與動物升級清單。
-const ASSET_SERVER_HOST = 'https://attention-lesson-plan-assets.zeabur.app';
+const ASSET_SERVER_HOST = 'https://attentionlessonplan-production.up.railway.app';
 const DEFAULT_ANIMAL_PATH = 'assets/animals/rabbit.png';
 let animalImageGeneration = 0;
 const DEFAULT_ANIMAL_POOL = [

@@ -1,6 +1,6 @@
 """手錶 Xsens DOT 專心判定的轉發端點。
 
-手錶平台 https://xsensdotdata2server.zeabur.app 提供
+Railway 手錶平台提供
 GET /remote/predict/{subject_id}，回傳 {"result": 1 | 0, ...}。
 該平台不提供 CORS 標頭，瀏覽器無法直接呼叫。此後端代為呼叫，前端只存取此後端。
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["attention"])
 
-_DEFAULT_WATCH_API_BASE = "https://xsensdotdata2server.zeabur.app"
+_DEFAULT_WATCH_API_BASE = "https://adhd-xsensdot2server-production.up.railway.app"
 _TIMEOUT_SECONDS = 5
 _CASE_ID_PATTERN = re.compile(r"^([A-Za-z]+)(\d+)$")
 
@@ -51,7 +51,13 @@ def _watch_api_base() -> str:
 
 def fetch_watch_prediction(subject: str) -> dict:
     url = f"{_watch_api_base()}/remote/predict/{urllib.parse.quote(subject)}"
-    with urllib.request.urlopen(url, timeout=_TIMEOUT_SECONDS) as response:
+    request = urllib.request.Request(url)
+    api_key = os.getenv("WATCH_API_KEY")
+    if api_key:
+        if request.type != "https":
+            raise ValueError("WATCH_API_KEY requires an HTTPS endpoint")
+        request.add_unredirected_header("X-API-Key", api_key)
+    with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
         return json.load(response)
 
 
