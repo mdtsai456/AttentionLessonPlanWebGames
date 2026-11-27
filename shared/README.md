@@ -23,7 +23,8 @@
 | `dat-save.js` | 動物追擊令 | 送出一局成績與畫面上的儲存狀態。每筆成績第一次送出時帶 `data.submissionId`（`WebGameApi.uuid()`），重送沿用同一個內容，後端回同一個 `sessionId`、不多寫一列。網路中斷或逾時（結果未確認）不會自己重送，但玩家按重試或離開時會重送同一筆；已送過較高關卡就不再送較低的檢查點（已儲存視為完成，未確認或失敗改重送那一筆）。請求逾時用 `WebGameRuntime.nativeSetTimeout`，確認離開後遊戲暫停時仍會逾時。 |
 | `eft-game-logic.js` | 漂浮泡泡 | 出題、方向判定、`EFT_*` 成績欄位。 |
 | `eft-player.js` | 漂浮泡泡 | 單一玩家的記憶、作答、計時與計分。單人一個，雙人兩個。每關結束留一份成績快照，送檢查點時只算到那一關。 |
-| `eft-assets.js` | 漂浮泡泡 | 向素材平台要 `EFT.assets.files`，並預載箭頭與泡泡。API 或圖片超過 5 秒沒回應就改用本機箭頭，不會卡住開局。 |
+| `eft-assets.js` | 漂浮泡泡 | 向素材平台要 `EFT.assets.files`，並預載箭頭與泡泡。API 或上傳的箭頭超過 5 秒沒回應就改用本機箭頭；本機圖用 `image-wait.js` 等到載完才開局。 |
+| `image-wait.js` | 漂浮泡泡、指令出擊 | `WebGameImageWait.waitFor(sources, { zIndex })` 等圖片全部載完才 resolve，期間蓋一層載入畫面並顯示進度。慢不會中斷，超過 15 秒多顯示「重新載入」「返回選遊戲」；載入失敗自動重試兩次（加 `retry` 參數），仍失敗就顯示錯誤並 reject。計時用 `WebGameRuntime.nativeSetTimeout`。 |
 | `tgame-support.js`、`tgame-support.css` | 勇闖迷宮 | 物品圖預載，以及視窗太窄時擋住遊玩。暫停畫面的「離開」同樣先跳出離開確認，按「繼續遊戲」後維持暫停、按鈕恢復可按。 |
 
 ## API 位址

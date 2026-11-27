@@ -102,7 +102,7 @@ function preloadImage(src) {
     });
 }
 
-// 本機圖只是慢就不擋開局（瀏覽器會繼續載入）；真的載入失敗才 reject。
+// 沒有載入畫面可用時（例如單元測試）的舊做法：本機圖只是慢就不擋，真的載入失敗才 reject。
 async function preloadLocalImage(src) {
     try {
         await preloadImage(src);
@@ -112,30 +112,41 @@ async function preloadLocalImage(src) {
     }
 }
 
-async function preloadArrowAssets(arrowAssets) {
+/**
+ * 決定每個位置用哪張箭頭：素材 API 上傳的圖 5 秒內載得到就用它，否則換成內建箭頭。
+ * 內建箭頭不在這裡等，交給 waitForEftImages 一起等到載完。
+ */
+export async function resolveArrowAssets(studentId) {
+    const arrowAssets = await getArrowAssets(studentId);
     return Promise.all(arrowAssets.map(async (src, index) => {
         const fallback = getArrowPlaceholderPath(index);
-        if (src === fallback) {
-            await preloadLocalImage(src);
-            return src;
-        }
+        if (src === fallback) return src;
         try {
             await preloadImage(src);
             return src;
         } catch {
-            await preloadLocalImage(fallback);
             return fallback;
         }
     }));
 }
 
+/**
+ * 等遊戲要用的圖全部載完。有 shared/image-wait.js 時顯示載入畫面，慢也一直等，
+ * 不會在泡泡、箭頭還沒出現時就開始計時；載入失敗會 reject，畫面上有「重新載入」。
+ * @param {string[] | Promise<string[]>} paths
+ */
+export async function waitForEftImages(paths, { zIndex = 205 } = {}) {
+    const imageWait = globalThis.WebGameImageWait;
+    if (imageWait) {
+        await imageWait.waitFor(paths, { zIndex });
+        return;
+    }
+    await Promise.all((await paths).map((src) => preloadLocalImage(src)));
+}
+
 export async function preloadEftAssets(options = {}) {
-    const arrowAssets = await getArrowAssets(options.studentId);
-    const loadedArrowAssets = await preloadArrowAssets(arrowAssets);
-    const assetPaths = await getEftAssetPaths({ ...options, arrowAssets: loadedArrowAssets });
-    const arrowAssetSet = new Set(loadedArrowAssets);
-    await Promise.all(assetPaths
-        .filter((src) => !arrowAssetSet.has(src))
-        .map((src) => preloadLocalImage(src)));
-    return loadedArrowAssets;
+    const arrowsReady = resolveArrowAssets(options.studentId);
+    const pathsReady = arrowsReady.then((arrowAssets) => getEftAssetPaths({ ...options, arrowAssets }));
+    await waitForEftImages(pathsReady, options);
+    return arrowsReady;
 }
