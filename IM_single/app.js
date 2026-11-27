@@ -248,13 +248,25 @@ init();
 // 啟動與事件
 // -----------------------------------------------------------------------------
 
-/** 預載圖片、讀取題目並綁定操作後，開始第一場遊戲。同一個課次已完成前半時從第 4 關開始。 */
+/**
+ * 圖片全部載完、讀取題目並綁定操作後，開始第一場遊戲。同一個課次已完成前半時從第 4 關開始。
+ * 圖片沒載完不開局：否則倒數開始了，房間和要拿的物品卻還沒出現。
+ */
 async function init() {
-  preloadImages();
+  // 載入期間也要能按「離開」。
+  document.getElementById("leave-btn").addEventListener("click", leaveGame);
+  const imagesReady = preloadImages();
   renderBackpack();
   const startStageReady = (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage("InstructionGame", { mode: "single", slots: [1] }) : Promise.resolve(1));
   const data = await fetchQuestions();
   state.questions = data.questions;
+  try {
+    await imagesReady;
+  } catch (error) {
+    // 載入畫面已改成錯誤訊息與「重新載入」，這裡不開局。
+    console.error(error);
+    return;
+  }
   bindEvents();
   startGame(await startStageReady);
 }
@@ -275,7 +287,6 @@ function bindEvents() {
   });
   // 還沒打完六關就關掉頁面時，先跳瀏覽器的離開詢問。
   window.guardUnload(() => state.playing);
-  document.getElementById("leave-btn").addEventListener("click", leaveGame);
 
   document.addEventListener("keydown", (event) => {
     // 遊戲暫停時（例如確定離開、成績還在送）不收操作，免得存檔期間還能撿東西、過關。
@@ -1220,18 +1231,25 @@ function setPlayerSprite(src) {
   playerImg.src = src;
 }
 
+/** 等遊戲會用到的圖全部載完（顯示載入畫面）；載入失敗時 reject，畫面上有「重新載入」。 */
 function preloadImages() {
-  [
+  const sources = [
     ...Object.values(ROOM_SCENE),
     ...OBJECTS.map(objectSrc),
     "img/item/closedoor.png",
     "img/item/opendoor.png",
     ...PLAYER_IDLE,
     ...PLAYER_WALK,
-  ].forEach((src) => {
+  ];
+  if (window.WebGameImageWait) {
+    // 蓋在場景上、離開鈕（z-index 12）下面，載入時仍按得到離開。
+    return window.WebGameImageWait.waitFor(sources, { zIndex: 11 });
+  }
+  sources.forEach((src) => {
     const image = new Image();
     image.src = src;
   });
+  return Promise.resolve();
 }
 
 function shuffle(list) {

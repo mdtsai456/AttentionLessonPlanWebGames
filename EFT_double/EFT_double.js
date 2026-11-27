@@ -1,5 +1,5 @@
 import { buildEftStats } from '../shared/eft-game-logic.js';
-import { preloadEftAssets } from '../shared/eft-assets.js';
+import { getEftAssetPaths, resolveArrowAssets, waitForEftImages } from '../shared/eft-assets.js';
 import { createEftPlayer } from '../shared/eft-player.js';
 
 // 每關 60 秒，共 6 關。關卡時間內持續出題。單題 10 秒未作答時，計為錯誤並換題。
@@ -218,13 +218,20 @@ document.getElementById('mid-lobby').addEventListener('click', async () => {
     }
 });
 
-// 預載素材後，同時開始兩位玩家的第一題。查這個課次的成績和載入素材同時進行；
+// 兩位玩家的圖全部載完後，才同時開始第一題（載入畫面只顯示一個）。查這個課次的成績和載入素材同時進行；
 // 兩位都只完成前半才從第 4 關開始，查不到或超過 5 秒都從第 1 關開始。
-Promise.all([
-    Promise.all(players.map((player, playerIndex) => preloadEftAssets({
-        studentId: getPlayerIdentity(playerIndex).caseId,
+const arrowsReady = Promise.all(players.map((player, playerIndex) => (
+    resolveArrowAssets(getPlayerIdentity(playerIndex).caseId)
+)));
+const imagesReady = waitForEftImages(arrowsReady.then(async (arrowAssetsByPlayer) => {
+    const pathsByPlayer = await Promise.all(arrowAssetsByPlayer.map((arrowAssets, playerIndex) => getEftAssetPaths({
+        arrowAssets,
         backgroundAssets: playerIndex === 0 ? ['assets/background.png'] : [],
-    }))),
+    })));
+    return pathsByPlayer.flat();
+}));
+Promise.all([
+    imagesReady.then(() => arrowsReady),
     (window.WebGameSecondHalf ? window.WebGameSecondHalf.startStage('EFT', { mode: 'double', slots: [1, 2] }) : Promise.resolve(1)),
 ]).then(([arrowAssetsByPlayer, startStage]) => {
     players.forEach((player, playerIndex) => {
